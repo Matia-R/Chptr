@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isProtectedRoute } from './protected-routes'
 
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -27,8 +28,23 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // refreshing the auth token
-    await supabase.auth.getUser()
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    console.log('user', user)
+    console.log('here')
+
+    if (
+        !user &&
+        isProtectedRoute(request.nextUrl.pathname)
+    ) {
+        console.log('redirecting to login page')
+        // no user, redirect to login page
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
+    }
 
     return supabaseResponse
 }

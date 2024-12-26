@@ -8,5 +8,17 @@ export default async function Account() {
         data: { user },
     } = await supabase.auth.getUser()
 
-    return <AccountForm user={user} />
+    return (
+        <div>
+            <h1>Account: {user?.email}</h1>
+            <AccountForm user={user} />
+            <div>
+                <form action="/auth/signout" method="post">
+                    <button className="button block" type="submit">
+                        Sign out
+                    </button>
+                </form>
+            </div>
+        </div>
+    )
 }

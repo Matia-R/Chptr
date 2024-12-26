@@ -16,6 +16,7 @@ import {
     FormMessage,
 } from "../_components/form"
 import { Input } from "../_components/input"
+import { PasswordInput } from "../_components/password-input"
 
 const formSchema = z.object({
     email: z
@@ -91,7 +92,7 @@ export default function LoginPage() {
                                     Password
                                 </FormLabel>
                                 <FormControl>
-                                    <Input type="password" placeholder="Password" {...field} />
+                                    <PasswordInput placeholder="Password" {...field} />
                                 </FormControl>
                                 <FormDescription className="text-sm text-gray-500">
                                     Your password.

@@ -1,134 +1,130 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
-import { createClient } from '../../utils/supabase/client'
-import { type User } from '@supabase/supabase-js'
 
-// ...
+import { updateProfile } from './actions'
+import { Button } from '../_components/button'
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from 'zod'
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "../_components/form"
+import { Input } from "../_components/input"
+import { PasswordInput } from "../_components/password-input"
+import { User } from '@supabase/supabase-js'
 
-export default function AccountForm({ user }: { user: User | null }) {
-    const supabase = createClient()
-    const [loading, setLoading] = useState(true)
-    const [fullname, setFullname] = useState<string | null>(null)
-    const [username, setUsername] = useState<string | null>(null)
-    const [website, setWebsite] = useState<string | null>(null)
-    const [avatar_url, setAvatarUrl] = useState<string | null>(null)
+const formSchema = z.object({
+    email: z
+        .string()
+        .min(2, { message: "Email must be at least 2 characters" })
+        .max(50)
+        .email({ message: "Must be a valid email address" }),
+    password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+    username: z.string().min(2, { message: "Username must be at least 2 characters" }).max(50),
+})
 
-    const getProfile = useCallback(async () => {
+interface AccountFormProps {
+    user: User | null
+}
+
+export default function AccountForm({ user }: AccountFormProps) {
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            email: "",
+            password: "",
+            username: "",
+        },
+    })
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            setLoading(true)
+            const formData = new FormData()
+            formData.append('email', values.email)
+            formData.append('password', values.password)
+            formData.append('username', values.username)
 
-            const { data, error, status } = await supabase
-                .from('profiles')
-                .select(`full_name, username, website, avatar_url`)
-                .eq('id', user?.id)
-                .single()
-
-            if (error && status !== 406) {
-                console.log(error)
-                throw error
-            }
-
-            if (data) {
-                setFullname(data.full_name as unknown as string)
-                setUsername(data.username as unknown as string)
-                setWebsite(data.website as unknown as string)
-                setAvatarUrl(data.avatar_url as unknown as string)
-            }
+            await updateProfile(formData)
+            console.log("Profile updated successfully")
         } catch (error) {
-            alert('Error loading user data!')
-        } finally {
-            setLoading(false)
-        }
-    }, [user, supabase])
-
-    useEffect(() => {
-        void getProfile()
-    }, [user, getProfile])
-
-    async function updateProfile({
-        username,
-        website,
-        avatar_url,
-    }: {
-        username: string | null
-        fullname: string | null
-        website: string | null
-        avatar_url: string | null
-    }) {
-        try {
-            setLoading(true)
-
-            const { error } = await supabase.from('profiles').upsert({
-                id: user?.id as unknown as string,
-                full_name: fullname,
-                username,
-                website,
-                avatar_url,
-                updated_at: new Date().toISOString(),
-            })
-            if (error) throw error
-            alert('Profile updated!')
-        } catch (error) {
-            alert('Error updating the data!')
-        } finally {
-            setLoading(false)
+            console.error("Profile update failed:", error)
         }
     }
 
     return (
-        <div className="form-widget">
-
-            {/* ... */}
-
-            <div>
-                <label htmlFor="email">Email</label>
-                <input id="email" type="text" value={user?.email} disabled />
-            </div>
-            <div>
-                <label htmlFor="fullName">Full Name</label>
-                <input
-                    id="fullName"
-                    type="text"
-                    value={fullname ?? ''}
-                    onChange={(e) => setFullname(e.target.value)}
-                />
-            </div>
-            <div>
-                <label htmlFor="username">Username</label>
-                <input
-                    id="username"
-                    type="text"
-                    value={username ?? ''}
-                    onChange={(e) => setUsername(e.target.value)}
-                />
-            </div>
-            <div>
-                <label htmlFor="website">Website</label>
-                <input
-                    id="website"
-                    type="url"
-                    value={website ?? ''}
-                    onChange={(e) => setWebsite(e.target.value)}
-                />
-            </div>
-
-            <div>
-                <button
-                    className="button primary block"
-                    onClick={() => updateProfile({ fullname, username, website, avatar_url })}
-                    disabled={loading}
+        <div className="flex flex-col items-center justify-center min-h-screen px-4">
+            <Form {...form}>
+                <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-6 w-full max-w-sm"
                 >
-                    {loading ? 'Loading ...' : 'Update'}
-                </button>
-            </div>
-
-            <div>
-                <form action="/auth/signout" method="post">
-                    <button className="button block" type="submit">
-                        Sign out
-                    </button>
+                    <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="block text-sm font-medium">
+                                    Email
+                                </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Email" {...field} />
+                                </FormControl>
+                                <FormDescription className="text-sm text-gray-500">
+                                    Your email address.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="username"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="block text-sm font-medium">
+                                    Username
+                                </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Username" {...field} />
+                                </FormControl>
+                                <FormDescription className="text-sm text-gray-500">
+                                    Your public display name.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="block text-sm font-medium">
+                                    Password
+                                </FormLabel>
+                                <FormControl>
+                                    <PasswordInput placeholder="Password" {...field} />
+                                </FormControl>
+                                <FormDescription className="text-sm text-gray-500">
+                                    Your new password.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <Button
+                        type="submit"
+                        className="w-full py-2 text-sm font-medium"
+                    >
+                        Update Profile
+                    </Button>
                 </form>
-            </div>
+            </Form>
         </div>
     )
 }
