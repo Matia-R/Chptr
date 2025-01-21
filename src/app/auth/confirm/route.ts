@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
             redirectTo.searchParams.delete('next')
             return NextResponse.redirect(redirectTo)
         }
+
+        // TODO: Handle auth error
     }
 
     // return the user to an error page with some instructions

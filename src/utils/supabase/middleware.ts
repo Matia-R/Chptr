@@ -32,14 +32,10 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    console.log('user', user)
-    console.log('here')
-
     if (
         !user &&
         isProtectedRoute(request.nextUrl.pathname)
     ) {
-        console.log('redirecting to login page')
         // no user, redirect to login page
         const url = request.nextUrl.clone()
         url.pathname = '/login'

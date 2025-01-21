@@ -43,20 +43,14 @@ export default function SignUpPage() {
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
-        // Do something with the form values.
-        // ✅ This will be type-safe and validated.
-        console.log(values)
 
         try {
-            // Convert plain object to FormData
             const formData = new FormData();
             formData.append('email', values.email);
             formData.append('password', values.password);
 
-            // Call the login server action with FormData
             await signup(formData);
 
-            console.log("Signup successful");
         } catch (error) {
             console.error("Signup failed:", error);
         }

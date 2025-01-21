@@ -10,10 +10,12 @@ const PasswordInput = React.forwardRef<
     Omit<React.ComponentProps<typeof Input>, "type">
 >(({ className, ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false)
+    const inputId = React.useId()
 
     return (
         <div className="relative">
             <Input
+                id={inputId}
                 type={showPassword ? "text" : "password"}
                 className={cn("pr-10", className)}
                 ref={ref}
@@ -21,6 +23,8 @@ const PasswordInput = React.forwardRef<
             />
             <button
                 type="button"
+                aria-controls={inputId}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
             >

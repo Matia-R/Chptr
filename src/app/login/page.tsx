@@ -38,20 +38,15 @@ export default function LoginPage() {
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
-        // Do something with the form values.
-        // ✅ This will be type-safe and validated.
-        console.log(values)
 
         try {
-            // Convert plain object to FormData
+
             const formData = new FormData();
             formData.append('email', values.email);
             formData.append('password', values.password);
 
-            // Call the login server action with FormData
             await login(formData);
 
-            console.log("Login successful");
         } catch (error) {
             console.error("Login failed:", error);
         }
