@@ -17,21 +17,9 @@ async function saveToStorage(jsonBlocks: Block[]) {
     localStorage.setItem("editorContent", JSON.stringify(jsonBlocks));
 }
 
-async function loadFromStorage() {
-    // Gets the previously stored editor contents.
-    const storageString = localStorage.getItem("editorContent");
-    return storageString
-        ? (JSON.parse(storageString) as PartialBlock[])
-        : undefined;
-}
-
-export default function Editor() {
-
+export default function Editor({ initialContent: propInitialContent }: { initialContent: PartialBlock[] }) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
-    const [initialContent, setInitialContent] = useState<
-        PartialBlock[] | undefined | "loading"
-    >("loading");
 
     useEffect(() => {
         if (theme === "system") {
@@ -54,27 +42,12 @@ export default function Editor() {
         } else {
             setCurrentTheme(theme as Theme);
         }
-        // Load initial content
-        loadFromStorage().then(content => {
-            setInitialContent(content);
-        }).catch(error => {
-            console.error("Failed to load editor content:", error);
-            setInitialContent(undefined);
-        });
-
     }, [theme]);
 
     // Creates a new editor instance.
     const editor = useMemo(() => {
-        if (initialContent === "loading") {
-            return undefined;
-        }
-        return BlockNoteEditor.create({ initialContent });
-    }, [initialContent]);
-
-    if (editor === undefined) {
-        return "Loading content...";
-    }
+        return BlockNoteEditor.create({ initialContent: propInitialContent });
+    }, [propInitialContent]);
 
     // Renders the editor instance using a React component.
     return (
