@@ -2,33 +2,54 @@
 
 import { useParams } from "next/navigation"
 import { Editor } from "~/app/_components/dynamic-editor"
-import { type Block } from "@blocknote/core"
+// import { type Block } from "@blocknote/core"
+import { api } from "~/trpc/react"
 
 export default function DocumentPage() {
     const params = useParams()
     const documentId = params.documentId as string
 
-    // Create initial content with document ID as heading
-    const initialContent: Block[] = [
-        {
-            id: "1",
-            type: "heading",
-            props: {
-                textColor: "default",
-                backgroundColor: "default",
-                textAlignment: "left",
-                level: 1
-            },
-            content: [
-                {
-                    type: "text",
-                    text: `Document: ${documentId}`,
-                    styles: {}
-                }
-            ],
-            children: []
-        }
-    ]
+    const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
+
+    if (isLoading) {
+        return <div>Loading...</div>
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen p-4 md:p-8 lg:p-12">
+                <div className="mx-auto max-w-5xl">
+                    <div className="rounded-lg bg-red-50 p-4">
+                        <h3 className="text-lg font-medium text-red-800">Error loading document</h3>
+                        <p className="mt-2 text-red-700">{error.message}</p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (!documentData?.document) {
+        return <div>Document not found</div>
+    }
+
+    const initialContent = documentData.document.content ?? [{
+        id: "1",
+        type: "heading",
+        props: {
+            textColor: "default",
+            backgroundColor: "default",
+            textAlignment: "left",
+            level: 1
+        },
+        content: [
+            {
+                type: "text",
+                text: "Untitled",
+                styles: {}
+            }
+        ],
+        children: []
+    }]
 
     return (
         <div className="min-h-screen p-4 md:p-8 lg:p-12">
