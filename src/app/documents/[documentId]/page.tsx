@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation"
 import { Editor } from "~/app/_components/dynamic-editor"
-// import { type Block } from "@blocknote/core"
 import { api } from "~/trpc/react"
 
 export default function DocumentPage() {
@@ -28,33 +27,26 @@ export default function DocumentPage() {
         )
     }
 
-    if (!documentData?.document) {
-        return <div>Document not found</div>
+    if (!documentData?.document?.content) {
+        return (
+            <div className="min-h-screen p-4 md:p-8 lg:p-12">
+                <div className="mx-auto max-w-5xl">
+                    <div className="rounded-lg bg-red-50 p-4">
+                        <h3 className="text-lg font-medium text-red-800">Error loading document</h3>
+                        <p className="mt-2 text-red-700">Document content not found</p>
+                    </div>
+                </div>
+            </div>
+        )
     }
-
-    const initialContent = documentData.document.content ?? [{
-        id: "1",
-        type: "heading",
-        props: {
-            textColor: "default",
-            backgroundColor: "default",
-            textAlignment: "left",
-            level: 1
-        },
-        content: [
-            {
-                type: "text",
-                text: "Untitled",
-                styles: {}
-            }
-        ],
-        children: []
-    }]
 
     return (
         <div className="min-h-screen p-4 md:p-8 lg:p-12">
             <div className="mx-auto max-w-5xl h-[calc(100vh-8rem)]">
-                <Editor initialContent={initialContent} />
+                <Editor
+                    initialContent={documentData.document.content}
+                    documentId={documentId}
+                />
             </div>
         </div>
     )
