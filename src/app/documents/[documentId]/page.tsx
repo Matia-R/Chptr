@@ -3,12 +3,31 @@
 import { useParams } from "next/navigation"
 import { Editor } from "~/app/_components/dynamic-editor"
 import { api } from "~/trpc/react"
+import { useEffect, useMemo } from "react"
+import * as Y from "yjs";
+import { WebrtcProvider } from "y-webrtc";
 
 export default function DocumentPage() {
     const params = useParams()
     const documentId = params.documentId as string
 
+    // Create YJS doc and provider for each document instance
+    const ydoc = useMemo(() => new Y.Doc(), []);
+    const provider = useMemo(
+        () => new WebrtcProvider(`document-${documentId}`, ydoc),
+        [documentId, ydoc]
+    );
+    const fragment = useMemo(() => ydoc.getXmlFragment("document-store"), [ydoc]);
+
     const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
+
+    // Cleanup Y.js resources
+    useEffect(() => {
+        return () => {
+            provider.destroy();
+            ydoc.destroy();
+        };
+    }, [provider, ydoc]);
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -46,6 +65,8 @@ export default function DocumentPage() {
                 <Editor
                     initialContent={documentData.document.content}
                     documentId={documentId}
+                    provider={provider}
+                    fragment={fragment}
                 />
             </div>
         </div>
