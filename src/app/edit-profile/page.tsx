@@ -42,6 +42,7 @@ interface EditProfilePageProps {
     };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function EditProfilePage({ user, profile }: EditProfilePageProps) {
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
