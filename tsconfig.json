@@ -20,7 +20,7 @@
     ],
     "noEmit": true,
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "jsx": "preserve",
     "plugins": [
       {
