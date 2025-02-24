@@ -16,7 +16,7 @@ import {
 } from "../_components/form"
 import { Input } from "../_components/input"
 import { Textarea } from "../_components/textarea"
-import { type User } from '@supabase/supabase-js'
+// import { type User } from '@supabase/supabase-js'
 
 const formSchema = z.object({
     username: z
@@ -35,15 +35,14 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 interface EditProfilePageProps {
-    user?: User | null;
+    // user?: User | null;
     profile?: {
         username?: string;
         bio?: string;
     };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function EditProfilePage({ user, profile }: EditProfilePageProps) {
+export default function EditProfilePage({ profile }: EditProfilePageProps) {
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
