@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams } from "next/navigation"
-import { Editor } from "~/app/_components/dynamic-editor"
+import { Editor } from "~/app/_components/editor/dynamic-editor"
 import { api } from "~/trpc/react"
 
 export default function DocumentPage() {

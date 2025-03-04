@@ -2,11 +2,12 @@
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { ThemeToggle } from "./theme-toggle";
+import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { type Block, BlockNoteEditor, type PartialBlock } from "@blocknote/core";
+import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
+import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
 
 // Define a type for the theme
@@ -31,7 +32,23 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const saveDocument = api.document.saveDocument.useMutation();
+    // const atActionRoutes = {
+    //     'summarize': api.atActions.summarize.useMutation()
+    // }
     const timeoutRef = useRef<NodeJS.Timeout>();
+
+    const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
+        type AtActionKey = keyof typeof api.atActions
+        const actions = Object.keys(api.atActions) as AtActionKey[];
+
+        return actions.map((action) => ({
+            title: action,
+            onItemClick: () => {
+                const route = api.atActions[action as AtActionKey].useMutation();
+                void route.mutate(content);
+            },
+        }));
+    };
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -71,6 +88,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         }
     }, [theme]);
 
+    // TODO: Change this to the useBlockNoteEdtitor hook
     const editor = useMemo(() => {
         return BlockNoteEditor.create({ initialContent: propInitialContent });
     }, [propInitialContent]);
@@ -88,8 +106,16 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 shadCNComponents={{}}
                 theme={currentTheme as 'light' | 'dark'}
                 onChange={handleChange}
-            />
+            >
+                <SuggestionMenuController
+                    triggerCharacter={"@"}
+                    getItems={async (query) =>
+                        // Gets the mentions menu items
+                        filterSuggestionItems(getAtActionMenuItems(editor.document.toString()), query)
+                    }
+                />
+            </BlockNoteView>
             <ThemeToggle />
-        </div>
+        </div >
     );
 }
