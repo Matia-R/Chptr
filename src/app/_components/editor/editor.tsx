@@ -9,6 +9,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
+import { LangChainAdapter } from "ai";
 
 // Define a type for the theme
 type Theme = 'light' | 'dark' | 'system';
@@ -32,20 +33,40 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const saveDocument = api.document.saveDocument.useMutation();
-    // const atActionRoutes = {
-    //     'summarize': api.atActions.summarize.useMutation()
-    // }
+    const summarize = api.atActions.summarize.useMutation();
+    const [streamContent, setStreamContent] = useState("");
     const timeoutRef = useRef<NodeJS.Timeout>();
 
+    useEffect(() => {
+        if (streamContent) {
+            console.log('Current content:', streamContent);
+        }
+    }, [streamContent]);
+
     const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
-        type AtActionKey = keyof typeof api.atActions
-        const actions = Object.keys(api.atActions) as AtActionKey[];
+        const actions = ['summarize']
 
         return actions.map((action) => ({
             title: action,
-            onItemClick: () => {
-                const route = api.atActions[action as AtActionKey].useMutation();
-                void route.mutate(content);
+            onItemClick: async () => {
+                setStreamContent(""); // Reset content
+                const result = await summarize.mutateAsync(content);
+
+                const stream = new ReadableStream({
+                    async start(controller) {
+                        for await (const text of result) {
+                            if (text?.type === "finish") {
+                                controller.close();
+                                break;
+                            } else if (text?.type === "text-delta") {
+                                setStreamContent(prev => prev + text.textDelta);
+                                controller.enqueue(text.textDelta);
+                            }
+                        }
+                    },
+                });
+
+                console.log('Final content:', streamContent);
             },
         }));
     };
@@ -111,7 +132,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     triggerCharacter={"@"}
                     getItems={async (query) =>
                         // Gets the mentions menu items
-                        filterSuggestionItems(getAtActionMenuItems(editor.document.toString()), query)
+                        filterSuggestionItems(getAtActionMenuItems(await editor.blocksToMarkdownLossy(editor.document)), query)
                     }
                 />
             </BlockNoteView>
