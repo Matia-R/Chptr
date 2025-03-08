@@ -60,6 +60,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                                 break;
                             } else if (text?.type === "text-delta") {
                                 setStreamContent(prev => prev + text.textDelta);
+                                editor.insertInlineContent([{
+                                    type: "text" as const,
+                                    text: text.textDelta,
+                                    styles: {}
+                                }]);
                                 controller.enqueue(text.textDelta);
                             }
                         }
