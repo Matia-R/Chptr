@@ -9,7 +9,7 @@ export const atActionsRouter = createTRPCRouter({
         .mutation(async function* ({ input }) {
             const result = streamText({
                 model: google("models/gemini-2.0-flash-exp"),
-                prompt: `summarize this text: ${input}`
+                prompt: `summarize this text in markdown: ${input}`
             });
 
             for await (const text of result.fullStream) {

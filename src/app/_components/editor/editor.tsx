@@ -60,11 +60,14 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                                 break;
                             } else if (text?.type === "text-delta") {
                                 setStreamContent(prev => prev + text.textDelta);
-                                editor.insertInlineContent([{
-                                    type: "text" as const,
-                                    text: text.textDelta,
-                                    styles: {}
-                                }]);
+                                const blocks = await editor.tryParseMarkdownToBlocks(text.textDelta);
+                                if (blocks.length > 0) {
+                                    const lastBlock = editor.document[editor.document.length - 1];
+                                    editor.insertBlocks(
+                                        blocks,
+                                        lastBlock ? lastBlock.id : "start"
+                                    );
+                                }
                                 controller.enqueue(text.textDelta);
                             }
                         }
