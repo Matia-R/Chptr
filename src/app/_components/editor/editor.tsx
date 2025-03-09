@@ -55,12 +55,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const [streamContent, setStreamContent] = useState("");
     const timeoutRef = useRef<NodeJS.Timeout>();
     const markdownBufferRef = useRef(""); // Stores accumulated markdown chunks
+    const insertedBlockIdsRef = useRef<string[]>([]); // Tracks intermediate block IDs
 
-    useEffect(() => {
-        if (streamContent) {
-            console.log('Current content:', streamContent);
-        }
-    }, [streamContent]);
+    const hasEnoughWords = (text: string) => {
+        return text.trim().split(/\s+/).length >= 3; // Enforce minimum word count
+    };
 
     const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
         const actions = ["summarize"];
@@ -70,35 +69,42 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             onItemClick: async () => {
                 setStreamContent(""); // Reset streaming content
                 markdownBufferRef.current = ""; // Clear markdown buffer
+                insertedBlockIdsRef.current = []; // Reset inserted block tracking
+
                 const result = await summarize.mutateAsync(content);
 
                 const stream = new ReadableStream({
                     async start(controller) {
                         for await (const text of result) {
+
+                            console.log(text.type)
+
                             if (text?.type === "finish") {
-                                // Final parsing attempt before closing
-                                if (markdownBufferRef.current) {
-                                    const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-                                    if (finalBlocks.length > 0) {
-                                        const lastBlock = editor.document[editor.document.length - 1];
-                                        editor.insertBlocks(finalBlocks, lastBlock ? lastBlock.id : "start");
-                                    }
-                                    markdownBufferRef.current = "";
-                                }
+
+                                console.log(streamContent)
+
+                                setTimeout(() => {
+                                    void replaceFinalBlocks();
+                                }, 1000); // Adjust delay if needed
+
                                 controller.close();
                                 break;
                             } else if (text?.type === "text-delta") {
                                 markdownBufferRef.current += text.textDelta;
                                 setStreamContent((prev) => prev + text.textDelta);
 
-                                // Only parse if markdown is complete
-                                if (isCompleteBlock(markdownBufferRef.current) && isMarkdownComplete(markdownBufferRef.current)) {
+                                console.log(streamContent)
+
+                                if (hasEnoughWords(markdownBufferRef.current)) {
                                     const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                     if (blocks.length > 0) {
                                         const lastBlock = editor.document[editor.document.length - 1];
-                                        editor.insertBlocks(blocks, lastBlock ? lastBlock.id : "start");
+                                        const insertedBlocks = editor.insertBlocks(blocks, lastBlock ? lastBlock.id : "start");
 
-                                        // Remove successfully parsed markdown from buffer
+                                        // Track inserted blocks so they can be replaced later
+                                        insertedBlockIdsRef.current.push(...insertedBlocks.map((b) => b.id));
+
+                                        // Reset buffer after inserting
                                         markdownBufferRef.current = "";
                                     }
                                 }
@@ -109,9 +115,22 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     },
                 });
 
-                console.log("Final content:", streamContent);
+                // console.log("Final content:", streamContent);
             },
         }));
+    };
+
+    const replaceFinalBlocks = async () => {
+        if (!streamContent) return;
+
+        const finalBlocks = await editor.tryParseMarkdownToBlocks(streamContent);
+        if (finalBlocks.length > 0) {
+            console.log('here')
+            if (insertedBlockIdsRef.current.length > 0) {
+                editor.removeBlocks(insertedBlockIdsRef.current);
+            }
+            editor.insertBlocks(finalBlocks, editor.document[editor.document.length - 1]?.id ?? '');
+        }
     };
 
     const debouncedSave = useCallback((content: Block[]) => {
