@@ -9,7 +9,10 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
-import { LangChainAdapter } from "ai";
+// import { LangChainAdapter } from "ai";
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+
 
 // Define a type for the theme
 type Theme = 'light' | 'dark' | 'system';
@@ -29,6 +32,21 @@ interface EditorProps {
     documentId: string;
 }
 
+// Checks if the markdown text represents a complete thought
+const isCompleteBlock = (text: string) => {
+    return /[\.\!\?\n]\s*$/.test(text); // Ends with punctuation or newline
+};
+
+// Function to check if markdown is complete
+const isMarkdownComplete = (markdown: string) => {
+    try {
+        unified().use(remarkParse).parse(markdown);
+        return true; // No errors = complete markdown
+    } catch (error) {
+        return false; // Parsing failed = incomplete markdown
+    }
+};
+
 export default function Editor({ initialContent: propInitialContent, documentId }: EditorProps) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
@@ -36,6 +54,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const summarize = api.atActions.summarize.useMutation();
     const [streamContent, setStreamContent] = useState("");
     const timeoutRef = useRef<NodeJS.Timeout>();
+    const markdownBufferRef = useRef(""); // Stores accumulated markdown chunks
 
     useEffect(() => {
         if (streamContent) {
@@ -44,37 +63,53 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     }, [streamContent]);
 
     const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
-        const actions = ['summarize']
+        const actions = ["summarize"];
 
         return actions.map((action) => ({
             title: action,
             onItemClick: async () => {
-                setStreamContent(""); // Reset content
+                setStreamContent(""); // Reset streaming content
+                markdownBufferRef.current = ""; // Clear markdown buffer
                 const result = await summarize.mutateAsync(content);
 
                 const stream = new ReadableStream({
                     async start(controller) {
                         for await (const text of result) {
                             if (text?.type === "finish") {
+                                // Final parsing attempt before closing
+                                if (markdownBufferRef.current) {
+                                    const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                    if (finalBlocks.length > 0) {
+                                        const lastBlock = editor.document[editor.document.length - 1];
+                                        editor.insertBlocks(finalBlocks, lastBlock ? lastBlock.id : "start");
+                                    }
+                                    markdownBufferRef.current = "";
+                                }
                                 controller.close();
                                 break;
                             } else if (text?.type === "text-delta") {
-                                setStreamContent(prev => prev + text.textDelta);
-                                const blocks = await editor.tryParseMarkdownToBlocks(text.textDelta);
-                                if (blocks.length > 0) {
-                                    const lastBlock = editor.document[editor.document.length - 1];
-                                    editor.insertBlocks(
-                                        blocks,
-                                        lastBlock ? lastBlock.id : "start"
-                                    );
+                                markdownBufferRef.current += text.textDelta;
+                                setStreamContent((prev) => prev + text.textDelta);
+
+                                // Only parse if markdown is complete
+                                if (isCompleteBlock(markdownBufferRef.current) && isMarkdownComplete(markdownBufferRef.current)) {
+                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                    if (blocks.length > 0) {
+                                        const lastBlock = editor.document[editor.document.length - 1];
+                                        editor.insertBlocks(blocks, lastBlock ? lastBlock.id : "start");
+
+                                        // Remove successfully parsed markdown from buffer
+                                        markdownBufferRef.current = "";
+                                    }
                                 }
+
                                 controller.enqueue(text.textDelta);
                             }
                         }
                     },
                 });
 
-                console.log('Final content:', streamContent);
+                console.log("Final content:", streamContent);
             },
         }));
     };
