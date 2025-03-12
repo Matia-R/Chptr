@@ -76,46 +76,33 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 const stream = new ReadableStream({
                     async start(controller) {
                         for await (const text of result) {
+                            controller.enqueue(text);
+                            setStreamContent(prev => prev + text);
 
-                            console.log(text.type)
+                            // Accumulate markdown in buffer
+                            markdownBufferRef.current += text;
 
-                            if (text?.type === "finish") {
+                            // Try to parse accumulated markdown into blocks
+                            if (isMarkdownComplete(markdownBufferRef.current) && isCompleteBlock(markdownBufferRef.current)) {
+                                const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                if (blocks.length > 0) {
+                                    // Insert new blocks after the last block
+                                    const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
+                                    editor.insertBlocks(blocks, insertAfterBlockId);
 
-                                console.log(streamContent)
+                                    // Track inserted block IDs for potential replacement later
+                                    insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
 
-                                setTimeout(() => {
-                                    void replaceFinalBlocks();
-                                }, 1000); // Adjust delay if needed
-
-                                controller.close();
-                                break;
-                            } else if (text?.type === "text-delta") {
-                                markdownBufferRef.current += text.textDelta;
-                                setStreamContent((prev) => prev + text.textDelta);
-
-                                console.log(streamContent)
-
-                                if (hasEnoughWords(markdownBufferRef.current)) {
-                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-                                    if (blocks.length > 0) {
-                                        const lastBlock = editor.document[editor.document.length - 1];
-                                        const insertedBlocks = editor.insertBlocks(blocks, lastBlock ? lastBlock.id : "start");
-
-                                        // Track inserted blocks so they can be replaced later
-                                        insertedBlockIdsRef.current.push(...insertedBlocks.map((b) => b.id));
-
-                                        // Reset buffer after inserting
-                                        markdownBufferRef.current = "";
-                                    }
+                                    // Clear the markdown buffer after successful insertion
+                                    markdownBufferRef.current = "";
                                 }
-
-                                controller.enqueue(text.textDelta);
                             }
+
                         }
                     },
                 });
 
-                // console.log("Final content:", streamContent);
+                console.log("Final content:", streamContent);
             },
         }));
     };

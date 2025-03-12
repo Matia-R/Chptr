@@ -1,16 +1,20 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { z } from "zod"
-import { streamText } from "ai"
+import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
 
 export const atActionsRouter = createTRPCRouter({
     summarize: publicProcedure
         .input(z.string())
         .mutation(async function* ({ input }) {
-            const result = streamText({
-                model: google("models/gemini-2.0-flash-exp"),
+            const { textStream } = streamText({
+                model: google("models/gemini-1.5-flash"),
                 prompt: `create a markdown table for the following: ${input}`,
                 experimental_continueSteps: true,
+                experimental_transform: smoothStream({
+                    delayInMs: 20, // optional: defaults to 10ms
+                    chunking: 'line', // optional: defaults to 'word'
+                }),
                 onFinish({ finishReason }) {
                     // your own logic, e.g. for saving the chat history or recording usage
 
@@ -18,7 +22,8 @@ export const atActionsRouter = createTRPCRouter({
                 },
             });
 
-            for await (const text of result.fullStream) {
+            for await (const text of textStream) {
+                console.log(text)
                 yield text;
             }
 
