@@ -9,9 +9,6 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
-// import { LangChainAdapter } from "ai";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
 
 
 // Define a type for the theme
@@ -32,21 +29,6 @@ interface EditorProps {
     documentId: string;
 }
 
-// Checks if the markdown text represents a complete thought
-const isCompleteBlock = (text: string) => {
-    return /[\.\!\?\n]\s*$/.test(text); // Ends with punctuation or newline
-};
-
-// Function to check if markdown is complete
-const isMarkdownComplete = (markdown: string) => {
-    try {
-        unified().use(remarkParse).parse(markdown);
-        return true; // No errors = complete markdown
-    } catch (error) {
-        return false; // Parsing failed = incomplete markdown
-    }
-};
-
 export default function Editor({ initialContent: propInitialContent, documentId }: EditorProps) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
@@ -56,10 +38,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const timeoutRef = useRef<NodeJS.Timeout>();
     const markdownBufferRef = useRef(""); // Stores accumulated markdown chunks
     const insertedBlockIdsRef = useRef<string[]>([]); // Tracks intermediate block IDs
-
-    const hasEnoughWords = (text: string) => {
-        return text.trim().split(/\s+/).length >= 3; // Enforce minimum word count
-    };
 
     const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
         const actions = ["summarize"];
@@ -75,15 +53,15 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                 const stream = new ReadableStream({
                     async start(controller) {
-                        for await (const text of result) {
-                            controller.enqueue(text);
-                            setStreamContent(prev => prev + text);
+                        try {
+                            for await (const text of result) {
+                                controller.enqueue(text);
+                                setStreamContent(prev => prev + text);
 
-                            // Accumulate markdown in buffer
-                            markdownBufferRef.current += text;
+                                // Accumulate markdown in buffer
+                                markdownBufferRef.current += text;
 
-                            // Try to parse accumulated markdown into blocks
-                            if (isMarkdownComplete(markdownBufferRef.current) && isCompleteBlock(markdownBufferRef.current)) {
+                                // Try to parse accumulated markdown into blocks
                                 const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                 if (blocks.length > 0) {
                                     // Insert new blocks after the last block
@@ -98,6 +76,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                                 }
                             }
 
+                            // Stream is complete, call replaceFinalBlocks
+                            await replaceFinalBlocks();
+
+                        } catch (error) {
+                            console.error("Error processing stream:", error);
                         }
                     },
                 });

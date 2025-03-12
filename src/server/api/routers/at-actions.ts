@@ -9,7 +9,7 @@ export const atActionsRouter = createTRPCRouter({
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
                 model: google("models/gemini-1.5-flash"),
-                prompt: `create a markdown table for the following: ${input}`,
+                prompt: `summarize this text in markdown with thorough points. Use a variety of elements including a small table: ${input}`,
                 experimental_continueSteps: true,
                 experimental_transform: smoothStream({
                     delayInMs: 20, // optional: defaults to 10ms
