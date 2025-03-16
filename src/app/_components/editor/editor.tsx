@@ -48,6 +48,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 setStreamContent(""); // Reset streaming content
                 markdownBufferRef.current = ""; // Clear markdown buffer
                 insertedBlockIdsRef.current = []; // Reset inserted block tracking
+                let isInCodeBlock = false;
 
                 const result = await summarize.mutateAsync(content);
 
@@ -55,32 +56,65 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     async start(controller) {
                         try {
                             for await (const text of result) {
+
                                 controller.enqueue(text);
                                 setStreamContent(prev => prev + text);
 
-                                // Accumulate markdown in buffer
-                                markdownBufferRef.current += text;
+                                if (text.includes('<table-tag>')) {
+                                    markdownBufferRef.current += text.replace('<table-tag>', '');
+                                    continue;
+                                }
 
-                                // Try to parse accumulated markdown into blocks
-                                const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-                                if (blocks.length > 0) {
-                                    // Insert new blocks after the last block
-                                    const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
-                                    editor.insertBlocks(blocks, insertAfterBlockId);
+                                // Count occurrences of code block markers in the current text chunk
+                                const codeBlockMarkerCount = (text.match(/```/g) ?? []).length;
 
-                                    // Track inserted block IDs for potential replacement later
-                                    insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
+                                // Handle code blocks
+                                if (codeBlockMarkerCount === 1) {
+                                    isInCodeBlock = !isInCodeBlock;
+                                    markdownBufferRef.current += text;
+                                    continue;
+                                }
 
-                                    // Clear the markdown buffer after successful insertion
-                                    markdownBufferRef.current = "";
+                                // If we're in a code block, accumulate text
+                                if (isInCodeBlock) {
+                                    markdownBufferRef.current += text;
+                                    continue;
+                                }
+
+                                // Accumulate regular markdown in buffer
+                                markdownBufferRef.current += text
+
+                                // Only try to parse if we're not in a code block
+                                if (!isInCodeBlock) {
+                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+
+                                    // const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                    if (blocks.length > 0) {
+                                        const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
+                                        editor.insertBlocks(blocks, insertAfterBlockId);
+                                        insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
+                                        markdownBufferRef.current = "";
+                                    }
                                 }
                             }
 
-                            // Stream is complete, call replaceFinalBlocks
-                            await replaceFinalBlocks();
+                            controller.close();
 
+                            // Parse any remaining content in the buffer
+                            if (markdownBufferRef.current) {
+                                const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                if (finalBlocks.length > 0) {
+                                    const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
+                                    editor.insertBlocks(finalBlocks, insertAfterBlockId);
+                                    markdownBufferRef.current = "";
+                                }
+                            }
                         } catch (error) {
-                            console.error("Error processing stream:", error);
+                            if (error instanceof Error) {
+                                console.log(error.stack);
+                                console.log(markdownBufferRef.current)
+                                console.error("Error processing stream:", error.message);
+                            }
                         }
                     },
                 });
