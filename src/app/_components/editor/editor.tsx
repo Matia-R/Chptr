@@ -86,7 +86,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                                 // Only try to parse if we're not in a code block
                                 if (!isInCodeBlock) {
-                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+
+                                    let blocks = []
+
+                                    if (markdownBufferRef.current.includes('```')) {
+                                        blocks.push(manuallyParseCodeMarkdownToBlocks(markdownBufferRef.current));
+                                    }
+                                    else blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
 
                                     // const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                     if (blocks.length > 0) {
@@ -122,6 +128,25 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 console.log("Final content:", streamContent);
             },
         }));
+    };
+
+    const manuallyParseCodeMarkdownToBlocks = (markdownText: string): Block => {
+        const language = markdownText.split('\n')[0]?.replace('```', '').trim() ?? 'default';
+        const code = markdownText.replaceAll('```', '').split('\n').slice(1).join('\n').trim();
+
+        return {
+            id: crypto.randomUUID(),
+            type: "codeBlock",
+            props: {
+                language
+            },
+            content: [{
+                type: "text",
+                text: code,
+                styles: {}
+            }],
+            children: []
+        };
     };
 
     const replaceFinalBlocks = async () => {
