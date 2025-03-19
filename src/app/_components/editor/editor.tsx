@@ -6,7 +6,7 @@ import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { type Block, BlockNoteEditor, BlockNoteSchema, type PartialBlock, defaultInlineContentSpecs, filterSuggestionItems, } from "@blocknote/core";
+import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
 
@@ -52,7 +52,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                 const result = await summarize.mutateAsync(content);
 
-                const stream = new ReadableStream({
+                new ReadableStream({
                     async start(controller) {
                         try {
                             for await (const text of result) {
@@ -149,18 +149,18 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         };
     };
 
-    const replaceFinalBlocks = async () => {
-        if (!streamContent) return;
+    // const replaceFinalBlocks = async () => {
+    //     if (!streamContent) return;
 
-        const finalBlocks = await editor.tryParseMarkdownToBlocks(streamContent);
-        if (finalBlocks.length > 0) {
-            console.log('here')
-            if (insertedBlockIdsRef.current.length > 0) {
-                editor.removeBlocks(insertedBlockIdsRef.current);
-            }
-            editor.insertBlocks(finalBlocks, editor.document[editor.document.length - 1]?.id ?? '');
-        }
-    };
+    //     const finalBlocks = await editor.tryParseMarkdownToBlocks(streamContent);
+    //     if (finalBlocks.length > 0) {
+    //         console.log('here')
+    //         if (insertedBlockIdsRef.current.length > 0) {
+    //             editor.removeBlocks(insertedBlockIdsRef.current);
+    //         }
+    //         editor.insertBlocks(finalBlocks, editor.document[editor.document.length - 1]?.id ?? '');
+    //     }
+    // };
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -200,15 +200,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         }
     }, [theme]);
 
-    const schema = BlockNoteSchema.create({
-        inlineContentSpecs: {
-            ...defaultInlineContentSpecs,
-        },
-    });
-
     // TODO: Change this to the useBlockNoteEdtitor hook
     const editor = useMemo(() => {
-        return BlockNoteEditor.create({ initialContent: propInitialContent, schema });
+        return BlockNoteEditor.create({ initialContent: propInitialContent });
     }, [propInitialContent]);
 
     const handleChange = useCallback(() => {
