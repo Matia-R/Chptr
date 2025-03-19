@@ -6,7 +6,7 @@ import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
+import { type Block, BlockNoteEditor, BlockNoteSchema, type PartialBlock, defaultInlineContentSpecs, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
 
@@ -200,9 +200,15 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         }
     }, [theme]);
 
+    const schema = BlockNoteSchema.create({
+        inlineContentSpecs: {
+            ...defaultInlineContentSpecs,
+        },
+    });
+
     // TODO: Change this to the useBlockNoteEdtitor hook
     const editor = useMemo(() => {
-        return BlockNoteEditor.create({ initialContent: propInitialContent });
+        return BlockNoteEditor.create({ initialContent: propInitialContent, schema });
     }, [propInitialContent]);
 
     const handleChange = useCallback(() => {
@@ -214,6 +220,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     return (
         <div>
             <BlockNoteView
+                // @ts-expect-error: Suppress error about missing _pmSchema
                 editor={editor}
                 shadCNComponents={{}}
                 theme={currentTheme as 'light' | 'dark'}
