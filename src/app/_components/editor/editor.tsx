@@ -214,7 +214,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     return (
         <div>
             <BlockNoteView
-                // @ts-expect-error: Suppress error about missing _pmSchema
                 editor={editor}
                 shadCNComponents={{}}
                 theme={currentTheme as 'light' | 'dark'}
