@@ -49,6 +49,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 markdownBufferRef.current = ""; // Clear markdown buffer
                 insertedBlockIdsRef.current = []; // Reset inserted block tracking
                 let isInCodeBlock = false;
+                let isInNumberedList = false;
+                let isInNonNumberedList = false;
 
                 const result = await summarize.mutateAsync(content);
 
@@ -60,42 +62,51 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                                 controller.enqueue(text);
                                 setStreamContent(prev => prev + text);
 
+                                console.log(text)
+
                                 if (text.includes('<table-tag>')) {
                                     markdownBufferRef.current += text.replace('<table-tag>', '');
                                     continue;
                                 }
 
+                                isInNonNumberedList = /^\s*[*-]/.test(text);
+
+                                if (isInNonNumberedList) {
+                                    markdownBufferRef.current += text
+                                    continue;
+                                }
+
                                 // Count occurrences of code block markers in the current text chunk
                                 const codeBlockMarkerCount = (text.match(/```/g) ?? []).length;
+                                const numberedListMarkerCount = (text.match(/<numbered-list-tag>/g) ?? []).length;
+
+                                if (numberedListMarkerCount === 1) {
+                                    isInNumberedList = !isInNumberedList;
+                                }
 
                                 // Handle code blocks
                                 if (codeBlockMarkerCount === 1) {
                                     isInCodeBlock = !isInCodeBlock;
-                                    markdownBufferRef.current += text;
-                                    continue;
                                 }
 
-                                // If we're in a code block, accumulate text
-                                if (isInCodeBlock) {
-                                    markdownBufferRef.current += text;
+                                markdownBufferRef.current += text.replace('<numbered-list-tag>', '').replace(/^\s{2,}(?=\d+\.)/, ' ').replace('bash', 'text');
+
+                                if (isInCodeBlock || isInNumberedList) {
                                     continue;
                                 }
-
-                                // Accumulate regular markdown in buffer
-                                markdownBufferRef.current += text
 
                                 // Only try to parse if we're not in a code block
-                                if (!isInCodeBlock) {
+                                if (!isInCodeBlock && !isInNumberedList) {
 
                                     let blocks = []
 
-                                    if (markdownBufferRef.current.includes('```')) {
-                                        blocks.push(manuallyParseCodeMarkdownToBlocks(markdownBufferRef.current));
-                                    }
-                                    else blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                    blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
 
                                     // const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                     if (blocks.length > 0) {
+
+                                        // TODO: Manually parse / add checkboxes
+
                                         const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
                                         editor.insertBlocks(blocks, insertAfterBlockId);
                                         insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
@@ -106,6 +117,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                             controller.close();
 
+                            // TODO: check if this is needed
+                            // Extract into function with above logic if it is
                             // Parse any remaining content in the buffer
                             if (markdownBufferRef.current) {
                                 const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
@@ -131,8 +144,12 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     };
 
     const manuallyParseCodeMarkdownToBlocks = (markdownText: string): Block => {
-        const language = markdownText.split('\n')[0]?.replace('```', '').trim() ?? 'default';
+        let language = markdownText.split('\n')[0]?.replace('```', '').trim() ?? 'default';
         const code = markdownText.replaceAll('```', '').split('\n').slice(1).join('\n').trim();
+
+        if (language === 'bash') {
+            language = 'text'
+        }
 
         return {
             id: crypto.randomUUID(),
