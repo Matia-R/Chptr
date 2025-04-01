@@ -35,8 +35,86 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const saveDocument = api.document.saveDocument.useMutation();
     const summarize = api.atActions.summarize.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
-    const markdownBufferRef = useRef(""); // Stores accumulated markdown chunks
-    const insertedBlockIdsRef = useRef<string[]>([]); // Tracks intermediate block IDs
+
+    const insertParsedMarkdownBlocks = async (
+        editor: BlockNoteEditor,
+        markdown: string,
+        insertBlockId: string
+    ) => {
+        const blocks = await editor.tryParseMarkdownToBlocks(markdown);
+        if (blocks.length > 0) {
+            editor.insertBlocks(blocks, insertBlockId);
+        }
+    }
+
+    const streamMarkdownToEditor = async (
+        result: AsyncIterable<string>,
+        editor: BlockNoteEditor,
+        insertBlockId: string,
+        insertBlocksFn: (editor: BlockNoteEditor, markdown: string, insertBlockId: string) => Promise<void>
+    ) => {
+        const markdownBuffer = { current: "" }; // Stores accumulated markdown chunks
+        let isInCodeBlock = false;
+        let isInNumberedList = false;
+        let isInNonNumberedList = false;
+
+        return new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const text of result) {
+                        controller.enqueue(text);
+
+                        if (text.includes('<table-tag>')) {
+                            markdownBuffer.current += text.replace('<table-tag>', '');
+                            continue;
+                        }
+
+                        isInNonNumberedList = /^\s*[*-]/.test(text);
+                        if (isInNonNumberedList) {
+                            markdownBuffer.current += text;
+                            continue;
+                        }
+
+                        const codeBlockMarkerCount = (text.match(/```/g) ?? []).length;
+                        const numberedListMarkerCount = (text.match(/<numbered-list-tag>/g) ?? []).length;
+
+                        if (numberedListMarkerCount === 1) {
+                            isInNumberedList = !isInNumberedList;
+                        }
+
+                        if (codeBlockMarkerCount === 1) {
+                            isInCodeBlock = !isInCodeBlock;
+                        }
+
+                        markdownBuffer.current += text
+                            .replace('<numbered-list-tag>', '')
+                            .replace(/^\s{2,}(?=\d+\.)/, ' ')
+                            .replace('bash', 'text');
+
+                        if (isInCodeBlock || isInNumberedList) continue;
+
+                        await insertBlocksFn(editor, markdownBuffer.current, insertBlockId);
+                        markdownBuffer.current = "";
+                    }
+
+                    controller.close();
+
+                    if (markdownBuffer.current) {
+                        await insertBlocksFn(editor, markdownBuffer.current, insertBlockId);
+                    }
+
+                } catch (error) {
+                    // TODO: add custom error block
+                    if (error instanceof Error) {
+                        console.error("Error processing stream:", error.message);
+                        console.log(error.stack);
+                        console.log(markdownBuffer.current);
+                    }
+                }
+            },
+        });
+    };
+
 
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
         const actions = ["summarize"];
@@ -47,100 +125,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                 const insertBlockId = editor.getTextCursorPosition().block.id;
 
-                markdownBufferRef.current = ""; // Clear markdown buffer
-                insertedBlockIdsRef.current = []; // Reset inserted block tracking
-                let isInCodeBlock = false;
-                let isInNumberedList = false;
-                let isInNonNumberedList = false;
-
                 const blocks = editor.document;
                 const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
                 const contentToSummarize = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
                 const result = await summarize.mutateAsync(contentToSummarize);
 
-                new ReadableStream({
-                    async start(controller) {
-                        try {
-                            for await (const text of result) {
-
-                                controller.enqueue(text);
-
-                                if (text.includes('<table-tag>')) {
-                                    markdownBufferRef.current += text.replace('<table-tag>', '');
-                                    continue;
-                                }
-
-                                isInNonNumberedList = /^\s*[*-]/.test(text);
-
-                                if (isInNonNumberedList) {
-                                    markdownBufferRef.current += text
-                                    continue;
-                                }
-
-                                // Count occurrences of code block markers in the current text chunk
-                                const codeBlockMarkerCount = (text.match(/```/g) ?? []).length;
-                                const numberedListMarkerCount = (text.match(/<numbered-list-tag>/g) ?? []).length;
-
-                                if (numberedListMarkerCount === 1) {
-                                    isInNumberedList = !isInNumberedList;
-                                }
-
-                                // Handle code blocks
-                                if (codeBlockMarkerCount === 1) {
-                                    isInCodeBlock = !isInCodeBlock;
-                                }
-
-                                markdownBufferRef.current += text.replace('<numbered-list-tag>', '').replace(/^\s{2,}(?=\d+\.)/, ' ').replace('bash', 'text');
-
-                                if (isInCodeBlock || isInNumberedList) {
-                                    continue;
-                                }
-
-                                // Only try to parse if we're not in a code block
-                                if (!isInCodeBlock && !isInNumberedList) {
-
-                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-
-                                    // const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-                                    if (blocks.length > 0) {
-
-                                        // TODO: Manually parse / add checkboxes
-
-                                        // const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
-                                        // editor.insertBlocks(blocks, insertAfterBlockId);
-                                        editor.insertBlocks(blocks, insertBlockId);
-                                        insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
-                                        markdownBufferRef.current = "";
-                                    }
-                                }
-                            }
-
-                            controller.close();
-
-                            // TODO: check if this is needed
-                            // Extract into function with above logic if it is
-                            // Parse any remaining content in the buffer
-                            if (markdownBufferRef.current) {
-                                const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
-                                if (finalBlocks.length > 0) {
-                                    // const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
-                                    // editor.insertBlocks(finalBlocks, insertAfterBlockId);
-                                    editor.insertBlocks(finalBlocks, insertBlockId);
-                                    markdownBufferRef.current = "";
-                                }
-                            }
-                        } catch (error) {
-
-                            // TODO: add a custom error block here if stream fails
-                            if (error instanceof Error) {
-                                console.log(error.stack);
-                                console.log(markdownBufferRef.current)
-                                console.error("Error processing stream:", error.message);
-                            }
-                        }
-                    },
-                });
+                await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
             },
         }));
     };
