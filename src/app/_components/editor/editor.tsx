@@ -9,6 +9,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
+import { atActions } from "~/app/ai/prompt/at-actions";
 
 
 // Define a type for the theme
@@ -33,7 +34,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const saveDocument = api.document.saveDocument.useMutation();
-    const summarize = api.atActions.summarize.useMutation();
+    const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
 
     const insertParsedMarkdownBlocks = async (
@@ -117,19 +118,19 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
 
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
-        const actions = ["summarize"];
-
-        return actions.map((action) => ({
+        return atActions.map((action) => ({
             title: action,
             onItemClick: async () => {
-
                 const insertBlockId = editor.getTextCursorPosition().block.id;
 
                 const blocks = editor.document;
                 const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
-                const contentToSummarize = await editor.blocksToMarkdownLossy(contentUpToBlock);
+                const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
-                const result = await summarize.mutateAsync(contentToSummarize);
+                const result = await generate.mutateAsync({
+                    action,
+                    content: contentToProcess
+                });
 
                 await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
             },

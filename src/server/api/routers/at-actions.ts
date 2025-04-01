@@ -2,23 +2,25 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { z } from "zod"
 import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
+import { AtAction, atActionPrompts } from "~/app/ai/prompt/at-actions"
 
 export const atActionsRouter = createTRPCRouter({
-    summarize: publicProcedure
-        .input(z.string())
+    generate: publicProcedure
+        .input(z.object({
+            action: z.nativeEnum(AtAction),
+            content: z.string()
+        }))
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
                 model: google("models/gemini-1.5-flash"),
                 system: systemPrompt,
-                prompt: `summarize this text thoroughly. Include a table, numbered list, bulleted list, nested list and a codeblock: ${input}`,
+                prompt: `${atActionPrompts[input.action]} ${input.content}`,
                 experimental_continueSteps: true,
                 experimental_transform: smoothStream({
-                    delayInMs: 20, // optional: defaults to 10ms
-                    chunking: 'line', // optional: defaults to 'word'
+                    delayInMs: 20,
+                    chunking: 'line',
                 }),
                 onFinish({ finishReason }) {
-                    // your own logic, e.g. for saving the chat history or recording usage
-
                     console.log('finish reason: ' + finishReason)
                 },
             });
@@ -27,8 +29,6 @@ export const atActionsRouter = createTRPCRouter({
                 console.log(text)
                 yield text;
             }
-
-            // console.log(result.finishReason)
         })
 });
 
