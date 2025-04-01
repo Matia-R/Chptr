@@ -34,25 +34,30 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const saveDocument = api.document.saveDocument.useMutation();
     const summarize = api.atActions.summarize.useMutation();
-    const [streamContent, setStreamContent] = useState("");
     const timeoutRef = useRef<NodeJS.Timeout>();
     const markdownBufferRef = useRef(""); // Stores accumulated markdown chunks
     const insertedBlockIdsRef = useRef<string[]>([]); // Tracks intermediate block IDs
 
-    const getAtActionMenuItems = (content: string): DefaultReactSuggestionItem[] => {
+    const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
         const actions = ["summarize"];
 
         return actions.map((action) => ({
             title: action,
             onItemClick: async () => {
-                setStreamContent(""); // Reset streaming content
+
+                const insertBlockId = editor.getTextCursorPosition().block.id;
+
                 markdownBufferRef.current = ""; // Clear markdown buffer
                 insertedBlockIdsRef.current = []; // Reset inserted block tracking
                 let isInCodeBlock = false;
                 let isInNumberedList = false;
                 let isInNonNumberedList = false;
 
-                const result = await summarize.mutateAsync(content);
+                const blocks = editor.document;
+                const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
+                const contentToSummarize = await editor.blocksToMarkdownLossy(contentUpToBlock);
+
+                const result = await summarize.mutateAsync(contentToSummarize);
 
                 new ReadableStream({
                     async start(controller) {
@@ -60,9 +65,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                             for await (const text of result) {
 
                                 controller.enqueue(text);
-                                setStreamContent(prev => prev + text);
-
-                                console.log(text)
 
                                 if (text.includes('<table-tag>')) {
                                     markdownBufferRef.current += text.replace('<table-tag>', '');
@@ -98,17 +100,16 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                                 // Only try to parse if we're not in a code block
                                 if (!isInCodeBlock && !isInNumberedList) {
 
-                                    let blocks = []
-
-                                    blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
+                                    const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
 
                                     // const blocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                     if (blocks.length > 0) {
 
                                         // TODO: Manually parse / add checkboxes
 
-                                        const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
-                                        editor.insertBlocks(blocks, insertAfterBlockId);
+                                        // const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
+                                        // editor.insertBlocks(blocks, insertAfterBlockId);
+                                        editor.insertBlocks(blocks, insertBlockId);
                                         insertedBlockIdsRef.current.push(...blocks.map(b => b.id));
                                         markdownBufferRef.current = "";
                                     }
@@ -123,12 +124,15 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                             if (markdownBufferRef.current) {
                                 const finalBlocks = await editor.tryParseMarkdownToBlocks(markdownBufferRef.current);
                                 if (finalBlocks.length > 0) {
-                                    const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
-                                    editor.insertBlocks(finalBlocks, insertAfterBlockId);
+                                    // const insertAfterBlockId = editor.document[editor.document.length - 1]?.id ?? '';
+                                    // editor.insertBlocks(finalBlocks, insertAfterBlockId);
+                                    editor.insertBlocks(finalBlocks, insertBlockId);
                                     markdownBufferRef.current = "";
                                 }
                             }
                         } catch (error) {
+
+                            // TODO: add a custom error block here if stream fails
                             if (error instanceof Error) {
                                 console.log(error.stack);
                                 console.log(markdownBufferRef.current)
@@ -137,47 +141,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         }
                     },
                 });
-
-                console.log("Final content:", streamContent);
             },
         }));
     };
-
-    const manuallyParseCodeMarkdownToBlocks = (markdownText: string): Block => {
-        let language = markdownText.split('\n')[0]?.replace('```', '').trim() ?? 'default';
-        const code = markdownText.replaceAll('```', '').split('\n').slice(1).join('\n').trim();
-
-        if (language === 'bash') {
-            language = 'text'
-        }
-
-        return {
-            id: crypto.randomUUID(),
-            type: "codeBlock",
-            props: {
-                language
-            },
-            content: [{
-                type: "text",
-                text: code,
-                styles: {}
-            }],
-            children: []
-        };
-    };
-
-    // const replaceFinalBlocks = async () => {
-    //     if (!streamContent) return;
-
-    //     const finalBlocks = await editor.tryParseMarkdownToBlocks(streamContent);
-    //     if (finalBlocks.length > 0) {
-    //         console.log('here')
-    //         if (insertedBlockIdsRef.current.length > 0) {
-    //             editor.removeBlocks(insertedBlockIdsRef.current);
-    //         }
-    //         editor.insertBlocks(finalBlocks, editor.document[editor.document.length - 1]?.id ?? '');
-    //     }
-    // };
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -240,7 +206,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     triggerCharacter={"@"}
                     getItems={async (query) =>
                         // Gets the mentions menu items
-                        filterSuggestionItems(getAtActionMenuItems(await editor.blocksToMarkdownLossy(editor.document)), query)
+                        filterSuggestionItems(getAtActionMenuItems(), query)
                     }
                 />
             </BlockNoteView>
