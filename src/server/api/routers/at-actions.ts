@@ -2,7 +2,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { z } from "zod"
 import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
-import { AtAction, atActionPrompts } from "~/app/ai/prompt/at-actions"
+import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
 
 export const atActionsRouter = createTRPCRouter({
     generate: publicProcedure
@@ -14,7 +14,7 @@ export const atActionsRouter = createTRPCRouter({
             const { textStream } = streamText({
                 model: google("models/gemini-1.5-flash"),
                 system: systemPrompt,
-                prompt: `${atActionPrompts[input.action]} ${input.content}`,
+                prompt: `${atActionsConfig[input.action].prompt} ${input.content}`,
                 experimental_continueSteps: true,
                 experimental_transform: smoothStream({
                     delayInMs: 20,

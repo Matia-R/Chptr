@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
 import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
 import { api } from "~/trpc/react";
-import { atActions } from "~/app/ai/prompt/at-actions";
+import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 
 
 // Define a type for the theme
@@ -118,23 +118,26 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
 
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
-        return atActions.map((action) => ({
-            title: action,
-            onItemClick: async () => {
-                const insertBlockId = editor.getTextCursorPosition().block.id;
+        return atActions.map((action) => {
+            const config = atActionsConfig[action]
+            return {
+                ...config,
+                onItemClick: async () => {
+                    const insertBlockId = editor.getTextCursorPosition().block.id;
 
-                const blocks = editor.document;
-                const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
-                const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
+                    const blocks = editor.document;
+                    const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
+                    const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
-                const result = await generate.mutateAsync({
-                    action,
-                    content: contentToProcess
-                });
+                    const result = await generate.mutateAsync({
+                        action,
+                        content: contentToProcess
+                    });
 
-                await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
-            },
-        }));
+                    await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
+                },
+            }
+        });
     };
 
     const debouncedSave = useCallback((content: Block[]) => {
