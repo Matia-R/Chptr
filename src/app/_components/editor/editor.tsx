@@ -5,11 +5,12 @@ import { BlockNoteView } from "@blocknote/shadcn";
 import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { type Block, BlockNoteEditor, type PartialBlock, filterSuggestionItems, } from "@blocknote/core";
-import { type DefaultReactSuggestionItem, SuggestionMenuController } from "@blocknote/react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { type Block, type BlockNoteEditor, BlockNoteSchema, type PartialBlock, defaultBlockSpecs, filterSuggestionItems, } from "@blocknote/core";
+import { type DefaultReactSuggestionItem, SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
 import { api } from "~/trpc/react";
 import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
+import { Alert } from "./custom-blocks/Alert";
 
 
 // Define a type for the theme
@@ -30,6 +31,13 @@ interface EditorProps {
     documentId: string;
 }
 
+const schema = BlockNoteSchema.create({
+    blockSpecs: {
+        ...defaultBlockSpecs,
+        alert: Alert,
+    },
+});
+
 export default function Editor({ initialContent: propInitialContent, documentId }: EditorProps) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
@@ -38,7 +46,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const timeoutRef = useRef<NodeJS.Timeout>();
 
     const insertParsedMarkdownBlocks = async (
-        editor: BlockNoteEditor,
+        editor: typeof schema.BlockNoteEditor,
         markdown: string,
         insertBlockId: string
     ) => {
@@ -50,9 +58,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const streamMarkdownToEditor = async (
         result: AsyncIterable<string>,
-        editor: BlockNoteEditor,
+        editor: typeof schema.BlockNoteEditor,
         insertBlockId: string,
-        insertBlocksFn: (editor: BlockNoteEditor, markdown: string, insertBlockId: string) => Promise<void>
+        insertBlocksFn: (editor: typeof schema.BlockNoteEditor, markdown: string, insertBlockId: string) => Promise<void>
     ) => {
         const markdownBuffer = { current: "" }; // Stores accumulated markdown chunks
         let isInCodeBlock = false;
@@ -105,12 +113,22 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     }
 
                 } catch (error) {
+
+                    editor.insertBlocks([{
+                        type: "alert",
+                        props: {
+                            type: "error",
+                            text: "Something went wrong while generating the content.",
+                        },
+                    }], insertBlockId);
+
                     // TODO: add custom error block
                     if (error instanceof Error) {
                         console.error("Error processing stream:", error.message);
                         console.log(error.stack);
                         console.log(markdownBuffer.current);
                     }
+
                 }
             },
         });
@@ -179,12 +197,17 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     }, [theme]);
 
     // TODO: Change this to the useBlockNoteEdtitor hook
-    const editor = useMemo(() => {
-        return BlockNoteEditor.create({ initialContent: propInitialContent });
-    }, [propInitialContent]);
+    // const editor = useMemo(() => {
+    //     return BlockNoteEditor.create({ initialContent: propInitialContent, schema });
+    // }, [propInitialContent, schema]);
+
+    const editor = useCreateBlockNote({
+        schema,
+        initialContent: propInitialContent,
+    });
 
     const handleChange = useCallback(() => {
-        const content = editor.document;
+        const content = editor.document as Block[];
         void saveToStorage(content);
         debouncedSave(content);
     }, [editor, debouncedSave]);
