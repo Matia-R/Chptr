@@ -124,9 +124,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     }], insertBlockId);
 
                     if (error instanceof Error) {
+                        // TODO: log error once we have analytics
                         console.error("Error processing stream:", error.message);
-                        console.log(error.stack);
-                        console.log(markdownBuffer.current);
                     }
 
                 }
