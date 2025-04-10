@@ -7,42 +7,22 @@ export const alertTypes = [
     {
         title: "Warning",
         value: "warning",
-        icon: CircleAlert,
-        color: "#e69819",
-        backgroundColor: {
-            light: "#fff6e6",
-            dark: "#805d20",
-        },
+        icon: CircleAlert
     },
     {
         title: "Error",
         value: "error",
-        icon: CircleX,
-        color: "#d80d0d",
-        backgroundColor: {
-            light: "#ffe6e6",
-            dark: "#802020",
-        },
+        icon: CircleX
     },
     {
         title: "Info",
         value: "info",
-        icon: CircleAlert,
-        color: "#507aff",
-        backgroundColor: {
-            light: "#e6ebff",
-            dark: "#203380",
-        },
+        icon: CircleAlert
     },
     {
         title: "Success",
         value: "success",
-        icon: CircleCheck,
-        color: "#0bc10b",
-        backgroundColor: {
-            light: "#e6ffe6",
-            dark: "#208020",
-        },
+        icon: CircleCheck
     },
 ] as const;
 
@@ -70,10 +50,10 @@ export const Alert = createReactBlockSpec(
             )!;
             const Icon = alertType.icon;
             return (
-                <div contentEditable={false} className={`rounded-lg w-full p-4 my-4 ${props.block.props.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900' :
-                    props.block.props.type === 'error' ? 'bg-red-50 dark:bg-red-900' :
-                        props.block.props.type === 'info' ? 'bg-blue-50 dark:bg-blue-900' :
-                            'bg-green-50 dark:bg-green-900'}`}
+                <div contentEditable={false} className={`rounded-lg w-full p-4 my-4 ${props.block.props.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/30' :
+                    props.block.props.type === 'error' ? 'bg-red-50 dark:bg-red-900/30' :
+                        props.block.props.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/30' :
+                            'bg-green-50 dark:bg-green-900/30'}`}
                     data-alert-type={props.block.props.type}>
                     <div className="flex items-center gap-2 mb-2" contentEditable={false}>
                         <div className="flex-shrink-0">
@@ -86,10 +66,10 @@ export const Alert = createReactBlockSpec(
                                 size={24}
                             />
                         </div>
-                        <div contentEditable={false} className={`font-semibold ${props.block.props.type === 'warning' ? 'text-yellow-500 dark:text-yellow-200' :
-                            props.block.props.type === 'error' ? 'text-red-500 dark:text-red-200' :
-                                props.block.props.type === 'info' ? 'text-blue-500 dark:text-blue-200' :
-                                    'text-green-500 dark:text-green-200'}`}>
+                        <div contentEditable={false} className={`font-semibold ${props.block.props.type === 'warning' ? 'text-yellow-700 dark:text-yellow-200' :
+                            props.block.props.type === 'error' ? 'text-red-700 dark:text-red-200' :
+                                props.block.props.type === 'info' ? 'text-blue-700 dark:text-blue-200' :
+                                    'text-green-700 dark:text-green-200'}`}>
                             {alertType.title}
                         </div>
                     </div>
