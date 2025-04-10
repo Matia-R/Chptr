@@ -1,12 +1,14 @@
 'use client'
 
+import dynamic from "next/dynamic"
 import { useParams } from "next/navigation"
-import { Editor } from "~/app/_components/dynamic-editor"
+import { useMemo } from "react"
 import { api } from "~/trpc/react"
 
 export default function DocumentPage() {
     const params = useParams()
     const documentId = params.documentId as string
+    const Editor = useMemo(() => dynamic(() => import("~/app/_components/editor/editor"), { ssr: false }), []);
 
     const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
 
