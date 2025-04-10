@@ -114,6 +114,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                 } catch (error) {
 
+                    // TODO: Add option for buttons with callbacks - add callback to retry
                     editor.insertBlocks([{
                         type: "alert",
                         props: {
@@ -122,7 +123,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         },
                     }], insertBlockId);
 
-                    // TODO: add custom error block
                     if (error instanceof Error) {
                         console.error("Error processing stream:", error.message);
                         console.log(error.stack);
@@ -195,11 +195,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             setCurrentTheme(theme as Theme);
         }
     }, [theme]);
-
-    // TODO: Change this to the useBlockNoteEdtitor hook
-    // const editor = useMemo(() => {
-    //     return BlockNoteEditor.create({ initialContent: propInitialContent, schema });
-    // }, [propInitialContent, schema]);
 
     const editor = useCreateBlockNote({
         schema,
