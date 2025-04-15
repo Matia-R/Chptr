@@ -2,7 +2,7 @@ import { type Block } from "@blocknote/core";
 import { z } from "zod"
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { createDocument, saveDocument, getDocumentById, getLastUpdatedTimestamp } from '~/server/db'
+import { createDocument, saveDocument, getDocumentById, getLastUpdatedTimestamp, getDocumentsForUser as getDocumentsIdsForUser } from '~/server/db'
 
 export interface Document {
     id: string,
@@ -42,5 +42,9 @@ export const documentRouter = createTRPCRouter({
         .input(z.string())
         .query(async ({ input }) => {
             return getLastUpdatedTimestamp(input);
+        }),
+    getDocumentsForAuthenticatedUser: publicProcedure
+        .query(async () => {
+            return getDocumentsIdsForUser();
         }),
 });

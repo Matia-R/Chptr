@@ -10,6 +10,13 @@ type DocumentSchema = {
     last_updated?: Date;
 }
 
+type DocumentPermissionSchema = {
+    id: string;
+    user_id: string;
+    document_id: string;
+    permission: string;
+}
+
 export async function createDocument() {
     const supabase = await createClient()
     const currentUserId = (await supabase.auth.getUser()).data.user?.id
@@ -89,4 +96,30 @@ export async function getLastUpdatedTimestamp(documentId: string) {
 
     if (error) throw new Error(`Failed to fetch last updated timestamp: ${error.message}`)
     return { success: true, lastUpdated: data?.last_updated }
+}
+
+export const getDocumentsForUser = async () => {
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    const { data, error } = await supabase
+        .from('document_permissions')
+        .select(`
+            document_id,
+            documents:document_id (
+                name
+            )
+        `)
+        .eq('user_id', user?.id) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name'> })[] | null, error: Error | null }
+
+    const documents = data?.map((permission) => ({
+        id: permission.document_id,
+        name: permission.documents.name
+    }))
+
+    if (error) throw new Error(`Failed to fetch documents for user: ${error.message}`)
+    return { success: true, documents }
 }

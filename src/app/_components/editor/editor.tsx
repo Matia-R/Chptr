@@ -222,7 +222,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     }
                 />
             </BlockNoteView>
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
         </div >
     );
 }
