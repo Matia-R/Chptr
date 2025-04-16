@@ -3,7 +3,7 @@
 import * as React from "react"
 import { FileText, Plus } from "lucide-react"
 import { api } from "~/trpc/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 
 import {
@@ -19,31 +19,52 @@ import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
 import { ThemeToggle } from "./theme-toggle"
 
-type DocumentMenuButtonProps = { id: string; name: string }
-
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  documents: DocumentMenuButtonProps[]
+  initialDocuments: { id: string; name: string }[]
 }
 
-export function AppSidebar({ documents, ...props }: AppSidebarProps) {
+export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
+  const params = useParams();
+  const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
+
+  // Use TRPC query to keep documents in sync
+  const { data: documents } = api.document.getDocumentsForAuthenticatedUser.useQuery(undefined, {
+    initialData: { success: true, documents: initialDocuments },
+    refetchOnMount: true
+  });
+
   const createDocument = api.document.createDocument.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const doc = data.createdDocument[0] as Document;
       if (doc?.id) {
+        // Invalidate both the document list and the new document
+        await Promise.all([
+          utils.document.getDocumentsForAuthenticatedUser.invalidate(),
+          utils.document.getDocumentById.prefetch(doc.id)
+        ]);
         router.push(`/documents/${doc.id}`);
       }
     }
   });
 
-  // Prefetch all document pages
+  // Setup document data prefetching
   React.useEffect(() => {
-    documents.forEach((doc) => {
-      // Prefetch the document data
+    documents?.documents?.forEach((doc) => {
+      // Always prefetch the document data
       void utils.document.getDocumentById.prefetch(doc.id);
+
+      // If this is the current document, set up periodic revalidation
+      if (doc.id === currentDocumentId) {
+        const interval = setInterval(() => {
+          void utils.document.getDocumentById.invalidate(doc.id);
+        }, 30000); // Revalidate every 30 seconds
+
+        return () => clearInterval(interval);
+      }
     });
-  }, [documents, utils]);
+  }, [documents?.documents, utils, currentDocumentId]);
 
   return (
     <Sidebar variant="floating" {...props}>
@@ -77,10 +98,17 @@ export function AppSidebar({ documents, ...props }: AppSidebarProps) {
             </Button>
           </div>
           <SidebarMenu className="gap-2">
-            {documents.map((doc) => (
+            {documents?.documents?.map((doc) => (
               <SidebarMenuItem key={doc.id}>
                 <SidebarMenuButton asChild>
-                  <Link href={`/documents/${doc.id}`} prefetch={true}>
+                  <Link
+                    href={`/documents/${doc.id}`}
+                    prefetch={true}
+                    onClick={() => {
+                      // Invalidate the cache when navigating to ensure fresh data
+                      void utils.document.getDocumentById.invalidate(doc.id);
+                    }}
+                  >
                     {doc.name}
                   </Link>
                 </SidebarMenuButton>

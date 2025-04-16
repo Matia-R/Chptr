@@ -13,7 +13,23 @@ export default function DocumentPage() {
     const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
 
     if (isLoading) {
-        return <div>Loading...</div>
+        return (
+            <div className="space-y-4 animate-pulse">
+                <div className="h-9 w-2/3 bg-muted rounded-lg" /> {/* Title skeleton */}
+                <div className="space-y-3">
+                    {/* Paragraph skeletons */}
+                    <div className="h-4 bg-muted rounded" />
+                    <div className="h-4 bg-muted rounded w-[95%]" />
+                    <div className="h-4 bg-muted rounded w-[90%]" />
+                </div>
+                <div className="space-y-3 pt-4">
+                    {/* More paragraph blocks */}
+                    <div className="h-4 bg-muted rounded w-[85%]" />
+                    <div className="h-4 bg-muted rounded w-[88%]" />
+                    <div className="h-4 bg-muted rounded w-[92%]" />
+                </div>
+            </div>
+        )
     }
 
     if (error) {

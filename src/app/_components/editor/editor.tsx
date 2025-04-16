@@ -2,7 +2,6 @@
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -41,7 +40,13 @@ const schema = BlockNoteSchema.create({
 export default function Editor({ initialContent: propInitialContent, documentId }: EditorProps) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
-    const saveDocument = api.document.saveDocument.useMutation();
+    const utils = api.useUtils();
+    const saveDocument = api.document.saveDocument.useMutation({
+        onSuccess: () => {
+            // Invalidate the document query to ensure fresh data on next fetch
+            void utils.document.getDocumentById.invalidate(documentId);
+        }
+    });
     const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
 
