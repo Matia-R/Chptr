@@ -18,6 +18,7 @@ import {
 import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
 import { ThemeToggle } from "./theme-toggle"
+import { useToast } from "../../hooks/use-toast"
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
@@ -28,9 +29,10 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const params = useParams();
   const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
+  const { toast } = useToast();
 
   // Use TRPC query to keep documents in sync
-  const { data: documents } = api.document.getDocumentsForAuthenticatedUser.useQuery(undefined, {
+  const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
     initialData: { success: true, documents: initialDocuments },
     refetchOnMount: true
   });
@@ -41,11 +43,25 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       if (doc?.id) {
         // Invalidate both the document list and the new document
         await Promise.all([
-          utils.document.getDocumentsForAuthenticatedUser.invalidate(),
+          utils.document.getDocumentIdsForAuthenticatedUser.invalidate(),
           utils.document.getDocumentById.prefetch(doc.id)
         ]);
         router.push(`/documents/${doc.id}`);
       }
+      else {
+        toast({
+          title: "Failed to create document",
+          description: "The document was created but returned an invalid ID."
+        });
+      }
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Failed to create document",
+        description: error instanceof Error ? error.message : "An unexpected error occurred"
+      });
     }
   });
 

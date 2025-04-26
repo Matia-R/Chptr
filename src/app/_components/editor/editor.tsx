@@ -171,7 +171,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 id: documentId,
                 name: "Untitled",
                 content: content,
-                lastUpdated: new Date(),
+                lastUpdated: new Date(Date.now()),
             });
         }, 1000);
     }, [documentId, saveDocument]);

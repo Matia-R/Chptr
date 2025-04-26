@@ -123,3 +123,16 @@ export const getDocumentsForUser = async () => {
     if (error) throw new Error(`Failed to fetch documents for user: ${error.message}`)
     return { success: true, documents }
 }
+
+export async function updateDocumentName(documentId: string, name: string) {
+
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('documents')
+        .update({ name })
+        .eq('id', documentId)
+
+    if (error) throw new Error(`Failed to update document name: ${error.message}`)
+    return { success: true }
+}
