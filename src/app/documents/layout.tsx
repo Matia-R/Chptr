@@ -1,9 +1,6 @@
 import "~/styles/globals.css";
 import { ThemeProvider } from "../_components/theme-provider";
 import { type Metadata } from "next";
-import { headers } from "next/headers";
-import { createCaller } from "~/server/api/root";
-import { createTRPCContext } from "~/server/api/trpc";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { SidebarInset, SidebarTrigger } from "../_components/sidebar";
@@ -12,7 +9,7 @@ import { AppSidebar } from "../_components/app-sidebar";
 import { Separator } from "../_components/separator";
 import { Toaster } from "../_components/ui/toaster";
 import { DocumentBreadcrumb } from "../_components/document-breadcrumb";
-
+import { getTrpcCaller } from "~/utils/trpc-utils";
 export const metadata: Metadata = {
     title: "Chptr",
     description: "A simple, elegant, and powerful note-taking app.",
@@ -20,14 +17,7 @@ export const metadata: Metadata = {
 };
 
 async function getDocuments() {
-    const headersList = await headers();
-    const heads = new Headers();
-    for (const [key, value] of headersList.entries()) {
-        heads.set(key, value);
-    }
-    heads.set("x-trpc-source", "rsc");
-    const context = await createTRPCContext({ headers: heads });
-    const caller = createCaller(context);
+    const caller = await getTrpcCaller();
     const result = await caller.document.getDocumentIdsForAuthenticatedUser();
     return result.documents ?? [];
 }

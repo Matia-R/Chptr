@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-
 import { createClient } from '../../utils/supabase/server'
+import { getTrpcCaller } from '~/utils/trpc-utils'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -21,8 +21,18 @@ export async function login(formData: FormData) {
         redirect('/error')
     }
 
+    // Get the user's documents using TRPC
+    const caller = await getTrpcCaller();
+    const result = await caller.document.getDocumentIdsForAuthenticatedUser();
+
     revalidatePath('/', 'layout')
-    redirect('/account')
+
+    // Redirect to the first document if available, otherwise go to documents page
+    if (result.success && result.documents?.[0]?.id) {
+        redirect(`/documents/${result.documents[0].id}`)
+    } else {
+        redirect('/documents')
+    }
 }
 
 export async function signup(formData: FormData) {
@@ -42,5 +52,5 @@ export async function signup(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    redirect('/account')
+    redirect('/documents')
 }
