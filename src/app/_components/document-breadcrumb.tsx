@@ -15,13 +15,12 @@ export function DocumentBreadcrumb() {
     const utils = api.useUtils()
     const { toast } = useToast()
 
-    const { data: document } = api.document.getDocumentById.useQuery(documentId, {
+    const { data: document, isLoading } = api.document.getDocumentById.useQuery(documentId, {
         enabled: !!documentId
     })
 
     const updateName = api.document.updateDocumentName.useMutation({
         onError: (err) => {
-
             setName(document?.document?.name ?? "Untitled")
 
             toast({
@@ -90,61 +89,65 @@ export function DocumentBreadcrumb() {
         <Breadcrumb>
             <BreadcrumbList>
                 <BreadcrumbItem className="md:block">
-                    <div className="relative group">
-                        {isEditing ? (
-                            <div className="flex items-center">
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-                                    onBlur={handleSave}
-                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                                        if (e.key === "Enter") {
-                                            handleSave()
-                                        }
-                                        if (e.key === "Escape") {
-                                            handleCancel()
-                                        }
-                                    }}
-                                    className={cn(
-                                        sharedStyles,
-                                        "bg-transparent outline-none pr-8",
-                                        "focus:bg-accent focus:text-accent-foreground truncate"
-                                    )}
-                                    autoFocus
-                                />
-                                <button
-                                    onMouseDown={(e) => {
-                                        // Prevent the input's onBlur from firing
-                                        e.preventDefault()
-                                    }}
-                                    onClick={handleCancel}
-                                    className="absolute right-1 p-1 rounded-sm hover:bg-accent/50"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center">
-                                <button
-                                    onClick={() => setIsEditing(true)}
-                                    className={cn(
-                                        sharedStyles,
-                                        "text-left hover:bg-accent hover:text-accent-foreground pr-8 truncate"
-                                    )}
-                                    title={name}
-                                >
-                                    {name}
-                                </button>
-                                <button
-                                    onClick={() => setIsEditing(true)}
-                                    className="absolute right-1 p-1 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-accent/50"
-                                >
-                                    <SquarePen className="h-4 w-4" />
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    {isLoading ? (
+                        <div className={cn(sharedStyles, "bg-accent animate-pulse h-4")} />
+                    ) : (
+                        <div className="relative group">
+                            {isEditing ? (
+                                <div className="flex items-center">
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+                                        onBlur={handleSave}
+                                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                                            if (e.key === "Enter") {
+                                                handleSave()
+                                            }
+                                            if (e.key === "Escape") {
+                                                handleCancel()
+                                            }
+                                        }}
+                                        className={cn(
+                                            sharedStyles,
+                                            "bg-transparent outline-none pr-8",
+                                            "focus:bg-accent focus:text-accent-foreground truncate"
+                                        )}
+                                        autoFocus
+                                    />
+                                    <button
+                                        onMouseDown={(e) => {
+                                            // Prevent the input's onBlur from firing
+                                            e.preventDefault()
+                                        }}
+                                        onClick={handleCancel}
+                                        className="absolute right-1 p-1 rounded-sm hover:bg-accent/50"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className={cn(
+                                            sharedStyles,
+                                            "text-left hover:bg-accent hover:text-accent-foreground pr-8 truncate"
+                                        )}
+                                        title={name}
+                                    >
+                                        {name}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="absolute right-1 p-1 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-accent/50"
+                                    >
+                                        <SquarePen className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </BreadcrumbItem>
             </BreadcrumbList>
         </Breadcrumb>
