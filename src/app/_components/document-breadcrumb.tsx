@@ -21,7 +21,12 @@ export function DocumentBreadcrumb() {
 
     const updateName = api.document.updateDocumentName.useMutation({
         onError: (err) => {
-            setName(document?.document?.name ?? "Untitled")
+            setEditingName(document?.document?.name ?? "Untitled")
+
+            // Revert both caches on error
+            if (document?.document) {
+                utils.document.getDocumentById.setData(documentId, document)
+            }
 
             toast({
                 variant: "destructive",
@@ -35,25 +40,26 @@ export function DocumentBreadcrumb() {
     })
 
     const [isEditing, setIsEditing] = useState(false)
-    const [name, setName] = useState<string | undefined>(undefined)
+    const [editingName, setEditingName] = useState<string>("Untitled")
 
-    // Update local state when document name changes
+    // Update editing state when document name changes
     React.useEffect(() => {
         if (document?.document?.name) {
-            setName(document.document.name)
+            setEditingName(document.document.name)
         }
     }, [document?.document?.name])
 
     const handleSave = () => {
-        const trimmedName = name?.trim() ?? "Untitled"
+        const trimmedName = editingName.trim()
         if (!trimmedName) {
             handleCancel()
             return
         }
 
         if (documentId && trimmedName !== document?.document?.name) {
-            // Snapshot the previous value
+            // Snapshot the previous values
             const prevDocs = utils.document.getDocumentIdsForAuthenticatedUser.getData()
+            const prevDoc = utils.document.getDocumentById.getData(documentId)
 
             // Optimistically update the documents list
             utils.document.getDocumentIdsForAuthenticatedUser.setData(undefined, old => {
@@ -66,11 +72,25 @@ export function DocumentBreadcrumb() {
                 }
             })
 
+            // Optimistically update the document data
+            if (document?.document) {
+                utils.document.getDocumentById.setData(documentId, {
+                    ...document,
+                    document: {
+                        ...document.document,
+                        name: trimmedName
+                    }
+                })
+            }
+
             updateName.mutate({ id: documentId, name: trimmedName }, {
                 onError: () => {
-                    // Revert on error
+                    // Revert both caches on error
                     if (prevDocs) {
                         utils.document.getDocumentIdsForAuthenticatedUser.setData(undefined, prevDocs)
+                    }
+                    if (prevDoc) {
+                        utils.document.getDocumentById.setData(documentId, prevDoc)
                     }
                 }
             })
@@ -79,16 +99,12 @@ export function DocumentBreadcrumb() {
     }
 
     const handleCancel = () => {
-        setName(document?.document?.name ?? "Untitled")
+        setEditingName(document?.document?.name ?? "Untitled")
         setIsEditing(false)
     }
 
     const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm"
-
-    // Don't show anything until we have a name
-    if (!isLoading && !name) {
-        return null;
-    }
+    const displayName = document?.document?.name ?? "Untitled"
 
     return (
         <Breadcrumb>
@@ -102,8 +118,8 @@ export function DocumentBreadcrumb() {
                                 <div className="flex items-center">
                                     <input
                                         type="text"
-                                        value={name}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+                                        value={editingName}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingName(e.target.value)}
                                         onBlur={handleSave}
                                         onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                             if (e.key === "Enter") {
@@ -139,9 +155,9 @@ export function DocumentBreadcrumb() {
                                             sharedStyles,
                                             "text-left hover:bg-accent hover:text-accent-foreground pr-8 truncate"
                                         )}
-                                        title={name}
+                                        title={displayName}
                                     >
-                                        {name}
+                                        {displayName}
                                     </button>
                                     <button
                                         onClick={() => setIsEditing(true)}
