@@ -35,7 +35,7 @@ export function DocumentBreadcrumb() {
     })
 
     const [isEditing, setIsEditing] = useState(false)
-    const [name, setName] = useState(document?.document?.name ?? "Untitled")
+    const [name, setName] = useState<string | undefined>(undefined)
 
     // Update local state when document name changes
     React.useEffect(() => {
@@ -45,7 +45,7 @@ export function DocumentBreadcrumb() {
     }, [document?.document?.name])
 
     const handleSave = () => {
-        const trimmedName = name.trim()
+        const trimmedName = name?.trim() ?? "Untitled"
         if (!trimmedName) {
             handleCancel()
             return
@@ -84,6 +84,11 @@ export function DocumentBreadcrumb() {
     }
 
     const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm"
+
+    // Don't show anything until we have a name
+    if (!isLoading && !name) {
+        return null;
+    }
 
     return (
         <Breadcrumb>
