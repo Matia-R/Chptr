@@ -202,7 +202,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const editor = useCreateBlockNote({
         schema,
-        initialContent: propInitialContent,
+        ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     });
 
     const handleChange = useCallback(() => {

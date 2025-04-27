@@ -23,32 +23,13 @@ export async function createDocument() {
 
     const newDocumentId = randomUUID()
 
-    const newDocumentContent = [{
-        id: "1",
-        type: "heading",
-        props: {
-            textColor: "default",
-            backgroundColor: "default",
-            textAlignment: "left",
-            level: 1
-        },
-        content: [
-            {
-                type: "text",
-                text: "Untitled",
-                styles: {}
-            }
-        ],
-        children: []
-    }]
-
     const { data, error } = await supabase
         .from('documents')
         .insert({
             id: newDocumentId,
             creator_id: currentUserId,
             name: 'Untitled',
-            content: newDocumentContent
+            content: []
         })
         .select()
 
@@ -98,7 +79,7 @@ export async function getLastUpdatedTimestamp(documentId: string) {
     return { success: true, lastUpdated: data?.last_updated }
 }
 
-export const getDocumentsForUser = async () => {
+export const getDocumentIdsForUser = async () => {
     const supabase = await createClient()
 
     const {

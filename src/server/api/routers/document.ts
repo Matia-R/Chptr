@@ -2,7 +2,7 @@ import { type Block } from "@blocknote/core";
 import { z } from "zod"
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { createDocument, saveDocument, getDocumentById, getLastUpdatedTimestamp, getDocumentsForUser as getDocumentsIdsForUser, updateDocumentName } from '~/server/db'
+import { createDocument, saveDocument, getDocumentById, getLastUpdatedTimestamp, getDocumentIdsForUser as getDocumentsIdsForUser, updateDocumentName } from '~/server/db'
 
 export interface Document {
     id: string,
