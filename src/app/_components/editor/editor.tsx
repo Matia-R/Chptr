@@ -169,7 +169,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         timeoutRef.current = setTimeout(() => {
             void saveDocument.mutate({
                 id: documentId,
-                name: "Untitled",
                 content: content,
                 lastUpdated: new Date(Date.now()),
             });
