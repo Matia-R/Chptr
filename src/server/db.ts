@@ -37,16 +37,18 @@ export async function createDocument() {
     return { success: true, createdDocument: data }
 }
 
-export async function saveDocument(doc: Document) {
+export async function saveDocument(doc: Omit<Document, 'name'>) {
     const supabase = await createClient()
+
+    const lastUpdated = doc.lastUpdated || new Date()
+    console.log("Doc save time: ", lastUpdated)
 
     const { error } = await supabase
         .from('documents')
         .upsert({
             id: doc.id,
-            name: doc.name,
             content: doc.content,
-            last_updated: doc.lastUpdated
+            last_updated: lastUpdated
         })
 
     if (error) throw new Error(`Failed to save document: ${error.message}`)
@@ -91,10 +93,12 @@ export const getDocumentIdsForUser = async () => {
         .select(`
             document_id,
             documents:document_id (
-                name
+                name,
+                last_updated
             )
         `)
-        .eq('user_id', user?.id) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name'> })[] | null, error: Error | null }
+        .eq('user_id', user?.id)
+        .order('documents(last_updated)', { ascending: false }) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name' | 'last_updated'> })[] | null, error: Error | null }
 
     const documents = data?.map((permission) => ({
         id: permission.document_id,
@@ -111,7 +115,10 @@ export async function updateDocumentName(documentId: string, name: string) {
 
     const { error } = await supabase
         .from('documents')
-        .update({ name })
+        .update({
+            name,
+            last_updated: new Date()
+        })
         .eq('id', documentId)
 
     if (error) throw new Error(`Failed to update document name: ${error.message}`)

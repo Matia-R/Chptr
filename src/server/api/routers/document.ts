@@ -24,7 +24,7 @@ export const documentRouter = createTRPCRouter({
             return createDocument();
         }),
     saveDocument: publicProcedure
-        .input(documentSchema)
+        .input(documentSchema.omit({ name: true }))
         .mutation(async ({ input }) => {
             return saveDocument(input);
         }),
