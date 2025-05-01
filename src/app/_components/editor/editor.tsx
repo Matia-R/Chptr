@@ -2,7 +2,6 @@
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { ThemeToggle } from "../theme-toggle";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -41,7 +40,16 @@ const schema = BlockNoteSchema.create({
 export default function Editor({ initialContent: propInitialContent, documentId }: EditorProps) {
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
-    const saveDocument = api.document.saveDocument.useMutation();
+    const utils = api.useUtils();
+    const saveDocument = api.document.saveDocument.useMutation({
+        onSuccess: () => {
+            // Invalidate both the document and the document list queries
+            void Promise.all([
+                utils.document.getDocumentById.invalidate(documentId),
+                utils.document.getDocumentIdsForAuthenticatedUser.invalidate()
+            ]);
+        }
+    });
     const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
 
@@ -164,9 +172,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         timeoutRef.current = setTimeout(() => {
             void saveDocument.mutate({
                 id: documentId,
-                name: "Untitled",
                 content: content,
-                lastUpdated: new Date(),
+                lastUpdated: new Date(Date.now()),
             });
         }, 1000);
     }, [documentId, saveDocument]);
@@ -197,7 +204,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const editor = useCreateBlockNote({
         schema,
-        initialContent: propInitialContent,
+        ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     });
 
     const handleChange = useCallback(() => {
@@ -222,7 +229,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     }
                 />
             </BlockNoteView>
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
         </div >
     );
 }

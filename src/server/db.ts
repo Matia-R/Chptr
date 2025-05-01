@@ -10,30 +10,18 @@ type DocumentSchema = {
     last_updated?: Date;
 }
 
+type DocumentPermissionSchema = {
+    id: string;
+    user_id: string;
+    document_id: string;
+    permission: string;
+}
+
 export async function createDocument() {
     const supabase = await createClient()
     const currentUserId = (await supabase.auth.getUser()).data.user?.id
 
     const newDocumentId = randomUUID()
-
-    const newDocumentContent = [{
-        id: "1",
-        type: "heading",
-        props: {
-            textColor: "default",
-            backgroundColor: "default",
-            textAlignment: "left",
-            level: 1
-        },
-        content: [
-            {
-                type: "text",
-                text: "Untitled",
-                styles: {}
-            }
-        ],
-        children: []
-    }]
 
     const { data, error } = await supabase
         .from('documents')
@@ -41,7 +29,7 @@ export async function createDocument() {
             id: newDocumentId,
             creator_id: currentUserId,
             name: 'Untitled',
-            content: newDocumentContent
+            content: []
         })
         .select()
 
@@ -49,14 +37,15 @@ export async function createDocument() {
     return { success: true, createdDocument: data }
 }
 
-export async function saveDocument(doc: Document) {
+export async function saveDocument(doc: Omit<Document, 'name'>) {
     const supabase = await createClient()
+
+    console.log("Doc save time: ", doc.lastUpdated)
 
     const { error } = await supabase
         .from('documents')
         .upsert({
             id: doc.id,
-            name: doc.name,
             content: doc.content,
             last_updated: doc.lastUpdated
         })
@@ -89,4 +78,48 @@ export async function getLastUpdatedTimestamp(documentId: string) {
 
     if (error) throw new Error(`Failed to fetch last updated timestamp: ${error.message}`)
     return { success: true, lastUpdated: data?.last_updated }
+}
+
+export const getDocumentIdsForUser = async () => {
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    const { data, error } = await supabase
+        .from('document_permissions')
+        .select(`
+            document_id,
+            documents:document_id (
+                name,
+                last_updated
+            )
+        `)
+        .eq('user_id', user?.id)
+        .order('documents(last_updated)', { ascending: false }) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name' | 'last_updated'> })[] | null, error: Error | null }
+
+    const documents = data?.map((permission) => ({
+        id: permission.document_id,
+        name: permission.documents.name
+    }))
+
+    if (error) throw new Error(`Failed to fetch documents for user: ${error.message}`)
+    return { success: true, documents }
+}
+
+export async function updateDocumentName(documentId: string, name: string) {
+
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('documents')
+        .update({
+            name,
+            last_updated: new Date()
+        })
+        .eq('id', documentId)
+
+    if (error) throw new Error(`Failed to update document name: ${error.message}`)
+    return { success: true }
 }
