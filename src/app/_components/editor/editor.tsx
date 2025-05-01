@@ -43,8 +43,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const utils = api.useUtils();
     const saveDocument = api.document.saveDocument.useMutation({
         onSuccess: () => {
-            // Invalidate the document query to ensure fresh data on next fetch
-            void utils.document.getDocumentById.invalidate(documentId);
+            // Invalidate both the document and the document list queries
+            void Promise.all([
+                utils.document.getDocumentById.invalidate(documentId),
+                utils.document.getDocumentIdsForAuthenticatedUser.invalidate()
+            ]);
         }
     });
     const generate = api.atActions.generate.useMutation();

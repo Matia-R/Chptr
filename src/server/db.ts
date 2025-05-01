@@ -40,15 +40,14 @@ export async function createDocument() {
 export async function saveDocument(doc: Omit<Document, 'name'>) {
     const supabase = await createClient()
 
-    const lastUpdated = doc.lastUpdated || new Date()
-    console.log("Doc save time: ", lastUpdated)
+    console.log("Doc save time: ", doc.lastUpdated)
 
     const { error } = await supabase
         .from('documents')
         .upsert({
             id: doc.id,
             content: doc.content,
-            last_updated: lastUpdated
+            last_updated: doc.lastUpdated
         })
 
     if (error) throw new Error(`Failed to save document: ${error.message}`)

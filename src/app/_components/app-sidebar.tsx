@@ -113,23 +113,37 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               New Document
             </Button>
           </div>
-          <SidebarMenu className="gap-2">
-            {documents?.documents?.map((doc) => (
-              <SidebarMenuItem key={doc.id}>
-                <SidebarMenuButton asChild>
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    prefetch={true}
-                    onClick={() => {
-                      // Invalidate the cache when navigating to ensure fresh data
-                      void utils.document.getDocumentById.invalidate(doc.id);
-                    }}
-                  >
-                    {doc.name}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+          <SidebarMenu className="relative">
+            <div
+              className="relative"
+              style={{
+                '--item-count': documents?.documents?.length ?? 0,
+                height: 'calc(var(--item-count) * 48px)'
+              } as React.CSSProperties}
+            >
+              {documents?.documents?.map((doc, index) => (
+                <SidebarMenuItem
+                  key={doc.id}
+                  className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
+                  style={{
+                    '--index': index,
+                    transform: 'translateY(calc(var(--index) * 48px))'
+                  } as React.CSSProperties}
+                >
+                  <SidebarMenuButton asChild>
+                    <Link
+                      href={`/documents/${doc.id}`}
+                      prefetch={true}
+                      onClick={() => {
+                        void utils.document.getDocumentById.invalidate(doc.id);
+                      }}
+                    >
+                      {doc.name}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </div>
           </SidebarMenu>
         </SidebarGroup>
         <ThemeToggle />
