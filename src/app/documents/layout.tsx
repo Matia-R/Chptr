@@ -45,14 +45,14 @@ export default async function RootLayout({
                     <AppSidebar initialDocuments={documents} />
                     <SidebarInset>
                         <div className="flex h-screen flex-col">
-                            <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b bg-background">
+                            <header className="absolute top-0 left-0 right-0 flex h-16 shrink-0 items-center gap-2 px-4 border-b bg-background/75 backdrop-blur-sm z-10">
                                 <SidebarTrigger className="-ml-1" />
                                 <Separator orientation="vertical" className="mr-2 h-4" />
                                 <DocumentBreadcrumb />
                             </header>
-                            <main className="flex-1 overflow-auto">
-                                <div className="md:p-8 lg:p-12">
-                                    <div className="mx-auto max-w-5xl">
+                            <main className="flex-1 overflow-auto h-screen">
+                                <div className="h-full md:p-8 lg:p-12">
+                                    <div className="mx-auto max-w-5xl h-full pt-16">
                                         {children}
                                     </div>
                                 </div>
