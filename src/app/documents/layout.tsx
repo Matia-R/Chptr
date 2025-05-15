@@ -10,8 +10,8 @@ import { Separator } from "../_components/separator";
 import { Toaster } from "../_components/ui/toaster";
 import { DocumentBreadcrumb } from "../_components/document-breadcrumb";
 import { getTrpcCaller } from "~/utils/trpc-utils";
-import { Input } from "../_components/ui/input";
 import { LastEdited } from "../_components/last-edited";
+import { CommandMenu } from "../_components/command-menu";
 
 export const metadata: Metadata = {
     title: "Chptr",
@@ -48,7 +48,7 @@ export default async function RootLayout({
                     <AppSidebar initialDocuments={documents} />
                     <SidebarInset>
                         <div className="flex h-screen flex-col">
-                            <header className="absolute top-0 left-0 right-0 h-11 flex shrink-0 items-center justify-between gap-2 px-4 border-b bg-background/75 backdrop-blur-md z-10">
+                            <header className="absolute top-0 left-0 right-0 h-12 flex shrink-0 items-center justify-between gap-2 px-4 border-b bg-background/75 backdrop-blur-md z-10">
                                 <div className="flex items-center gap-2">
                                     <SidebarTrigger className="-ml-1" />
                                     <Separator orientation="vertical" className="mr-2 h-4" />
@@ -67,6 +67,7 @@ export default async function RootLayout({
                     </SidebarInset>
                     <Toaster />
                 </SidebarProvider>
+                <CommandMenu />
             </ThemeProvider>
         </TRPCReactProvider>
     );

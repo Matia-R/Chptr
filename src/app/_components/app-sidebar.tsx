@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { FileText, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { api } from "~/trpc/react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
+import { ScrollArea } from "~/app/_components/scroll-area"
 
 import {
   Sidebar,
@@ -14,12 +15,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
 } from "~/app/_components/sidebar"
 import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
 import { ThemeToggle } from "./theme-toggle"
 import { useToast } from "../../hooks/use-toast"
-
+import { NavUser } from "./nav-user"
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
 }
@@ -84,70 +86,81 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
   return (
     <Sidebar variant="floating" {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/documents">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <FileText className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">My Documents</span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <div className="px-2 mb-2">
-            <Button
-              className="w-full justify-start gap-2"
-              variant="outline"
-              onClick={() => createDocument.mutate()}
-              disabled={createDocument.status === 'pending'}
-            >
-              <Plus className="size-4" />
-              New Document
-            </Button>
-          </div>
-          <SidebarMenu className="relative">
-            <div
-              className="relative"
-              style={{
-                '--item-count': documents?.documents?.length ?? 0,
-                height: 'calc(var(--item-count) * 48px)'
-              } as React.CSSProperties}
-            >
-              {documents?.documents?.map((doc, index) => (
-                <SidebarMenuItem
-                  key={doc.id}
-                  className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
-                  style={{
-                    '--index': index,
-                    transform: 'translateY(calc(var(--index) * 48px))'
-                  } as React.CSSProperties}
+      <div className="flex h-full flex-col">
+        <div className="flex-none">
+          <SidebarHeader>
+            <div className="px-2 font-semibold">Chptr</div>
+            <div className="pt-2">
+              <div className="mb-2">
+                <Button
+                  className="w-full justify-start gap-2"
+                  variant="outline"
+                  onClick={() => createDocument.mutate()}
+                  disabled={createDocument.status === 'pending'}
                 >
-                  <SidebarMenuButton asChild>
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      prefetch={true}
-                      onClick={() => {
-                        void utils.document.getDocumentById.invalidate(doc.id);
-                      }}
-                    >
-                      {doc.name}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                  <Plus className="size-4" />
+                  New
+                  <span className="text-xs font-medium ml-auto">⌘N</span>
+                </Button>
+              </div>
             </div>
-          </SidebarMenu>
-        </SidebarGroup>
-        <ThemeToggle />
-      </SidebarContent>
+          </SidebarHeader>
+          <SidebarHeader>
+            <div className="px-2 text-sm font-semibold flex items-center justify-between">
+              <span>Notes</span>
+              <span className="text-xs text-muted-foreground">Search ⌘K</span>
+            </div>
+          </SidebarHeader>
+        </div>
+
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarMenu>
+                  <div
+                    className="relative"
+                    style={{
+                      '--item-count': documents?.documents?.length ?? 0,
+                      height: 'calc(var(--item-count) * 48px)'
+                    } as React.CSSProperties}
+                  >
+                    {documents?.documents?.map((doc, index) => (
+                      <SidebarMenuItem
+                        key={doc.id}
+                        className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
+                        style={{
+                          '--index': index,
+                          transform: 'translateY(calc(var(--index) * 48px))'
+                        } as React.CSSProperties}
+                      >
+                        <SidebarMenuButton asChild>
+                          <Link
+                            href={`/documents/${doc.id}`}
+                            prefetch={true}
+                            onClick={() => {
+                              void utils.document.getDocumentById.invalidate(doc.id);
+                            }}
+                          >
+                            {doc.name}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </div>
+                </SidebarMenu>
+              </SidebarGroup>
+            </SidebarContent>
+          </ScrollArea>
+        </div>
+
+        <div className="flex-none">
+          <SidebarFooter>
+            <NavUser user={{ name: "John Doe", email: "john.doe@example.com", avatar: "https://github.com/shadcn.png" }} />
+          </SidebarFooter>
+          {/* <ThemeToggle /> */}
+        </div>
+      </div>
     </Sidebar>
   )
 }
