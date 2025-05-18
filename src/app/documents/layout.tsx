@@ -10,7 +10,7 @@ import { Separator } from "../_components/separator";
 import { Toaster } from "../_components/ui/toaster";
 import { DocumentBreadcrumb } from "../_components/document-breadcrumb";
 import { getTrpcCaller } from "~/utils/trpc-utils";
-import { LastEdited } from "../_components/last-edited";
+import { DocumentActions } from "../_components/document-actions";
 import { CommandMenu } from "../_components/command-menu";
 
 export const metadata: Metadata = {
@@ -54,7 +54,7 @@ export default async function RootLayout({
                                     <Separator orientation="vertical" className="mr-2 h-4" />
                                     <DocumentBreadcrumb />
                                 </div>
-                                <LastEdited />
+                                <DocumentActions />
                             </header>
                             <main className="flex-1 overflow-auto h-screen">
                                 <div className="h-full md:p-8 lg:p-12">
