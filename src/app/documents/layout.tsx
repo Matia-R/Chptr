@@ -10,6 +10,9 @@ import { Separator } from "../_components/separator";
 import { Toaster } from "../_components/ui/toaster";
 import { DocumentBreadcrumb } from "../_components/document-breadcrumb";
 import { getTrpcCaller } from "~/utils/trpc-utils";
+import { DocumentActions } from "../_components/document-actions";
+import { CommandMenu } from "../_components/command-menu";
+
 export const metadata: Metadata = {
     title: "Chptr",
     description: "A simple, elegant, and powerful note-taking app.",
@@ -45,14 +48,17 @@ export default async function RootLayout({
                     <AppSidebar initialDocuments={documents} />
                     <SidebarInset>
                         <div className="flex h-screen flex-col">
-                            <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b bg-background">
-                                <SidebarTrigger className="-ml-1" />
-                                <Separator orientation="vertical" className="mr-2 h-4" />
-                                <DocumentBreadcrumb />
+                            <header className="absolute top-0 left-0 right-0 h-12 flex shrink-0 items-center justify-between gap-2 px-4 border-b bg-background/75 backdrop-blur-md z-10">
+                                <div className="flex items-center gap-2">
+                                    <SidebarTrigger className="-ml-1" />
+                                    <Separator orientation="vertical" className="mr-2 h-4" />
+                                    <DocumentBreadcrumb />
+                                </div>
+                                <DocumentActions />
                             </header>
-                            <main className="flex-1 overflow-auto">
-                                <div className="md:p-8 lg:p-12">
-                                    <div className="mx-auto max-w-5xl">
+                            <main className="flex-1 overflow-auto h-screen">
+                                <div className="h-full md:p-8 lg:p-12">
+                                    <div className="mx-auto max-w-5xl h-full pt-16">
                                         {children}
                                     </div>
                                 </div>
@@ -61,6 +67,7 @@ export default async function RootLayout({
                     </SidebarInset>
                     <Toaster />
                 </SidebarProvider>
+                <CommandMenu />
             </ThemeProvider>
         </TRPCReactProvider>
     );

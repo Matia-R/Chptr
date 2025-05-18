@@ -2130,3 +2130,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
 }
+
+[data-floating-ui-focusable] {
+  z-index: 5 !important;
+}

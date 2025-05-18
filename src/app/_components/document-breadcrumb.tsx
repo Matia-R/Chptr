@@ -110,7 +110,7 @@ export function DocumentBreadcrumb() {
         setIsEditing(false)
     }
 
-    const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm"
+    const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold"
 
     // Don't render anything until we have the document data
     if (isLoading || !document?.document?.name) {
