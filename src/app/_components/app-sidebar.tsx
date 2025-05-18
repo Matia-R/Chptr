@@ -19,9 +19,10 @@ import {
 } from "~/app/_components/sidebar"
 import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
-import { ThemeToggle } from "./theme-toggle"
 import { useToast } from "../../hooks/use-toast"
 import { NavUser } from "./nav-user"
+import { useCommandMenuStore } from "~/hooks/use-command-menu"
+
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
 }
@@ -32,6 +33,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
   const { toast } = useToast();
+  const setOpen = useCommandMenuStore((state) => state.setOpen)
 
   // Use TRPC query to keep documents in sync
   const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
@@ -108,7 +110,14 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           <SidebarHeader>
             <div className="px-2 text-sm font-semibold flex items-center justify-between">
               <span>Notes</span>
-              <span className="text-xs text-muted-foreground">Search ⌘K</span>
+              <button
+                onClick={() => setOpen(true)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground"
+                data-highlight="false"
+                data-search-button
+              >
+                Search ⌘K
+              </button>
             </div>
           </SidebarHeader>
         </div>
