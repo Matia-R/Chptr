@@ -17,6 +17,14 @@ type DocumentPermissionSchema = {
     permission: string;
 }
 
+type UserProfile = {
+    updated_at: string,
+    avatar_url: string,
+    first_name: string,
+    last_name: string,
+    default_avatar_background_color: string,
+};
+
 export async function createDocument() {
     const supabase = await createClient()
     const currentUserId = (await supabase.auth.getUser()).data.user?.id
@@ -122,4 +130,33 @@ export async function updateDocumentName(documentId: string, name: string) {
 
     if (error) throw new Error(`Failed to update document name: ${error.message}`)
     return { success: true }
+}
+
+export async function getCurrentUserFirstName(): Promise<string | undefined> {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log("User: ", user)
+    console.log("id: ", "181530dc-bc37-4799-a494-71bed724941a")
+    if (userError || !user) throw new Error('Not authenticated');
+    type ProfileFirstName = { first_name: string };
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name')
+        .eq('id', user.id)
+        .single<ProfileFirstName>();
+    if (error) throw new Error('Failed to fetch first name');
+    return data?.first_name;
+}
+
+export async function getCurrentUserProfile(): Promise<UserProfile | undefined> {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not authenticated');
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single<UserProfile>();
+    if (error) throw new Error('Failed to fetch user profile');
+    return data;
 }

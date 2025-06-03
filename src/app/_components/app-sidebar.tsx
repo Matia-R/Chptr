@@ -16,12 +16,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "~/app/_components/sidebar"
 import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
 import { useToast } from "../../hooks/use-toast"
 import { NavUser } from "./nav-user"
 import { useCommandMenuStore } from "~/hooks/use-command-menu"
+import { createBrowserClient } from '@supabase/ssr'
+import { type SupabaseClient } from '@supabase/supabase-js'
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
@@ -34,12 +37,35 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const utils = api.useUtils();
   const { toast } = useToast();
   const setOpen = useCommandMenuStore((state) => state.setOpen)
+  const { isMobile, setOpenMobile } = useSidebar();
 
   // Use TRPC query to keep documents in sync
   const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
     initialData: { success: true, documents: initialDocuments },
     refetchOnMount: true
   });
+
+  // Fetch user profile
+  const { data: userProfile, isLoading: userLoading } = api.user.getUserProfile.useQuery();
+
+  // Fetch user email from Supabase auth
+  const [userEmail, setUserEmail] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    const fetchEmail = async () => {
+      try {
+        const supabase: SupabaseClient = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        setUserEmail(data.user?.email ?? null);
+      } catch (err) {
+        setUserEmail(null);
+      }
+    };
+    void fetchEmail();
+  }, []);
 
   const createDocument = api.document.createDocument.useMutation({
     onSuccess: async (data) => {
@@ -102,7 +128,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 >
                   <Plus className="size-4" />
                   New
-                  <span className="text-xs font-medium ml-auto">⌘N</span>
+                  {/* <span className="text-xs font-medium ml-auto">⌘+Shift+N</span> */}
                 </Button>
               </div>
             </div>
@@ -112,7 +138,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               <span>Notes</span>
               <button
                 onClick={() => setOpen(true)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground focus-visible:ring-1 focus-visible:ring-ring outline-none"
                 data-highlight="false"
                 data-search-button
               >
@@ -149,6 +175,9 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                             prefetch={true}
                             onClick={() => {
                               void utils.document.getDocumentById.invalidate(doc.id);
+                              if (isMobile) {
+                                setOpenMobile(false);
+                              }
                             }}
                           >
                             {doc.name}
@@ -165,7 +194,19 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
         <div className="flex-none">
           <SidebarFooter>
-            <NavUser user={{ name: "John Doe", email: "john.doe@example.com", avatar: "https://github.com/shadcn.png" }} />
+            {userProfile && userEmail ? (
+              <NavUser
+                user={{
+                  first_name: userProfile.first_name,
+                  last_name: userProfile.last_name,
+                  email: userEmail,
+                  avatar_url: userProfile.avatar_url,
+                  default_avatar_background_color: userProfile.default_avatar_background_color,
+                }}
+              />
+            ) : (
+              <NavUser isLoading={userLoading} />
+            )}
           </SidebarFooter>
           {/* <ThemeToggle /> */}
         </div>

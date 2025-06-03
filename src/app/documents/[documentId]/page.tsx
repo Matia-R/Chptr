@@ -42,13 +42,9 @@ export default function DocumentPage() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-0">
-            <div className="mx-auto max-w-5xl h-[calc(100vh-8rem)]">
-                <Editor
-                    initialContent={documentData.document.content}
-                    documentId={documentId}
-                />
-            </div>
-        </div>
+        <Editor
+            initialContent={documentData.document.content}
+            documentId={documentId}
+        />
     )
 }

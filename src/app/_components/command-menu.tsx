@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { FileText } from "lucide-react"
 import { DialogTitle } from "./dialog"
 import { useCommandMenuStore } from "~/hooks/use-command-menu"
+import { FilePlus2 } from "lucide-react"
 
 export function CommandMenu() {
     const [search, setSearch] = useState("")
@@ -14,6 +15,7 @@ export function CommandMenu() {
     const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery()
     const isOpen = useCommandMenuStore((state) => state.isOpen)
     const setOpen = useCommandMenuStore((state) => state.setOpen)
+    const closeAll = useCommandMenuStore((state) => state.closeAll)
 
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -55,7 +57,7 @@ export function CommandMenu() {
                                 value={doc.name + "_" + doc.id}
                                 onSelect={() => {
                                     router.push(`/documents/${doc.id}`)
-                                    setOpen(false)
+                                    closeAll()
                                 }}
                             >
                                 <FileText className="mr-2 h-4 w-4" />
@@ -63,10 +65,11 @@ export function CommandMenu() {
                             </CommandItem>
                         ))}
                     </CommandGroup>
-                    <CommandGroup heading="Suggestions">
-                        <CommandItem value="calendar">Calendar</CommandItem>
-                        <CommandItem value="search-emoji">Search Emoji</CommandItem>
-                        <CommandItem value="calculator">Calculator</CommandItem>
+                    <CommandGroup heading="Quick Actions">
+                        <CommandItem value="new-note">
+                            <FilePlus2 className="mr-2 h-4 w-4" />
+                            New note
+                        </CommandItem>
                     </CommandGroup>
                 </CommandList>
             </Command>
