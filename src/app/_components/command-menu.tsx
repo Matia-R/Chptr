@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandDialog, CommandGroup } from "./command"
 import { api } from "~/trpc/react"
 import { useRouter } from "next/navigation"
-import { FileText } from "lucide-react"
+import { FileText, SunMoon, FilePlus } from "lucide-react"
 import { DialogTitle } from "./dialog"
 import { useCommandMenuStore } from "~/hooks/use-command-menu"
-import { FilePlus2 } from "lucide-react"
+import { useTheme } from "next-themes"
 
 export function CommandMenu() {
     const [search, setSearch] = useState("")
@@ -16,6 +16,7 @@ export function CommandMenu() {
     const isOpen = useCommandMenuStore((state) => state.isOpen)
     const setOpen = useCommandMenuStore((state) => state.setOpen)
     const closeAll = useCommandMenuStore((state) => state.closeAll)
+    const { theme, setTheme } = useTheme()
 
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -67,8 +68,19 @@ export function CommandMenu() {
                     </CommandGroup>
                     <CommandGroup heading="Quick Actions">
                         <CommandItem value="new-note">
-                            <FilePlus2 className="mr-2 h-4 w-4" />
+                            <FilePlus className="mr-2 h-4 w-4" />
                             New note
+                        </CommandItem>
+                        <CommandItem
+                            value="toggle-theme"
+                            onSelect={() => {
+                                setTheme(theme === "dark" ? "light" : "dark")
+                                closeAll()
+                            }}
+                        >
+                            <SunMoon className="mr-2 h-4 w-4" />
+                            Toggle theme
+                            <span className="ml-auto text-xs text-muted-foreground">Current: {theme}</span>
                         </CommandItem>
                     </CommandGroup>
                 </CommandList>
