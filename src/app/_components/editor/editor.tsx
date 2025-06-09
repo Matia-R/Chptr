@@ -11,7 +11,6 @@ import { api } from "~/trpc/react";
 import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { Alert } from "./custom-blocks/Alert";
 
-
 // Define a type for the theme
 type Theme = 'light' | 'dark' | 'system';
 
@@ -214,22 +213,19 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     }, [editor, debouncedSave]);
 
     return (
-        <div>
-            <BlockNoteView
-                editor={editor}
-                shadCNComponents={{}}
-                theme={currentTheme as 'light' | 'dark'}
-                onChange={handleChange}
-            >
-                <SuggestionMenuController
-                    triggerCharacter={"@"}
-                    getItems={async (query) =>
-                        // Gets the mentions menu items
-                        filterSuggestionItems(getAtActionMenuItems(), query)
-                    }
-                />
-            </BlockNoteView>
-            {/* <ThemeToggle /> */}
-        </div >
+        <BlockNoteView
+            editor={editor}
+            shadCNComponents={{}}
+            theme={currentTheme as 'light' | 'dark'}
+            onChange={handleChange}
+        >
+            <SuggestionMenuController
+                triggerCharacter={"@"}
+                getItems={async (query) =>
+                    // Gets the mentions menu items
+                    filterSuggestionItems(getAtActionMenuItems(), query)
+                }
+            />
+        </BlockNoteView>
     );
 }
