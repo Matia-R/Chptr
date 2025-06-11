@@ -23,8 +23,6 @@ import { type Document } from "~/server/api/routers/document"
 import { useToast } from "../../hooks/use-toast"
 import { NavUser } from "./nav-user"
 import { useCommandMenuStore } from "~/hooks/use-command-menu"
-import { createBrowserClient } from '@supabase/ssr'
-import { type SupabaseClient } from '@supabase/supabase-js'
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
@@ -45,27 +43,9 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     refetchOnMount: true
   });
 
-  // Fetch user profile
+  // Fetch user profile and email
   const { data: userProfile, isLoading: userLoading } = api.user.getUserProfile.useQuery();
-
-  // Fetch user email from Supabase auth
-  const [userEmail, setUserEmail] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    const fetchEmail = async () => {
-      try {
-        const supabase: SupabaseClient = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const { data, error } = await supabase.auth.getUser();
-        if (error) throw error;
-        setUserEmail(data.user?.email ?? null);
-      } catch (err) {
-        setUserEmail(null);
-      }
-    };
-    void fetchEmail();
-  }, []);
+  const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
   const createDocument = api.document.createDocument.useMutation({
     onSuccess: async (data) => {
@@ -128,7 +108,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 >
                   <Plus className="size-4" />
                   New
-                  {/* <span className="text-xs font-medium ml-auto">⌘+Shift+N</span> */}
                 </Button>
               </div>
             </div>
@@ -208,7 +187,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               <NavUser isLoading={userLoading} />
             )}
           </SidebarFooter>
-          {/* <ThemeToggle /> */}
         </div>
       </div>
     </Sidebar>

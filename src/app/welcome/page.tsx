@@ -24,7 +24,7 @@ export default function WelcomePage() {
         }
     })
 
-    const firstNameQuery = api.user.getFirstName.useQuery()
+    const firstNameQuery = api.user.getCurrentUser.useQuery()
 
     useEffect(() => {
         if (firstNameQuery.data) {

@@ -1,9 +1,9 @@
 import { publicProcedure, createTRPCRouter } from '../trpc'
-import { getCurrentUserFirstName, getCurrentUserProfile } from '~/server/db'
+import { getCurrentUser as getCurrentUser, getCurrentUserProfile } from '~/server/db'
 
 export const userRouter = createTRPCRouter({
-    getFirstName: publicProcedure.query(async () => {
-        return await getCurrentUserFirstName();
+    getCurrentUser: publicProcedure.query(async () => {
+        return await getCurrentUser();
     }),
     getUserProfile: publicProcedure.query(async () => {
         return await getCurrentUserProfile();

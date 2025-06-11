@@ -132,20 +132,11 @@ export async function updateDocumentName(documentId: string, name: string) {
     return { success: true }
 }
 
-export async function getCurrentUserFirstName(): Promise<string | undefined> {
+export async function getCurrentUser(): Promise<string | undefined> {
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    console.log("User: ", user)
-    console.log("id: ", "181530dc-bc37-4799-a494-71bed724941a")
     if (userError || !user) throw new Error('Not authenticated');
-    type ProfileFirstName = { first_name: string };
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('first_name')
-        .eq('id', user.id)
-        .single<ProfileFirstName>();
-    if (error) throw new Error('Failed to fetch first name');
-    return data?.first_name;
+    return user.email;
 }
 
 export async function getCurrentUserProfile(): Promise<UserProfile | undefined> {

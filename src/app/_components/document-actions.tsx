@@ -67,9 +67,6 @@ export function DocumentActions() {
                     )}
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:bg-destructive focus:text-destructive-foreground">
-                    Delete
-                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     )
