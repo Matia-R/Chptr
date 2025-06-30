@@ -5,7 +5,7 @@ export const userRouter = createTRPCRouter({
     getCurrentUser: publicProcedure.query(async () => {
         return await getCurrentUser();
     }),
-    getUserProfile: publicProcedure.query(async () => {
+    getCurrentUserProfile: publicProcedure.query(async () => {
         return await getCurrentUserProfile();
     })
 });

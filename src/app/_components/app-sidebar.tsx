@@ -44,7 +44,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   });
 
   // Fetch user profile and email
-  const { data: userProfile, isLoading: userLoading } = api.user.getUserProfile.useQuery();
+  const { data: userProfile, isLoading: userLoading } = api.user.getCurrentUserProfile.useQuery();
   const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
   const createDocument = api.document.createDocument.useMutation({
