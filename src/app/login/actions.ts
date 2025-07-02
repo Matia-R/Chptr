@@ -17,8 +17,14 @@ export async function login(formData: FormData) {
 
     const { error } = await supabase.auth.signInWithPassword(data)
 
+    // TODO: Add logging here for Error Codes so we know when things go wrong
     if (error) {
-        redirect('/error')
+        switch (error.message) {
+            case 'Invalid login credentials':
+                return { error: 'Invalid email or password' }
+            default:
+                return { error: error.message }
+        }
     }
 
     // Get the user's documents using TRPC

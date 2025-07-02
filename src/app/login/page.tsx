@@ -1,15 +1,14 @@
 "use client"
 
-import { login, signup } from './actions'
-import { ThemeToggle } from '../_components/theme-toggle'
+import { login } from './actions'
 import { Button } from '../_components/button'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from 'zod'
+import { useState } from 'react'
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -28,6 +27,8 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
+    const [authError, setAuthError] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -38,18 +39,22 @@ export default function LoginPage() {
     })
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
+        setAuthError(null) // Clear any previous errors
 
-        try {
+        const formData = new FormData();
+        formData.append('email', values.email);
+        formData.append('password', values.password);
 
-            const formData = new FormData();
-            formData.append('email', values.email);
-            formData.append('password', values.password);
+        setIsLoading(true)
 
-            await login(formData);
+        const result = await login(formData);
 
-        } catch (error) {
-            console.error("Login failed:", error);
+        // Check if login returned an error
+        if (result?.error && result.error !== null) {
+            setAuthError(result.error);
         }
+
+        setIsLoading(false)
     }
 
     return (
@@ -59,6 +64,9 @@ export default function LoginPage() {
                     onSubmit={form.handleSubmit(onSubmit)}
                     className="space-y-6 w-full max-w-sm"
                 >
+                    <div className="items-start w-full text-left mb-6">
+                        <h1 className="text-2xl font-bold">Login</h1>
+                    </div>
                     <FormField
                         control={form.control}
                         name="email"
@@ -68,11 +76,15 @@ export default function LoginPage() {
                                     Email
                                 </FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Email" {...field} />
+                                    <Input
+                                        placeholder="Email"
+                                        {...field}
+                                        onChange={(e) => {
+                                            field.onChange(e);
+                                            setAuthError(null);
+                                        }}
+                                    />
                                 </FormControl>
-                                <FormDescription className="text-sm text-gray-500">
-                                    This is your public display name.
-                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
 
@@ -87,26 +99,47 @@ export default function LoginPage() {
                                     Password
                                 </FormLabel>
                                 <FormControl>
-                                    <PasswordInput placeholder="Password" {...field} />
+                                    <PasswordInput
+                                        placeholder="Password"
+                                        {...field}
+                                        onChange={(e) => {
+                                            field.onChange(e);
+                                            setAuthError(null);
+                                        }}
+                                    />
                                 </FormControl>
-                                <FormDescription className="text-sm text-gray-500">
-                                    Your password.
-                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+                    {authError && (
+                        <div className="text-sm text-red-600">
+                            {authError}
+                        </div>
+                    )}
                     <Button
                         type="submit"
                         className="w-full py-2 text-sm font-medium"
+                        disabled={isLoading}
                     >
-                        Submit
+                        Login
                     </Button>
+                    <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
+                        Don&apos;t have an account?{" "}
+                        <a href="/signup" className="text-primary hover:underline">
+                            Sign up
+                        </a>
+                    </div>
                 </form>
             </Form>
-            <div className="mt-6">
-                <ThemeToggle />
-            </div>
+            {/* <div className="flex flex-col items-start">
+                <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
+                    Don&apos;t have an account?{" "}
+                    <a href="/signup" className="text-primary hover:underline">
+                        Sign up
+                    </a>
+                </div>
+            </div> */}
         </div>
 
     );

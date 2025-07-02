@@ -1,7 +1,6 @@
 "use client"
 
 import { signup } from './actions'
-import { ThemeToggle } from '../_components/theme-toggle'
 import { Button } from '../_components/button'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -68,6 +67,9 @@ export default function SignUpPage() {
                     onSubmit={form.handleSubmit(onSubmit)}
                     className="space-y-6 w-full max-w-sm"
                 >
+                    <div className="items-start w-full text-left mb-6">
+                        <h1 className="text-2xl font-bold">Signup</h1>
+                    </div>
                     <FormField
                         control={form.control}
                         name="firstName"
@@ -151,11 +153,15 @@ export default function SignUpPage() {
                     >
                         Submit
                     </Button>
+
+                    <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
+                        Already have an account?{" "}
+                        <a href="/login" className="text-primary hover:underline">
+                            Login
+                        </a>
+                    </div>
                 </form>
             </Form>
-            <div className="mt-6">
-                <ThemeToggle />
-            </div>
         </div>
 
     );

@@ -7,8 +7,8 @@ import { Button } from "./button"
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
+    // DropdownMenuItem,
+    // DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "./dropdown-menu"
 import { Skeleton } from "./skeleton"
@@ -66,7 +66,7 @@ export function DocumentActions() {
                         <span>Edited {dateStr as string}</span>
                     )}
                 </div>
-                <DropdownMenuSeparator />
+                {/* <DropdownMenuSeparator /> */}
             </DropdownMenuContent>
         </DropdownMenu>
     )

@@ -7,13 +7,13 @@ export default async function WelcomePage() {
 
     try {
         const userProfile = await caller.user.getCurrentUserProfile();
-        const { first_name, last_name } = userProfile!;
+        const { first_name } = userProfile!;
 
         return (
-            <WelcomeClient userName={first_name + " " + last_name} />
+            <WelcomeClient userName={first_name} />
         )
     } catch (error) {
         // If user is not authenticated, redirect to login
-        redirect('/auth/signin')
+        redirect('/login')
     }
 } 
