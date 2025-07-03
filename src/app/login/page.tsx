@@ -16,6 +16,7 @@ import {
 } from "../_components/form"
 import { Input } from "../_components/input"
 import { PasswordInput } from "../_components/password-input"
+import { useRouter } from 'next/navigation'
 
 const formSchema = z.object({
     email: z
@@ -29,7 +30,7 @@ const formSchema = z.object({
 export default function LoginPage() {
     const [authError, setAuthError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
-
+    const router = useRouter()
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -49,12 +50,13 @@ export default function LoginPage() {
 
         const result = await login(formData);
 
-        // Check if login returned an error
-        if (result?.error && result.error !== null) {
-            setAuthError(result.error);
-        }
-
         setIsLoading(false)
+
+        if (result?.error) {
+            setAuthError(result.error)
+        } else {
+            router.push(result.redirectTo!)
+        }
     }
 
     return (
@@ -63,6 +65,8 @@ export default function LoginPage() {
                 <form
                     onSubmit={form.handleSubmit(onSubmit)}
                     className="space-y-6 w-full max-w-sm"
+                    autoComplete="on"
+                    method="POST"
                 >
                     <div className="items-start w-full text-left mb-6">
                         <h1 className="text-2xl font-bold">Login</h1>
@@ -72,7 +76,7 @@ export default function LoginPage() {
                         name="email"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="block text-sm font-medium">
+                                <FormLabel htmlFor="email" className="block text-sm font-medium">
                                     Email
                                 </FormLabel>
                                 <FormControl>
@@ -83,6 +87,9 @@ export default function LoginPage() {
                                             field.onChange(e);
                                             setAuthError(null);
                                         }}
+                                        type="email"
+                                        name="email"
+                                        autoComplete="username"
                                     />
                                 </FormControl>
                                 <FormMessage />
@@ -95,7 +102,7 @@ export default function LoginPage() {
                         name="password"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="block text-sm font-medium">
+                                <FormLabel htmlFor="password" className="block text-sm font-medium">
                                     Password
                                 </FormLabel>
                                 <FormControl>
@@ -106,6 +113,9 @@ export default function LoginPage() {
                                             field.onChange(e);
                                             setAuthError(null);
                                         }}
+                                        name="password"
+                                        id="password"
+                                        autoComplete="current-password"
                                     />
                                 </FormControl>
                                 <FormMessage />

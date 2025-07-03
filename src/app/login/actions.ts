@@ -35,9 +35,9 @@ export async function login(formData: FormData) {
 
     // Redirect to the first document if available, otherwise go to documents page
     if (result.success && result.documents?.[0]?.id) {
-        redirect(`/documents/${result.documents[0].id}`)
+        return { redirectTo: `/documents/${result.documents[0].id}` }
     } else {
-        redirect('/documents')
+        return { redirectTo: '/documents' }
     }
 }
 
