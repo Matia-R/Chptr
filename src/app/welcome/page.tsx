@@ -5,6 +5,7 @@ import { WelcomeClient } from "../_components/welcome-client"
 export default async function WelcomePage() {
     const caller = await getTrpcCaller();
 
+    // TODO: Find a better way to handle this
     try {
         const userProfile = await caller.user.getCurrentUserProfile();
         const { first_name } = userProfile!;
