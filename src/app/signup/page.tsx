@@ -1,7 +1,6 @@
 "use client"
 
 import { signup } from './actions'
-import { ThemeToggle } from '../_components/theme-toggle'
 import { Button } from '../_components/button'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -9,7 +8,6 @@ import { z } from 'zod'
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -19,6 +17,8 @@ import { Input } from "../_components/input"
 import { PasswordInput } from "../_components/password-input"
 
 const formSchema = z.object({
+    firstName: z.string().min(1, { message: "First name is required" }),
+    lastName: z.string().min(1, { message: "Last name is required" }),
     email: z
         .string()
         .min(2, { message: "Email must be at least 2 characters" })
@@ -36,6 +36,8 @@ export default function SignUpPage() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            firstName: "",
+            lastName: "",
             email: "",
             password: "",
             confirmPassword: "",
@@ -46,6 +48,8 @@ export default function SignUpPage() {
 
         try {
             const formData = new FormData();
+            formData.append('firstName', values.firstName);
+            formData.append('lastName', values.lastName);
             formData.append('email', values.email);
             formData.append('password', values.password);
 
@@ -63,6 +67,39 @@ export default function SignUpPage() {
                     onSubmit={form.handleSubmit(onSubmit)}
                     className="space-y-6 w-full max-w-sm"
                 >
+                    <div className="items-start w-full text-left mb-6">
+                        <h1 className="text-2xl font-bold">Signup</h1>
+                    </div>
+                    <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="block text-sm font-medium">
+                                    First Name
+                                </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="First Name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="block text-sm font-medium">
+                                    Last Name
+                                </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Last Name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                     <FormField
                         control={form.control}
                         name="email"
@@ -74,9 +111,6 @@ export default function SignUpPage() {
                                 <FormControl>
                                     <Input placeholder="Email" {...field} />
                                 </FormControl>
-                                <FormDescription className="text-sm text-gray-500">
-                                    This is your public display name.
-                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
 
@@ -93,9 +127,6 @@ export default function SignUpPage() {
                                 <FormControl>
                                     <PasswordInput placeholder="Password" {...field} />
                                 </FormControl>
-                                <FormDescription className="text-sm text-gray-500">
-                                    Your password.
-                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -111,9 +142,6 @@ export default function SignUpPage() {
                                 <FormControl>
                                     <PasswordInput placeholder="Confirm Password" {...field} />
                                 </FormControl>
-                                <FormDescription className="text-sm text-gray-500">
-                                    Please confirm your password.
-                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -125,11 +153,15 @@ export default function SignUpPage() {
                     >
                         Submit
                     </Button>
+
+                    <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
+                        Already have an account?{" "}
+                        <a href="/login" className="text-primary hover:underline">
+                            Login
+                        </a>
+                    </div>
                 </form>
             </Form>
-            <div className="mt-6">
-                <ThemeToggle />
-            </div>
         </div>
 
     );

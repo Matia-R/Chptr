@@ -16,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "~/app/_components/sidebar"
 import { Button } from "./button"
 import { type Document } from "~/server/api/routers/document"
@@ -34,12 +35,17 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const utils = api.useUtils();
   const { toast } = useToast();
   const setOpen = useCommandMenuStore((state) => state.setOpen)
+  const { isMobile, setOpenMobile } = useSidebar();
 
   // Use TRPC query to keep documents in sync
   const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
     initialData: { success: true, documents: initialDocuments },
     refetchOnMount: true
   });
+
+  // Fetch user profile and email
+  const { data: userProfile, isLoading: userLoading } = api.user.getCurrentUserProfile.useQuery();
+  const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
   const createDocument = api.document.createDocument.useMutation({
     onSuccess: async (data) => {
@@ -102,7 +108,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 >
                   <Plus className="size-4" />
                   New
-                  <span className="text-xs font-medium ml-auto">⌘N</span>
                 </Button>
               </div>
             </div>
@@ -112,7 +117,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               <span>Notes</span>
               <button
                 onClick={() => setOpen(true)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground focus-visible:ring-1 focus-visible:ring-ring outline-none"
                 data-highlight="false"
                 data-search-button
               >
@@ -149,6 +154,9 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                             prefetch={true}
                             onClick={() => {
                               void utils.document.getDocumentById.invalidate(doc.id);
+                              if (isMobile) {
+                                setOpenMobile(false);
+                              }
                             }}
                           >
                             {doc.name}
@@ -165,9 +173,20 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
         <div className="flex-none">
           <SidebarFooter>
-            <NavUser user={{ name: "John Doe", email: "john.doe@example.com", avatar: "https://github.com/shadcn.png" }} />
+            {userProfile && userEmail ? (
+              <NavUser
+                user={{
+                  first_name: userProfile.first_name,
+                  last_name: userProfile.last_name,
+                  email: userEmail,
+                  avatar_url: userProfile.avatar_url,
+                  default_avatar_background_color: userProfile.default_avatar_background_color,
+                }}
+              />
+            ) : (
+              <NavUser isLoading={userLoading} />
+            )}
           </SidebarFooter>
-          {/* <ThemeToggle /> */}
         </div>
       </div>
     </Sidebar>

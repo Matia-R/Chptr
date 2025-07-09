@@ -17,6 +17,14 @@ type DocumentPermissionSchema = {
     permission: string;
 }
 
+type UserProfile = {
+    updated_at: string,
+    avatar_url: string,
+    first_name: string,
+    last_name: string,
+    default_avatar_background_color: string,
+};
+
 export async function createDocument() {
     const supabase = await createClient()
     const currentUserId = (await supabase.auth.getUser()).data.user?.id
@@ -122,4 +130,24 @@ export async function updateDocumentName(documentId: string, name: string) {
 
     if (error) throw new Error(`Failed to update document name: ${error.message}`)
     return { success: true }
+}
+
+export async function getCurrentUser(): Promise<string | undefined> {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not authenticated');
+    return user.email;
+}
+
+export async function getCurrentUserProfile(): Promise<UserProfile | undefined> {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error('Not authenticated');
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single<UserProfile>();
+    if (error) throw new Error('Failed to fetch user profile');
+    return data;
 }
