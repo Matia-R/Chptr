@@ -93,11 +93,11 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   }, [documents?.documents, utils, currentDocumentId]);
 
   return (
-    <Sidebar variant="floating" {...props}>
+    <Sidebar variant="sidebar" {...props}>
       <div className="flex h-full flex-col">
         <div className="flex-none">
           <SidebarHeader>
-            <div className="px-2 font-semibold">Chptr</div>
+            <div className="font-semibold text-xl font-sans px-1">Chptr</div>
             <div className="pt-2">
               <div className="mb-2">
                 <Button
