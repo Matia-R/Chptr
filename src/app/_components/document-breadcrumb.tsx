@@ -110,7 +110,7 @@ export function DocumentBreadcrumb() {
         setIsEditing(false)
     }
 
-    const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold focus-visible:ring-1 focus-visible:ring-ring outline-none"
+    const sharedStyles = "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none"
 
     // Don't render anything until we have the document data
     if (isLoading || !document?.document?.name) {
@@ -158,7 +158,7 @@ export function DocumentBreadcrumb() {
                                         e.preventDefault()
                                     }}
                                     onClick={handleCancel}
-                                    className="absolute right-1 p-1 rounded-sm hover:bg-accent/50"
+                                    className="absolute right-1 p-1 rounded-sm hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
@@ -177,7 +177,7 @@ export function DocumentBreadcrumb() {
                                 </button>
                                 <button
                                     onClick={() => setIsEditing(true)}
-                                    className="absolute right-1 p-1 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-accent/50"
+                                    className="absolute right-1 p-1 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
                                 >
                                     <SquarePen className="h-4 w-4" />
                                 </button>
