@@ -37,11 +37,31 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const setOpen = useCommandMenuStore((state) => state.setOpen)
   const { isMobile, setOpenMobile } = useSidebar();
 
+  // State to track scroll position for shadow indicators
+  const [showTopShadow, setShowTopShadow] = React.useState(false);
+  const [showBottomShadow, setShowBottomShadow] = React.useState(false);
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+
+  // Handle scroll events to detect when user is not at top or bottom
+  const handleScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    setShowTopShadow(target.scrollTop > 0);
+    setShowBottomShadow(target.scrollTop + target.clientHeight < target.scrollHeight - 1);
+  }, []);
+
   // Use TRPC query to keep documents in sync
   const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
     initialData: { success: true, documents: initialDocuments },
     refetchOnMount: true
   });
+
+  // Ensure shadow state is correct on mount and when content changes
+  React.useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    setShowTopShadow(el.scrollTop > 0);
+    setShowBottomShadow(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, [documents]);
 
   // Fetch user profile and email
   const { data: userProfile, isLoading: userLoading } = api.user.getCurrentUserProfile.useQuery();
@@ -128,47 +148,59 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         </div>
 
         <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarMenu>
-                  <div
-                    className="relative"
-                    style={{
-                      '--item-count': documents?.documents?.length ?? 0,
-                      height: 'calc(var(--item-count) * 48px)'
-                    } as React.CSSProperties}
-                  >
-                    {documents?.documents?.map((doc, index) => (
-                      <SidebarMenuItem
-                        key={doc.id}
-                        className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
-                        style={{
-                          '--index': index,
-                          transform: 'translateY(calc(var(--index) * 48px))'
-                        } as React.CSSProperties}
-                      >
-                        <SidebarMenuButton asChild>
-                          <Link
-                            href={`/documents/${doc.id}`}
-                            prefetch={true}
-                            onClick={() => {
-                              void utils.document.getDocumentById.invalidate(doc.id);
-                              if (isMobile) {
-                                setOpenMobile(false);
-                              }
-                            }}
-                          >
-                            {doc.name}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </div>
-                </SidebarMenu>
-              </SidebarGroup>
-            </SidebarContent>
-          </ScrollArea>
+          <div className="relative h-full">
+            <ScrollArea
+              className="h-full"
+              ref={scrollAreaRef}
+              onScroll={handleScroll}
+            >
+              {showTopShadow && (
+                <div className="border-t absolute pointer-events-none inset-x-0 top-0 h-4 bg-gradient-to-b from-sidebar to-transparent z-10" />
+              )}
+              {showBottomShadow && (
+                <div className="border-b absolute pointer-events-none inset-x-0 bottom-0 h-4 bg-gradient-to-t from-sidebar to-transparent z-10" />
+              )}
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarMenu>
+                    <div
+                      className="relative"
+                      style={{
+                        '--item-count': documents?.documents?.length ?? 0,
+                        height: 'calc(var(--item-count) * 48px)'
+                      } as React.CSSProperties}
+                    >
+                      {documents?.documents?.map((doc, index) => (
+                        <SidebarMenuItem
+                          key={doc.id}
+                          className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
+                          style={{
+                            '--index': index,
+                            transform: 'translateY(calc(var(--index) * 48px))'
+                          } as React.CSSProperties}
+                        >
+                          <SidebarMenuButton asChild>
+                            <Link
+                              href={`/documents/${doc.id}`}
+                              prefetch={true}
+                              onClick={() => {
+                                void utils.document.getDocumentById.invalidate(doc.id);
+                                if (isMobile) {
+                                  setOpenMobile(false);
+                                }
+                              }}
+                            >
+                              {doc.name}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </div>
+                  </SidebarMenu>
+                </SidebarGroup>
+              </SidebarContent>
+            </ScrollArea>
+          </div>
         </div>
 
         <div className="flex-none">
