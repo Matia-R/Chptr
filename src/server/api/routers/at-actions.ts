@@ -12,17 +12,13 @@ export const atActionsRouter = createTRPCRouter({
         }))
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
-                model: google("gemini-2.0-flash-exp"),
+                model: google("gemini-1.5-flash"),
                 system: systemPrompt,
                 prompt: `${atActionsConfig[input.action].prompt} ${input.content}`,
-                // experimental_continueSteps: true,
-                // experimental_transform: smoothStream({
-                //     delayInMs: 20,
-                //     // chunking: 'line',
-                // }),
-                // onFinish({ finishReason }) {
-                //     console.log('finish reason: ' + finishReason)
-                // },
+                experimental_transform: smoothStream({
+                    delayInMs: 20,
+                    chunking: "word"
+                }),
             });
 
             for await (const text of textStream) {
@@ -32,8 +28,4 @@ export const atActionsRouter = createTRPCRouter({
         })
 });
 
-const systemPrompt = `You are a Markdown assistant. Follow these instructions to produce an augmented markdown output for the provided input. The output will be parsed into another format so follow thse instructions strictly: 
-
-When you want to insert a table, DO NOT write it in markdown. Instead, emit a JSON object prefixed by [[tool: and suffixed by ]]. Example:
-[[tool:{"tool_call":"addTableBlock","args":{"rows":[["A", "B"],["C", "D"]]}}]]
-`
+const systemPrompt = `You are a writing assistant. Respond to the provided input by perfoming the instructed action:`

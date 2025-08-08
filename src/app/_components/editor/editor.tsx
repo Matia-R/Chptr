@@ -52,134 +52,36 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
 
-    const insertParsedMarkdownBlocks = async (
-        editor: typeof schema.BlockNoteEditor,
-        markdown: string,
-        insertBlockId: string
-    ) => {
-        const blocks = await editor.tryParseMarkdownToBlocks(markdown);
-        if (blocks.length > 0) {
-            editor.insertBlocks(blocks, insertBlockId);
-        }
-    }
-
     const streamMarkdownToEditor = async (
         result: AsyncIterable<string>,
         editor: typeof schema.BlockNoteEditor,
         insertBlockId: string,
-        insertBlocksFn: (
-            editor: typeof schema.BlockNoteEditor,
-            markdown: string,
-            insertBlockId: string
-        ) => Promise<void>
     ) => {
-        const buffer = { current: "" };
-        let currentListType: "bullet" | "numbered" | null = null;
-
-        const flushLineAsBlock = async (line: string) => {
-            if (!line.trim()) return;
-
-            // Check for tool call inline (assuming tool calls are serialized JSON prefixed with [[tool:)
-            if (line.startsWith("[[tool:")) {
-                console.log("tool call", line);
-                const jsonStart = line.indexOf("{");
-                const jsonEnd = line.lastIndexOf("}");
-                if (jsonStart !== -1 && jsonEnd !== -1) {
-                    const json = line.slice(jsonStart, jsonEnd + 1);
-                    console.log("json", json);
-                    const tool = JSON.parse(json);
-                    console.log("tool", tool);
-                    if (tool.tool_call === "addTableBlock") {
-                        // INSERT_YOUR_CODE
-                        // Convert the 2d array of rows into a markdown table string
-                        const rows = tool.args.rows;
-                        if (Array.isArray(rows) && rows.length > 0) {
-                            // Build header row
-                            const header = rows[0].map(cell => String(cell)).join(" | ");
-                            // Build separator row
-                            const separator = rows[0].map(() => "---").join(" | ");
-                            // Build data rows
-                            const dataRows = rows.slice(1).map(row => row.map(cell => String(cell)).join(" | "));
-                            // Combine all parts
-                            const markdownTable = [
-                                `| ${header} |`,
-                                `| ${separator} |`,
-                                ...dataRows.map(row => `| ${row} |`)
-                            ].join("\n");
-                            // Insert as markdown block(s)
-                            await insertBlocksFn(editor, markdownTable, insertBlockId);
-                        }
-
-                        // const tableBlock = {
-                        //     type: "table",
-                        //     id: insertBlockId + "-table",
-                        //     content: {
-                        //         type: "tableContent",
-                        //         rows: {
-                        //             cells: tool.args.rows,
-                        //         },
-                        //     }
-                        // };
-                        // editor.insertBlocks([tableBlock], insertBlockId);
-                    }
-                    return;
-                }
-            }
-
-            let blockMarkdown = "";
-
-            // Headings
-            if (/^#{1,6}\s/.test(line)) {
-                blockMarkdown = line;
-            }
-            // Numbered list
-            else if (/^\d+\.\s/.test(line)) {
-                if (currentListType !== "numbered") {
-                    currentListType = "numbered";
-                }
-                blockMarkdown = line;
-            }
-            // Bullet list
-            else if (/^[-*+]\s/.test(line)) {
-                if (currentListType !== "bullet") {
-                    currentListType = "bullet";
-                }
-                blockMarkdown = line;
-            }
-            // Paragraph
-            else {
-                currentListType = null;
-                blockMarkdown = line;
-            }
-
-            await insertBlocksFn(editor, blockMarkdown.trim(), insertBlockId);
-        };
-
-        const tryFlushBuffer = async () => {
-            const lines = buffer.current.split("\n");
-
-            for (let i = 0; i < lines.length - 1; i++) {
-                const line = lines[i];
-                await flushLineAsBlock(line!);
-            }
-
-            buffer.current = lines.at(-1) ?? "";
-        };
-
         return new ReadableStream({
             async start(controller) {
                 try {
+                    let buffer = { current: '', prev: '' };
+                    let blocks: any[] = [];
                     for await (const token of result) {
                         controller.enqueue(token);
                         buffer.current += token;
 
-                        if (token.includes("\n")) {
-                            await tryFlushBuffer();
+                        // Skip if current buffer (whitespace removed) is the same as previous
+                        const currentTrimmed = buffer.current.trim();
+                        const prevTrimmed = buffer.prev.trim();
+                        if (currentTrimmed === prevTrimmed) {
+                            continue;
                         }
-                    }
 
-                    if (buffer.current.trim()) {
-                        await flushLineAsBlock(buffer.current);
+                        const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
+                        if (blocks.length === 0) {
+                            editor.insertBlocks(blocksToAdd, insertBlockId);
+                        }
+                        else {
+                            editor.replaceBlocks(blocks.map(block => block.id!), blocksToAdd);
+                        }
+                        blocks = blocksToAdd;
+                        buffer.prev = buffer.current;
                     }
 
                     controller.close();
@@ -205,9 +107,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         });
     };
 
-
-
-
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
         return atActions.map((action) => {
             const config = atActionsConfig[action]
@@ -225,7 +124,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         content: contentToProcess
                     });
 
-                    await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
+                    await streamMarkdownToEditor(result, editor, insertBlockId);
                 },
             }
         });
