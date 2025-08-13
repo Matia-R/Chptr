@@ -1,18 +1,29 @@
-"use client"
+"use client";
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { type Block, type BlockNoteEditor, BlockNoteSchema, type PartialBlock, defaultBlockSpecs, filterSuggestionItems, } from "@blocknote/core";
-import { type DefaultReactSuggestionItem, SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
+import {
+    type Block,
+    BlockNoteSchema,
+    type PartialBlock,
+    defaultBlockSpecs,
+    filterSuggestionItems,
+} from "@blocknote/core";
+import {
+    type DefaultReactSuggestionItem,
+    SuggestionMenuController,
+    useCreateBlockNote,
+} from "@blocknote/react";
 import { api } from "~/trpc/react";
 import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { Alert } from "./custom-blocks/Alert";
 
-// Define a type for the theme
-type Theme = 'light' | 'dark' | 'system';
+import { createHighlighter } from "shiki";
+
+type Theme = "light" | "dark" | "system";
 
 async function saveToStorage(jsonBlocks: Block[]) {
     try {
@@ -42,12 +53,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const utils = api.useUtils();
     const saveDocument = api.document.saveDocument.useMutation({
         onSuccess: () => {
-            // Invalidate both the document and the document list queries
             void Promise.all([
                 utils.document.getDocumentById.invalidate(documentId),
-                utils.document.getDocumentIdsForAuthenticatedUser.invalidate()
+                utils.document.getDocumentIdsForAuthenticatedUser.invalidate(),
             ]);
-        }
+        },
     });
     const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
@@ -60,9 +70,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         return new ReadableStream({
             async start(controller) {
                 try {
-                    let buffer = { current: '', prev: '' };
-                    let blocks: any[] = [];
+                    const buffer = { current: "", prev: "" };
+                    let blocks: Awaited<ReturnType<typeof editor.tryParseMarkdownToBlocks>> = [];
+
                     for await (const token of result) {
+                        console.log(token);
                         controller.enqueue(token);
                         buffer.current += token;
 
@@ -76,9 +88,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
                         if (blocks.length === 0) {
                             editor.insertBlocks(blocksToAdd, insertBlockId);
-                        }
-                        else {
-                            editor.replaceBlocks(blocks.map(block => block.id!), blocksToAdd);
+                        } else {
+                            editor.replaceBlocks(blocks.map(block => block.id), blocksToAdd);
                         }
                         blocks = blocksToAdd;
                         buffer.prev = buffer.current;
@@ -109,7 +120,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
         return atActions.map((action) => {
-            const config = atActionsConfig[action]
+            const config = atActionsConfig[action];
             return {
                 ...config,
                 onItemClick: async () => {
@@ -126,7 +137,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
                     await streamMarkdownToEditor(result, editor, insertBlockId);
                 },
-            }
+            };
         });
     };
 
@@ -154,9 +165,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     useEffect(() => {
         if (theme === "system") {
             const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-            setCurrentTheme(mediaQuery.matches ? "dark" : "light");
+            const newTheme = mediaQuery.matches ? "dark" : "light";
+            setCurrentTheme(newTheme);
+            console.log("Theme changed to:", newTheme);
             const handleChange = (e: MediaQueryListEvent) => {
-                setCurrentTheme(e.matches ? "dark" : "light");
+                const newTheme = e.matches ? "dark" : "light";
+                setCurrentTheme(newTheme);
+                console.log("Theme changed to:", newTheme);
             };
             mediaQuery.addEventListener("change", handleChange);
             return () => {
@@ -164,13 +179,49 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             };
         } else {
             setCurrentTheme(theme as Theme);
+            console.log("Theme changed to:", theme);
         }
     }, [theme]);
 
     const editor = useCreateBlockNote({
         schema,
+        codeBlock: {
+            indentLineWithTab: true,
+            defaultLanguage: "typescript",
+            supportedLanguages: {
+                javascript: { name: "JavaScript", aliases: ["js"] },
+                typescript: { name: "TypeScript", aliases: ["ts"] },
+                python: { name: "Python", aliases: ["py"] },
+                java: { name: "Java" },
+                c: { name: "C" },
+                cpp: { name: "C++" },
+                go: { name: "Go" },
+                ruby: { name: "Ruby" },
+                php: { name: "PHP" },
+                rust: { name: "Rust" },
+                kotlin: { name: "Kotlin" },
+                swift: { name: "Swift" },
+                csharp: { name: "C#", aliases: ["cs"] },
+                scala: { name: "Scala" },
+                html: { name: "HTML" },
+                css: { name: "CSS" },
+                json: { name: "JSON" },
+                yaml: { name: "YAML", aliases: ["yml"] },
+                markdown: { name: "Markdown", aliases: ["md"] },
+                sql: { name: "SQL" },
+                bash: { name: "Bash", aliases: ["sh"] },
+                powershell: { name: "PowerShell", aliases: ["ps"] },
+                dart: { name: "Dart" },
+                "objective-c": { name: "Objective-C", aliases: ["objc"] },
+            },
+            createHighlighter: () => 
+                createHighlighter({
+                themes: ["github-dark"],
+                langs: ["javascript", "typescript", "python", "html", "css", "json", "yaml", "markdown", "sql", "bash", "powershell", "dart", "objective-c"],
+            })
+        },
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
-    });
+    }, [currentTheme]);
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
@@ -188,7 +239,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             <SuggestionMenuController
                 triggerCharacter={"@"}
                 getItems={async (query) =>
-                    // Gets the mentions menu items
                     filterSuggestionItems(getAtActionMenuItems(), query)
                 }
             />

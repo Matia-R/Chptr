@@ -475,8 +475,8 @@
 
 .bn-block-content[data-content-type="codeBlock"] {
   position: relative;
-  background-color: #161616;
-  color: #fff;
+  background-color: hsl(var(--code-block-background));
+  color: hsl(var(--code-block-foreground));
   border-radius: 8px;
 }
 

@@ -1,6 +1,6 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { z } from "zod"
-import { streamText, generateText, smoothStream } from "ai"
+import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
 import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
 
@@ -22,10 +22,9 @@ export const atActionsRouter = createTRPCRouter({
             });
 
             for await (const text of textStream) {
-                console.log(text)
                 yield text;
             }
         })
 });
 
-const systemPrompt = `You are a writing assistant. Respond to the provided input by perfoming the instructed action:`
+const systemPrompt = `You are a writing assistant. Respond to the provided input by perfoming the instructed action. If providing a codeblock, indicate the language e.g., \`\`\`python\nprint("Hello, world!")\n\`\`\`:`
