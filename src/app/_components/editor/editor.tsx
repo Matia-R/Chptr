@@ -1,18 +1,29 @@
-"use client"
+"use client";
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "./style.css";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { type Block, type BlockNoteEditor, BlockNoteSchema, type PartialBlock, defaultBlockSpecs, filterSuggestionItems, } from "@blocknote/core";
-import { type DefaultReactSuggestionItem, SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
+import {
+    type Block,
+    BlockNoteSchema,
+    type PartialBlock,
+    defaultBlockSpecs,
+    filterSuggestionItems,
+} from "@blocknote/core";
+import {
+    type DefaultReactSuggestionItem,
+    SuggestionMenuController,
+    useCreateBlockNote,
+} from "@blocknote/react";
 import { api } from "~/trpc/react";
 import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { Alert } from "./custom-blocks/Alert";
 
-// Define a type for the theme
-type Theme = 'light' | 'dark' | 'system';
+import { createHighlighter } from "shiki";
+
+type Theme = "light" | "dark" | "system";
 
 async function saveToStorage(jsonBlocks: Block[]) {
     try {
@@ -42,108 +53,74 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const utils = api.useUtils();
     const saveDocument = api.document.saveDocument.useMutation({
         onSuccess: () => {
-            // Invalidate both the document and the document list queries
             void Promise.all([
                 utils.document.getDocumentById.invalidate(documentId),
-                utils.document.getDocumentIdsForAuthenticatedUser.invalidate()
+                utils.document.getDocumentIdsForAuthenticatedUser.invalidate(),
             ]);
-        }
+        },
     });
     const generate = api.atActions.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
-
-    const insertParsedMarkdownBlocks = async (
-        editor: typeof schema.BlockNoteEditor,
-        markdown: string,
-        insertBlockId: string
-    ) => {
-        const blocks = await editor.tryParseMarkdownToBlocks(markdown);
-        if (blocks.length > 0) {
-            editor.insertBlocks(blocks, insertBlockId);
-        }
-    }
 
     const streamMarkdownToEditor = async (
         result: AsyncIterable<string>,
         editor: typeof schema.BlockNoteEditor,
         insertBlockId: string,
-        insertBlocksFn: (editor: typeof schema.BlockNoteEditor, markdown: string, insertBlockId: string) => Promise<void>
     ) => {
-        const markdownBuffer = { current: "" }; // Stores accumulated markdown chunks
-        let isInCodeBlock = false;
-        let isInNumberedList = false;
-        let isInNonNumberedList = false;
-
         return new ReadableStream({
             async start(controller) {
                 try {
-                    for await (const text of result) {
-                        controller.enqueue(text);
+                    const buffer = { current: "", prev: "" };
+                    let blocks: Awaited<ReturnType<typeof editor.tryParseMarkdownToBlocks>> = [];
 
-                        if (text.includes('<table-tag>')) {
-                            markdownBuffer.current += text.replace('<table-tag>', '');
+                    for await (const token of result) {
+                        console.log(token);
+                        controller.enqueue(token);
+                        buffer.current += token;
+
+                        // Skip if current buffer (whitespace removed) is the same as previous
+                        const currentTrimmed = buffer.current.trim();
+                        const prevTrimmed = buffer.prev.trim();
+                        if (currentTrimmed === prevTrimmed) {
                             continue;
                         }
 
-                        isInNonNumberedList = /^\s*[*-]/.test(text);
-                        if (isInNonNumberedList) {
-                            markdownBuffer.current += text;
-                            continue;
+                        const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
+                        if (blocks.length === 0) {
+                            editor.insertBlocks(blocksToAdd, insertBlockId);
+                        } else {
+                            editor.replaceBlocks(blocks.map(block => block.id), blocksToAdd);
                         }
-
-                        const codeBlockMarkerCount = (text.match(/```/g) ?? []).length;
-                        const numberedListMarkerCount = (text.match(/<numbered-list-tag>/g) ?? []).length;
-
-                        if (numberedListMarkerCount === 1) {
-                            isInNumberedList = !isInNumberedList;
-                        }
-
-                        if (codeBlockMarkerCount === 1) {
-                            isInCodeBlock = !isInCodeBlock;
-                        }
-
-                        markdownBuffer.current += text
-                            .replace('<numbered-list-tag>', '')
-                            .replace(/^\s{2,}(?=\d+\.)/, ' ')
-                            .replace('bash', 'text');
-
-                        if (isInCodeBlock || isInNumberedList) continue;
-
-                        await insertBlocksFn(editor, markdownBuffer.current, insertBlockId);
-                        markdownBuffer.current = "";
+                        blocks = blocksToAdd;
+                        buffer.prev = buffer.current;
                     }
 
                     controller.close();
-
-                    if (markdownBuffer.current) {
-                        await insertBlocksFn(editor, markdownBuffer.current, insertBlockId);
-                    }
-
                 } catch (error) {
-
-                    // TODO: Add option for buttons with callbacks - add callback to retry
-                    editor.insertBlocks([{
-                        type: "alert",
-                        props: {
-                            type: "error",
-                            text: "Something went wrong while generating the content.",
-                        },
-                    }], insertBlockId);
+                    editor.insertBlocks(
+                        [
+                            {
+                                type: "alert",
+                                props: {
+                                    type: "error",
+                                    text: "Something went wrong while generating the content.",
+                                },
+                            },
+                        ],
+                        insertBlockId
+                    );
 
                     if (error instanceof Error) {
-                        // TODO: log error once we have analytics
                         console.error("Error processing stream:", error.message);
                     }
-
                 }
             },
         });
     };
 
-
     const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
         return atActions.map((action) => {
-            const config = atActionsConfig[action]
+            const config = atActionsConfig[action];
             return {
                 ...config,
                 onItemClick: async () => {
@@ -158,9 +135,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         content: contentToProcess
                     });
 
-                    await streamMarkdownToEditor(result, editor, insertBlockId, insertParsedMarkdownBlocks);
+                    await streamMarkdownToEditor(result, editor, insertBlockId);
                 },
-            }
+            };
         });
     };
 
@@ -188,9 +165,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     useEffect(() => {
         if (theme === "system") {
             const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-            setCurrentTheme(mediaQuery.matches ? "dark" : "light");
+            const newTheme = mediaQuery.matches ? "dark" : "light";
+            setCurrentTheme(newTheme);
+            console.log("Theme changed to:", newTheme);
             const handleChange = (e: MediaQueryListEvent) => {
-                setCurrentTheme(e.matches ? "dark" : "light");
+                const newTheme = e.matches ? "dark" : "light";
+                setCurrentTheme(newTheme);
+                console.log("Theme changed to:", newTheme);
             };
             mediaQuery.addEventListener("change", handleChange);
             return () => {
@@ -198,13 +179,49 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             };
         } else {
             setCurrentTheme(theme as Theme);
+            console.log("Theme changed to:", theme);
         }
     }, [theme]);
 
     const editor = useCreateBlockNote({
         schema,
+        codeBlock: {
+            indentLineWithTab: true,
+            defaultLanguage: "typescript",
+            supportedLanguages: {
+                javascript: { name: "JavaScript", aliases: ["js"] },
+                typescript: { name: "TypeScript", aliases: ["ts"] },
+                python: { name: "Python", aliases: ["py"] },
+                java: { name: "Java" },
+                c: { name: "C" },
+                cpp: { name: "C++" },
+                go: { name: "Go" },
+                ruby: { name: "Ruby" },
+                php: { name: "PHP" },
+                rust: { name: "Rust" },
+                kotlin: { name: "Kotlin" },
+                swift: { name: "Swift" },
+                csharp: { name: "C#", aliases: ["cs"] },
+                scala: { name: "Scala" },
+                html: { name: "HTML" },
+                css: { name: "CSS" },
+                json: { name: "JSON" },
+                yaml: { name: "YAML", aliases: ["yml"] },
+                markdown: { name: "Markdown", aliases: ["md"] },
+                sql: { name: "SQL" },
+                bash: { name: "Bash", aliases: ["sh"] },
+                powershell: { name: "PowerShell", aliases: ["ps"] },
+                dart: { name: "Dart" },
+                "objective-c": { name: "Objective-C", aliases: ["objc"] },
+            },
+            createHighlighter: () => 
+                createHighlighter({
+                themes: ["github-dark"],
+                langs: ["javascript", "typescript", "python", "html", "css", "json", "yaml", "markdown", "sql", "bash", "powershell", "dart", "objective-c"],
+            })
+        },
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
-    });
+    }, [currentTheme]);
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
@@ -222,7 +239,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             <SuggestionMenuController
                 triggerCharacter={"@"}
                 getItems={async (query) =>
-                    // Gets the mentions menu items
                     filterSuggestionItems(getAtActionMenuItems(), query)
                 }
             />

@@ -155,10 +155,10 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               onScroll={handleScroll}
             >
               {showTopShadow && (
-                <div className="border-t absolute pointer-events-none inset-x-0 top-0 h-4 bg-gradient-to-b from-sidebar to-transparent z-10" />
+                <div className="border-t absolute pointer-events-none inset-x-0 top-0 h-4 bg-gradient-to-b from-border/20 to-transparent z-10" />
               )}
               {showBottomShadow && (
-                <div className="border-b absolute pointer-events-none inset-x-0 bottom-0 h-4 bg-gradient-to-t from-sidebar to-transparent z-10" />
+                <div className="border-b absolute pointer-events-none inset-x-0 bottom-0 h-4 bg-gradient-to-t from-border/20 to-transparent z-10" />
               )}
               <SidebarContent>
                 <SidebarGroup>
