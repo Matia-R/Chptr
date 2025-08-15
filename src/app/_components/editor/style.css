@@ -273,7 +273,7 @@
 }
 
 .bn-block-content {
-  display: flex;
+  /* display: flex; */
   padding: 3px 0;
   transition: font-size 0.2s;
   width: 100%;
@@ -281,6 +281,11 @@
 
 .bn-block-content:before {
   transition: all 0.2s;
+}
+
+.bn-visual-media {
+  flex: 1;
+  min-width: 0;
 }
 
 .bn-block-content.ProseMirror-selectednode>*,
@@ -406,6 +411,16 @@
   gap: 0.5em;
 }
 
+.bn-block-content[data-content-type="numberedListItem"] .bn-inline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.bn-block-content[data-content-type="heading"] {
+  flex: 1;
+  min-width: 0;
+}
+
 [data-content-type="numberedListItem"] {
   --index: attr(data-index);
 }
@@ -427,8 +442,18 @@
   gap: 0.5em;
 }
 
+.bn-block-content[data-content-type="bulletListItem"] .bn-inline-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .bn-block-content[data-content-type="checkListItem"]>div {
   display: flex;
+}
+
+.bn-block-content[data-content-type="checkListItem"] .bn-inline-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .bn-block-content[data-content-type="checkListItem"]>div>div>input {
@@ -533,6 +558,7 @@
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
+  max-width: 100% !important;
 }
 
 [data-file-block] .bn-file-block-content-wrapper:has(.bn-add-file-button),
@@ -803,7 +829,6 @@
   margin: 0;
   padding: 0;
   font-size: inherit;
-  min-width: 2px !important;
 }
 
 .bn-default-styles {
@@ -1877,6 +1902,22 @@
 
 .bn-shadcn .bn-extend-button-add-remove-rows {
   cursor: row-resize;
+}
+
+/* Fix table extend button positioning */
+.bn-extend-button {
+  position: relative;
+  z-index: 10;
+}
+
+/* Ensure table container has enough space for buttons */
+.bn-editor [data-content-type="table"] .tableWrapper {
+  position: relative;
+  top: -16px;
+  left: -16px;
+  min-width: calc(100% + 32px); /* Increased from 16px to 32px to accommodate buttons */
+  padding-right: 16px; /* Add right padding for column buttons */
+  padding-left: 16px; /* Restore left padding for content spacing */
 }
 
 .bn-shadcn .bn-toolbar {
