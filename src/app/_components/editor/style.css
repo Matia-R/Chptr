@@ -902,7 +902,6 @@
   left: -16px;
   min-width: calc(100% + 16px);
   padding-bottom: 16px;
-  overflow-y: hidden;
 }
 
 .bn-editor [data-content-type="table"] .tableWrapper-inner {
