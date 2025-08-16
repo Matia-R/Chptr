@@ -1916,7 +1916,6 @@
   left: -16px;
   min-width: calc(100% + 32px); /* Increased from 16px to 32px to accommodate buttons */
   padding-right: 16px; /* Add right padding for column buttons */
-  padding-left: 16px; /* Restore left padding for content spacing */
 }
 
 .bn-shadcn .bn-toolbar {
