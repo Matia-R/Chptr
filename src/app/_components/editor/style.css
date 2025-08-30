@@ -2,7 +2,7 @@
 .bn-shadcn :before,
 .bn-shadcn :after {
   box-sizing: border-box;
-  border-width: 0;
+  /* border-width: 0; */
   border-style: solid;
   border-color: #e5e7eb;
 }
@@ -2173,3 +2173,56 @@
 [data-floating-ui-focusable] {
   z-index: 5 !important;
 }
+
+.bn-side-menu[data-block-type="generatePromptInput"] {
+  display: none;
+}
+
+/* Override global button styles for GeneratePromptInput block */
+.bn-block-content[data-content-type="generatePromptInput"] button {
+  /* Base button styles from Button component */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-duration: 0.15s !important;
+  outline: 2px solid transparent !important;
+  outline-offset: 2px !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  
+  /* Ghost variant styles */
+  background-color: transparent !important;
+  /* color: hsl(var(--muted-foreground)) !important; */
+  
+  /* Small size styles */
+  height: 2rem !important;
+  padding: 0.25rem 0.75rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+  
+  /* Hover state */
+  cursor: pointer !important;
+}
+
+.bn-block-content[data-content-type="generatePromptInput"] button:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+.bn-block-content[data-content-type="generatePromptInput"] button:focus-visible {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 2px !important;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+

@@ -18,8 +18,9 @@ import {
     useCreateBlockNote,
 } from "@blocknote/react";
 import { api } from "~/trpc/react";
-import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
-import { Alert } from "./custom-blocks/Alert";
+import { atActions, generateActionsConfig, type GenerateActionConfig } from "~/app/ai/prompt/generate-actions-config";
+import { Alert } from "./custom-blocks/alert";
+import { GeneratePromptInput } from "./custom-blocks/generate-prompt-input";
 
 import { createHighlighter } from "shiki";
 
@@ -44,6 +45,7 @@ const schema = BlockNoteSchema.create({
     blockSpecs: {
         ...defaultBlockSpecs,
         alert: Alert,
+        generatePromptInput: GeneratePromptInput,
     },
 });
 
@@ -118,9 +120,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         });
     };
 
-    const getAtActionMenuItems = (): DefaultReactSuggestionItem[] => {
+    const getGenerateActionSuggestions = (): GenerateActionConfig[] => {
         return atActions.map((action) => {
-            const config = atActionsConfig[action];
+            const config = generateActionsConfig[action];
             return {
                 ...config,
                 onItemClick: async () => {
@@ -229,6 +231,43 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         debouncedSave(content);
     }, [editor, debouncedSave]);
 
+    // Add keyboard shortcut handler for Cmd/Ctrl + /
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            // Check if Cmd (Mac) or Ctrl (Windows/Linux) + / is pressed
+            if ((event.metaKey || event.ctrlKey) && event.key === "/") {
+                event.preventDefault();
+                
+                // Get current cursor position
+                const cursorPosition = editor.getTextCursorPosition();
+                const currentBlockId = cursorPosition.block.id;
+                
+                // Insert error block after current block
+                editor.insertBlocks(
+                    [
+                        {
+                            type: "generatePromptInput",
+                            props: {
+                                    placeholder: "Enter your prompt here...",
+                                    buttonText: "Generate",
+                                    getGenerateActionSuggestions: getGenerateActionSuggestions(),
+                            },
+                        },
+                    ],
+                    currentBlockId
+                );
+            }
+        };
+
+        // Add event listener to the document
+        document.addEventListener("keydown", handleKeyDown);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [editor]);
+
     return (
         <BlockNoteView
             editor={editor}
@@ -236,12 +275,12 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             theme={currentTheme as 'light' | 'dark'}
             onChange={handleChange}
         >
-            <SuggestionMenuController
+            {/* <SuggestionMenuController
                 triggerCharacter={"@"}
                 getItems={async (query) =>
-                    filterSuggestionItems(getAtActionMenuItems(), query)
+                    filterSuggestionItems(getGenerateActionSuggestions(), query)
                 }
-            />
+            /> */}
         </BlockNoteView>
     );
 }

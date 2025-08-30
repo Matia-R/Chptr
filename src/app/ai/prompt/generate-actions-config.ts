@@ -1,12 +1,12 @@
 import { createElement } from "react";
 import { LucideBookDown, LucideTable } from "lucide-react";
 
-export enum AtAction {
+export enum GenerateAction {
     Summarize = "Summarize",
     AddTable = "Add Table",
 }
 
-export type AtActionConfig = {
+export type GenerateActionConfig = {
     title: string;
     subtext: string;
     group: string;
@@ -14,8 +14,8 @@ export type AtActionConfig = {
     prompt: string;
 };
 
-export const atActionsConfig: Record<AtAction, AtActionConfig> = {
-    [AtAction.Summarize]: {
+export const generateActionsConfig: Record<GenerateAction, GenerateActionConfig> = {
+    [GenerateAction.Summarize]: {
         title: "Summarize",
         subtext: "Summarize content",
         group: "Generate",
@@ -23,7 +23,7 @@ export const atActionsConfig: Record<AtAction, AtActionConfig> = {
         prompt:
             "Summarize this text thoroughly. Include a table, numbered list, bulleted list, nested list and a codeblock:",
     },
-    [AtAction.AddTable]: {
+    [GenerateAction.AddTable]: {
         title: "Add Table",
         subtext: "Organize content into a table",
         group: "Generate",
@@ -34,4 +34,4 @@ export const atActionsConfig: Record<AtAction, AtActionConfig> = {
 };
 
 // Optional helpers for convenience
-export const atActions = Object.values(AtAction);
+export const atActions = Object.values(GenerateAction);

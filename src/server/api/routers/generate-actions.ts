@@ -2,19 +2,19 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { z } from "zod"
 import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
-import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
+import { GenerateAction, generateActionsConfig } from "~/app/ai/prompt/generate-actions-config"
 
-export const atActionsRouter = createTRPCRouter({
+export const generateActionsRouter = createTRPCRouter({
     generate: publicProcedure
         .input(z.object({
-            action: z.nativeEnum(AtAction),
+            action: z.nativeEnum(GenerateAction),
             content: z.string()
         }))
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
                 model: google("gemini-1.5-flash"),
                 system: systemPrompt,
-                prompt: `${atActionsConfig[input.action].prompt} ${input.content}`,
+                prompt: `${generateActionsConfig[input.action].prompt} ${input.content}`,
                 experimental_transform: smoothStream({
                     delayInMs: 20,
                     chunking: "word"
