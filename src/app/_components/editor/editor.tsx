@@ -18,9 +18,10 @@ import {
     useCreateBlockNote,
 } from "@blocknote/react";
 import { api } from "~/trpc/react";
-import { atActions, generateActionsConfig, type GenerateActionConfig } from "~/app/ai/prompt/generate-actions-config";
+import { atActions, GenerateAction, generateActionsConfig, type GenerateActionConfig } from "~/app/ai/prompt/generate-actions-config";
 import { Alert } from "./custom-blocks/alert";
 import { GeneratePromptInput } from "./custom-blocks/generate-prompt-input";
+import { emitter } from "~/app/ai/prompt/events";
 
 import { createHighlighter } from "shiki";
 
@@ -62,86 +63,32 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         },
     });
     const generate = api.atActions.generate.useMutation();
+    const generateForPrompt = api.atActions.generateForPrompt.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
+    const [generateBlockPosition, setGenerateBlockPosition] = useState<string>("");
 
-    const streamMarkdownToEditor = async (
-        result: AsyncIterable<string>,
-        editor: typeof schema.BlockNoteEditor,
-        insertBlockId: string,
-    ) => {
-        return new ReadableStream({
-            async start(controller) {
-                try {
-                    const buffer = { current: "", prev: "" };
-                    let blocks: Awaited<ReturnType<typeof editor.tryParseMarkdownToBlocks>> = [];
+    // const getGenerateActionSuggestions = (): GenerateActionConfig[] => {
+    //     return atActions.map((action) => {
+    //         const config = generateActionsConfig[action];
+    //         return {
+    //             ...config,
+    //             onItemClick: async () => {
+    //                 const insertBlockId = editor.getTextCursorPosition().block.id;
 
-                    for await (const token of result) {
-                        console.log(token);
-                        controller.enqueue(token);
-                        buffer.current += token;
+    //                 const blocks = editor.document;
+    //                 const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
+    //                 const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
-                        // Skip if current buffer (whitespace removed) is the same as previous
-                        const currentTrimmed = buffer.current.trim();
-                        const prevTrimmed = buffer.prev.trim();
-                        if (currentTrimmed === prevTrimmed) {
-                            continue;
-                        }
+    //                 const result = await generate.mutateAsync({
+    //                     action,
+    //                     content: contentToProcess
+    //                 });
 
-                        const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
-                        if (blocks.length === 0) {
-                            editor.insertBlocks(blocksToAdd, insertBlockId);
-                        } else {
-                            editor.replaceBlocks(blocks.map(block => block.id), blocksToAdd);
-                        }
-                        blocks = blocksToAdd;
-                        buffer.prev = buffer.current;
-                    }
-
-                    controller.close();
-                } catch (error) {
-                    editor.insertBlocks(
-                        [
-                            {
-                                type: "alert",
-                                props: {
-                                    type: "error",
-                                    text: "Something went wrong while generating the content.",
-                                },
-                            },
-                        ],
-                        insertBlockId
-                    );
-
-                    if (error instanceof Error) {
-                        console.error("Error processing stream:", error.message);
-                    }
-                }
-            },
-        });
-    };
-
-    const getGenerateActionSuggestions = (): GenerateActionConfig[] => {
-        return atActions.map((action) => {
-            const config = generateActionsConfig[action];
-            return {
-                ...config,
-                onItemClick: async () => {
-                    const insertBlockId = editor.getTextCursorPosition().block.id;
-
-                    const blocks = editor.document;
-                    const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
-                    const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
-
-                    const result = await generate.mutateAsync({
-                        action,
-                        content: contentToProcess
-                    });
-
-                    await streamMarkdownToEditor(result, editor, insertBlockId);
-                },
-            };
-        });
-    };
+    //                 await streamMarkdownToEditor(result, editor, insertBlockId);
+    //             },
+    //         };
+    //     });
+    // };
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -225,6 +172,98 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     }, [currentTheme]);
 
+    useEffect(() => {
+
+        const handleGenerateActionPromptSubmitted = async (prompt: string, editor: typeof schema.BlockNoteEditor) => {
+            const insertBlockId = editor.getTextCursorPosition().block.id;
+    
+            const blocks = editor.document;
+            console.log("blocks", blocks);
+            const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
+            console.log("contentUpToBlock", contentUpToBlock);
+            const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
+            console.log("contentToProcess", contentToProcess);
+    
+            const result = await generateForPrompt.mutateAsync({
+                prompt: prompt,
+                content: contentToProcess
+            });
+    
+            const streamMarkdownToEditor = async (
+                result: AsyncIterable<string>,
+                editor: typeof schema.BlockNoteEditor,
+                insertBlockId: string,
+            ) => {
+                return new ReadableStream({
+                    async start(controller) {
+                        try {
+                            const buffer = { current: "", prev: "" };
+                            let blocks: Awaited<ReturnType<typeof editor.tryParseMarkdownToBlocks>> = [];
+        
+                            for await (const token of result) {
+                                console.log(token);
+                                controller.enqueue(token);
+                                buffer.current += token;
+        
+                                // Skip if current buffer (whitespace removed) is the same as previous
+                                const currentTrimmed = buffer.current.trim();
+                                const prevTrimmed = buffer.prev.trim();
+                                if (currentTrimmed === prevTrimmed) {
+                                    continue;
+                                }
+        
+                                const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
+                                if (blocks.length === 0) {
+                                    editor.insertBlocks(blocksToAdd, insertBlockId);
+                                } else {
+                                    editor.replaceBlocks(blocks.map(block => block.id), blocksToAdd);
+                                }
+                                blocks = blocksToAdd;
+                                buffer.prev = buffer.current;
+                            }
+        
+                            controller.close();
+                        } catch (error) {
+                            editor.insertBlocks(
+                                [
+                                    {
+                                        type: "alert",
+                                        props: {
+                                            type: "error",
+                                            text: "Something went wrong while generating the content.",
+                                        },
+                                    },
+                                ],
+                                insertBlockId
+                            );
+        
+                            if (error instanceof Error) {
+                                console.error("Error processing stream:", error.message);
+                            }
+                        }
+                    },
+                });
+            };
+    
+            await streamMarkdownToEditor(result, editor, insertBlockId);
+        };
+
+        const handler = async (prompt: string) => {
+          console.log("GenerateActionPromptSubmitted", prompt);
+      
+          await handleGenerateActionPromptSubmitted(
+            prompt,
+            editor
+          );
+        };
+      
+        emitter.on("GenerateActionPromptSubmitted", handler);
+      
+        return () => {
+          emitter.off("GenerateActionPromptSubmitted", handler);
+        };
+      }, [editor, generateForPrompt]);
+
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
         void saveToStorage(content);
@@ -241,6 +280,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 // Get current cursor position
                 const cursorPosition = editor.getTextCursorPosition();
                 const currentBlockId = cursorPosition.block.id;
+                setGenerateBlockPosition(currentBlockId);
                 
                 // Insert error block after current block
                 editor.insertBlocks(
@@ -248,9 +288,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         {
                             type: "generatePromptInput",
                             props: {
-                                    placeholder: "Enter your prompt here...",
-                                    buttonText: "Generate",
-                                    getGenerateActionSuggestions: getGenerateActionSuggestions(),
+                                    // placeholder: "Enter your prompt here...",
+                                    // buttonText: "Generate",
+                                    // getGenerateActionSuggestions: getGenerateActionSuggestions(),
                             },
                         },
                     ],

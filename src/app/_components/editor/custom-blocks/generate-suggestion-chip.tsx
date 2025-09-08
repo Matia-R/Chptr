@@ -11,7 +11,7 @@ export const TableButton = ({ label, onClick, variant = "default" }: TableButton
   
   const variantClasses = variant === "accent" 
     ? "border-accent-foreground text-accent-foreground hover:bg-accent-foreground/10" 
-    : "border-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/10";
+    : "border-muted-foreground/20 text-accent-foreground hover:bg-muted-foreground/10";
 
   return (
     <div 
