@@ -3,20 +3,18 @@ import { createReactBlockSpec } from "@blocknote/react";
 import { Button } from "../../ui/button";
 import { ArrowUp } from "lucide-react";
 import { TableButton } from "./generate-suggestion-chip";
-import { emitter } from "~/app/ai/prompt/events"; // import the shared emitter
-import { type GenerateActionConfig } from "~/app/ai/prompt/generate-actions-config";
 import React, { useRef } from "react";
+import { useGenerateStore } from "~/hooks/use-generate-store";
 
-// Separate React component for the prompt input
 const PromptInputComponent = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { submitPrompt, isGenerating } = useGenerateStore();
 
   const handleGenerate = () => {
     const value = textareaRef.current?.value.trim();
     if (!value) return;
 
-    // Emit event with the textarea value
-    emitter.emit("GenerateActionPromptSubmitted", value);
+    submitPrompt(value);
 
     // Optional: clear textarea after submit
     // textareaRef.current.value = "";
@@ -48,6 +46,7 @@ const PromptInputComponent = () => {
           ref={setTextareaRef}
           placeholder="Enter your prompt here..."
           onKeyDown={handleKeyDown}
+          disabled={isGenerating}
           className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 resize-none"
           rows={1}
         />
@@ -70,12 +69,15 @@ const PromptInputComponent = () => {
           variant="ghost"
           size="sm"
           className="text-xs text-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+          disabled={isGenerating}
+          // You could also reset the textarea here
         >
           Cancel
         </Button>
         <Button
           variant="ghost"
           size="sm"
+          disabled={isGenerating}
           className="text-xs text-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
           onClick={handleGenerate}
         >

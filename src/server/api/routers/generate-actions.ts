@@ -41,9 +41,14 @@ export const generateActionsRouter = createTRPCRouter({
             }),
         });
 
+        // const textStream = ['this ', ' is', ' a', ' test', ' stream'];
+
+        // const textStream = input.prompt.split(' ').map(word => word + ' ');
+
         for await (const text of textStream) {
             console.log(text);
             yield text;
+            await new Promise(resolve => setTimeout(resolve, 30));
         }
     })
 });
