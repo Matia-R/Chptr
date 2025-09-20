@@ -10,6 +10,7 @@ import {
     BlockNoteSchema,
     type PartialBlock,
     defaultBlockSpecs,
+    defaultStyleSpecs,
     filterSuggestionItems,
 } from "@blocknote/core";
 import {
@@ -207,7 +208,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
               ) => {
                 const buffer = { current: "", prev: "" };
                 let blocks: Awaited<ReturnType<typeof editor.tryParseMarkdownToBlocks>> = [];
-              
+                
                 for await (const token of result) {
                   buffer.current += token;
               
@@ -215,29 +216,43 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                   const prevTrimmed = buffer.prev.trim();
                   if (currentTrimmed === prevTrimmed) continue;
               
-                  const blocksToAdd = await editor.tryParseMarkdownToBlocks(buffer.current);
-              
-                  if (blocks.length === 0) {
-                    editor.insertBlocks(blocksToAdd, insertBlockId);
-                  } else {
-                    editor.replaceBlocks(
-                      blocks.map((block) => block.id),
-                      blocksToAdd
-                    );
-                  }
+                  const blocksToAdd = (await editor.tryParseMarkdownToBlocks(buffer.current)).map(block => ({
+                    ...block,
+                    props: { ...block.props, textColor: "default" }
+                  })) as Block[];
+                  
+                  editor.transact((transaction) => {
+                    transaction.setMeta('addToHistory', false);
+                    if (blocks.length === 0) {
+                        editor.insertBlocks(blocksToAdd, insertBlockId);
+                      } else {
+                        editor.replaceBlocks(
+                            blocks.map((block) => block.id),
+                            blocksToAdd
+                        );
+                      }
+                  });
               
                   blocks = blocksToAdd;
                   buffer.prev = buffer.current;
                 }
+                editor.transact((transaction) => {
+                    transaction.setMeta('addToHistory', false);
+                    editor.removeBlocks(blocks.map((block) => block.id));
+                });
+                
+                editor.transact(() => {
+                    editor.insertBlocks([], insertBlockId);
+                    editor.insertBlocks(blocks, insertBlockId);
+                })
             };
 
             await streamMarkdownToEditor(result, editor, insertBlockId);
-            // setGenerating(false);
         };
 
         setGenerating(true);
         void handleGenerateActionPromptSubmitted(prompt, editor).then(() => setGenerating(false));
-        // setGenerating(false);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prompt, editor, generateForPrompt]);
 
