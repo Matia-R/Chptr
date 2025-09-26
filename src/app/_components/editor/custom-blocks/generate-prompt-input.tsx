@@ -1,13 +1,13 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { Button } from "../../ui/button";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, RotateCcw, X, Check } from "lucide-react";
 import { TableButton } from "./generate-suggestion-chip";
-import React, { useRef } from "react";
-import { useGenerateStore } from "~/hooks/use-generate-store";
+import React, { useRef, useEffect } from "react";
+import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
 
 const PromptInputComponent = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { submitPrompt, isGenerating } = useGenerateStore();
+  const { submitPrompt, state, prompt, setState } = useGenerateStore();
 
   // Auto-resize function to adjust textarea height based on content
   const adjustTextareaHeight = () => {
@@ -41,6 +41,22 @@ const PromptInputComponent = () => {
     adjustTextareaHeight();
   };
 
+  const handleReject = () => {
+    setState(GenerateState.RejectedResponse);
+  };
+
+  const handleAccept = () => {
+    setState(GenerateState.AcceptedResponse);
+  };
+
+  // Clear textarea when state becomes GeneratedResponse
+  useEffect(() => {
+    if (state === GenerateState.GeneratedResponse && textareaRef.current) {
+      textareaRef.current.value = "";
+      adjustTextareaHeight();
+    }
+  }, [state]);
+
   // Auto-focus using a callback ref that only runs once
   const setTextareaRef = (element: HTMLTextAreaElement | null) => {
     if (element && !element.dataset.focused) {
@@ -58,13 +74,43 @@ const PromptInputComponent = () => {
       contentEditable={false}
       className="flex shadow-md border border-accent-foreground h-full w-full flex-col rounded-md bg-background text-popover-foreground my-3"
     >
+      {state === GenerateState.GeneratedResponse && (
+        <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between items-center">
+          <p className="text-sm text-muted-foreground">{prompt}</p>
+           <div className="flex gap-2">
+           <Button
+               variant="ghost"
+               size="sm"
+               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+             >
+               <RotateCcw className="h-4 w-4" />
+             </Button>
+             <Button
+               variant="ghost"
+               size="sm"
+               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+               onClick={handleReject}
+             >
+               <X className="h-4 w-4" />
+             </Button>
+             <Button
+               variant="ghost"
+               size="sm"
+               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+               onClick={handleAccept}
+             >
+               <Check className="h-4 w-4" />
+             </Button>
+           </div>
+        </div>
+      )}
       <div className="flex flex-col gap-y-2 px-3 pt-3 pb-2">
         <textarea
           ref={setTextareaRef}
-          placeholder="Enter your prompt here..."
+          placeholder={state === GenerateState.GeneratedResponse ? "Follow-up..." : "Enter your prompt here..."}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          disabled={isGenerating}
+          disabled={state === GenerateState.Generating}
           className="flex min-h-[2rem] w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 resize-none overflow-hidden"
           style={{ resize: 'none' }}
           rows={1}
@@ -88,18 +134,18 @@ const PromptInputComponent = () => {
           variant="ghost"
           size="sm"
           className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-          disabled={isGenerating}
+          disabled={state === GenerateState.Generating}
           // You could also reset the textarea here
         >
           Cancel
         </Button>
         <Button
-          variant="ghost"
-          size="sm"
-          disabled={isGenerating}
-          className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-          onClick={handleGenerate}
-        >
+            variant="ghost"
+            size="sm"
+            disabled={state === GenerateState.Generating}
+            className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={handleGenerate}
+          >
           <ArrowUp className="h-4 w-4" />
         </Button>
       </div>

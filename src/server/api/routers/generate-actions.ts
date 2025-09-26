@@ -31,21 +31,21 @@ export const generateActionsRouter = createTRPCRouter({
         content: z.string()
     }))
     .mutation(async function* ({ input }) {
-        const { textStream } = streamText({
-            model: google("gemini-1.5-flash"),
-            system: systemPrompt,
-            prompt: input.prompt + input.content,
-            experimental_transform: smoothStream({
-                delayInMs: 20,
-                chunking: "word"
-            }),
-        });
+        // const { textStream } = streamText({
+        //     model: google("gemini-1.5-flash"),
+        //     system: systemPrompt,
+        //     prompt: input.prompt + input.content,
+        //     experimental_transform: smoothStream({
+        //         delayInMs: 20,
+        //         chunking: "word"
+        //     }),
+        // });
 
         // const textStream = ['this ', ' is', ' a', ' test', ' stream'];
 
-        // const textStream = input.prompt.split(' ').map(word => word + ' ');
+        const textStream = input.prompt.split(' ').map(word => word + ' ');
 
-        for await (const text of textStream) {
+        for (const text of textStream) {
             console.log(text);
             yield text;
             await new Promise(resolve => setTimeout(resolve, 30));

@@ -25,7 +25,7 @@ import { GeneratePromptInput } from "./custom-blocks/generate-prompt-input";
 import { emitter } from "~/app/ai/prompt/events";
 
 import { createHighlighter } from "shiki";
-import { useGenerateStore } from "~/hooks/use-generate-store";
+import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
 
 type Theme = "light" | "dark" | "system";
 
@@ -64,12 +64,14 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             ]);
         },
     });
-    const generate = api.atActions.generate.useMutation();
+
     const generateForPrompt = api.atActions.generateForPrompt.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
-    const [generateBlockPosition, setGenerateBlockPosition] = useState<string>("");
-    const { prompt } = useGenerateStore();
-    const setGenerating = useGenerateStore((state) => state.setGenerating);
+    const { prompt, state, generatedBlockIds, generateBlockPosition } = useGenerateStore();
+    const setState = useGenerateStore((state) => state.setState);
+    const setPrompt = useGenerateStore((state) => state.submitPrompt);
+    const setGeneratedBlockIds = useGenerateStore((state) => state.setGeneratedBlockIds);
+    const setGenerateBlockPosition = useGenerateStore((state) => state.setGenerateBlockPosition);
 
     // const getGenerateActionSuggestions = (): GenerateActionConfig[] => {
     //     return atActions.map((action) => {
@@ -179,7 +181,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const prevPromptRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!prompt || prevPromptRef.current === prompt) return;
+        if (!prompt || prevPromptRef.current === prompt || state !== GenerateState.AwaitingPrompt) return;
         
         prevPromptRef.current = prompt;
 
@@ -244,18 +246,44 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 editor.transact(() => {
                     editor.insertBlocks([], insertBlockId);
                     editor.insertBlocks(blocks, insertBlockId);
-                })
+                });
+
+                // Set the generated block IDs in the store
+                const generatedBlockIds = blocks.map((block) => block.id);
+                setGeneratedBlockIds(generatedBlockIds);
             };
 
             await streamMarkdownToEditor(result, editor, insertBlockId);
         };
 
-        setGenerating(true);
-        void handleGenerateActionPromptSubmitted(prompt, editor).then(() => setGenerating(false));
+        setState(GenerateState.Generating);
+        void handleGenerateActionPromptSubmitted(prompt, editor).then(() => setState(GenerateState.GeneratedResponse));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prompt, editor, generateForPrompt]);
 
+    // Handle rejection by removing generated blocks
+    useEffect(() => {
+        if (state === GenerateState.RejectedResponse && generatedBlockIds.length > 0) {
+            editor.transact(() => {
+                editor.removeBlocks(generatedBlockIds);
+            });
+            // Clear the generated block IDs after removal
+            setGeneratedBlockIds([]);
+            setState(GenerateState.AwaitingPrompt);
+            setPrompt(null);
+            const generatePromptInputBlock = editor.getPrevBlock(generateBlockPosition);
+            editor.removeBlocks([generatePromptInputBlock!.id]);
+        }
+        if (state === GenerateState.AcceptedResponse && generatedBlockIds.length > 0) {
+            editor.removeBlocks([editor.getPrevBlock(editor.getPrevBlock(generateBlockPosition)!.id)!.id]);
+            // Clear the generated block IDs after removal
+            setGeneratedBlockIds([]);
+            setState(GenerateState.AwaitingPrompt);
+            setPrompt(null);
+        }
+        // handle accepted response
+    }, [state, generatedBlockIds, editor, setGeneratedBlockIds, setState, generateBlockPosition, setPrompt]);
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
@@ -299,7 +327,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         return () => {
             document.removeEventListener("keydown", handleKeyDown);
         };
-    }, [editor]);
+    }, [editor, setGenerateBlockPosition]);
 
     return (
         <BlockNoteView
