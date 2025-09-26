@@ -10,19 +10,13 @@ import {
     BlockNoteSchema,
     type PartialBlock,
     defaultBlockSpecs,
-    defaultStyleSpecs,
-    filterSuggestionItems,
 } from "@blocknote/core";
 import {
-    type DefaultReactSuggestionItem,
-    SuggestionMenuController,
     useCreateBlockNote,
 } from "@blocknote/react";
 import { api } from "~/trpc/react";
-import { atActions, GenerateAction, generateActionsConfig, type GenerateActionConfig } from "~/app/ai/prompt/generate-actions-config";
 import { Alert } from "./custom-blocks/alert";
 import { GeneratePromptInput } from "./custom-blocks/generate-prompt-input";
-import { emitter } from "~/app/ai/prompt/events";
 
 import { createHighlighter } from "shiki";
 import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
@@ -264,26 +258,38 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     // Handle rejection by removing generated blocks
     useEffect(() => {
-        if (state === GenerateState.RejectedResponse && generatedBlockIds.length > 0) {
+        const unsub = useGenerateStore.subscribe((s) => {
+          if (!editor) return;
+      
+          if (s.state === GenerateState.RejectedResponse && s.generatedBlockIds.length > 0) {
             editor.transact(() => {
-                editor.removeBlocks(generatedBlockIds);
+              editor.removeBlocks(s.generatedBlockIds);
             });
-            // Clear the generated block IDs after removal
-            setGeneratedBlockIds([]);
-            setState(GenerateState.AwaitingPrompt);
-            setPrompt(null);
-            const generatePromptInputBlock = editor.getPrevBlock(generateBlockPosition);
-            editor.removeBlocks([generatePromptInputBlock!.id]);
-        }
-        if (state === GenerateState.AcceptedResponse && generatedBlockIds.length > 0) {
-            editor.removeBlocks([editor.getPrevBlock(editor.getPrevBlock(generateBlockPosition)!.id)!.id]);
-            // Clear the generated block IDs after removal
-            setGeneratedBlockIds([]);
-            setState(GenerateState.AwaitingPrompt);
-            setPrompt(null);
-        }
-        // handle accepted response
-    }, [state, generatedBlockIds, editor, setGeneratedBlockIds, setState, generateBlockPosition, setPrompt]);
+      
+            const generatePromptInputBlock = editor.getPrevBlock(s.generateBlockPosition);
+            if (generatePromptInputBlock) {
+              editor.removeBlocks([generatePromptInputBlock.id]);
+            }
+      
+            useGenerateStore.getState().setGeneratedBlockIds([]);
+            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+            useGenerateStore.getState().submitPrompt(null);
+          }
+      
+          if (s.state === GenerateState.AcceptedResponse && s.generatedBlockIds.length > 0) {
+            const maybeInput = editor.getPrevBlock(editor.getPrevBlock(s.generateBlockPosition ?? "")?.id ?? "");
+            if (maybeInput) {
+              editor.removeBlocks([maybeInput.id]);
+            }
+      
+            useGenerateStore.getState().setGeneratedBlockIds([]);
+            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+            useGenerateStore.getState().submitPrompt(null);
+          }
+        });
+      
+        return () => unsub();
+      }, [editor]);      
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
