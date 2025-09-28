@@ -61,34 +61,10 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const generateForPrompt = api.atActions.generateForPrompt.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
-    const { prompt, state, generatedBlockIds, generateBlockPosition } = useGenerateStore();
+    const { prompt, state, generateBlockPosition } = useGenerateStore();
     const setState = useGenerateStore((state) => state.setState);
-    const setPrompt = useGenerateStore((state) => state.submitPrompt);
     const setGeneratedBlockIds = useGenerateStore((state) => state.setGeneratedBlockIds);
     const setGenerateBlockPosition = useGenerateStore((state) => state.setGenerateBlockPosition);
-
-    // const getGenerateActionSuggestions = (): GenerateActionConfig[] => {
-    //     return atActions.map((action) => {
-    //         const config = generateActionsConfig[action];
-    //         return {
-    //             ...config,
-    //             onItemClick: async () => {
-    //                 const insertBlockId = editor.getTextCursorPosition().block.id;
-
-    //                 const blocks = editor.document;
-    //                 const contentUpToBlock = blocks.slice(0, blocks.findIndex(block => block.id === insertBlockId) + 1);
-    //                 const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
-
-    //                 const result = await generate.mutateAsync({
-    //                     action,
-    //                     content: contentToProcess
-    //                 });
-
-    //                 await streamMarkdownToEditor(result, editor, insertBlockId);
-    //             },
-    //         };
-    //     });
-    // };
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -258,6 +234,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     // Handle rejection by removing generated blocks
     useEffect(() => {
+
+        const resetGenerateStore = () => {
+            useGenerateStore.getState().setGeneratedBlockIds([]);
+            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+            useGenerateStore.getState().setPrompt(null);
+        }
+
         const unsub = useGenerateStore.subscribe((s) => {
           if (!editor) return;
       
@@ -271,9 +254,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
               editor.removeBlocks([generatePromptInputBlock.id]);
             }
       
-            useGenerateStore.getState().setGeneratedBlockIds([]);
-            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
-            useGenerateStore.getState().submitPrompt(null);
+            resetGenerateStore();
           }
       
           if (s.state === GenerateState.AcceptedResponse && s.generatedBlockIds.length > 0) {
@@ -282,19 +263,35 @@ export default function Editor({ initialContent: propInitialContent, documentId 
               editor.removeBlocks([maybeInput.id]);
             }
       
-            useGenerateStore.getState().setGeneratedBlockIds([]);
-            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
-            useGenerateStore.getState().submitPrompt(null);
+            resetGenerateStore();
           }
         });
       
         return () => unsub();
-      }, [editor]);      
+      }, [editor]);
+      
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
         void saveToStorage(content);
         debouncedSave(content);
+
+        // Check if generated blocks were deleted/undone
+        const { generatedBlockIds, state } = useGenerateStore.getState();
+        
+        // Only care if we had a generated response
+        if (state === GenerateState.GeneratedResponse && generatedBlockIds.length > 0) {
+            const stillExists = generatedBlockIds.some(id =>
+                editor.getBlock(id) != null
+            );
+
+            if (!stillExists) {
+                // Generated blocks were deleted/undone → reset
+                useGenerateStore.getState().setGeneratedBlockIds([]);
+                useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+                useGenerateStore.getState().setPrompt(null);
+            }
+        }
     }, [editor, debouncedSave]);
 
     // Add keyboard shortcut handler for Cmd/Ctrl + /
@@ -342,12 +339,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             theme={currentTheme as 'light' | 'dark'}
             onChange={handleChange}
         >
-            {/* <SuggestionMenuController
-                triggerCharacter={"@"}
-                getItems={async (query) =>
-                    filterSuggestionItems(getGenerateActionSuggestions(), query)
-                }
-            /> */}
         </BlockNoteView>
     );
 }

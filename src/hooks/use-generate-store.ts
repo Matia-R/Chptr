@@ -15,10 +15,11 @@ interface GenerateStore {
   generatedBlockIds: string[];
   generateBlockPosition: string;
 
-  submitPrompt: (prompt: string) => void;
+  submitPrompt: (prompt: string | null) => void;
   setState: (state: GenerateState) => void;
   setGeneratedBlockIds: (blockIds: string[]) => void;
   setGenerateBlockPosition: (position: string) => void;
+  setPrompt: (prompt: string | null) => void;
 }
 
 export const useGenerateStore = create<GenerateStore>()(
@@ -31,7 +32,7 @@ export const useGenerateStore = create<GenerateStore>()(
 
       submitPrompt: (prompt) => set({ prompt }),
       setState: (state) => set({ state }),
-    //   setPrompt: (prompt: string | null) => set({ prompt }),
+      setPrompt: (prompt) => set({ prompt }),
       setGeneratedBlockIds: (generatedBlockIds) => set({ generatedBlockIds }),
       setGenerateBlockPosition: (generateBlockPosition) => set({ generateBlockPosition }),
     }),
