@@ -65,6 +65,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const setState = useGenerateStore((state) => state.setState);
     const setGeneratedBlockIds = useGenerateStore((state) => state.setGeneratedBlockIds);
     const setGenerateBlockPosition = useGenerateStore((state) => state.setGenerateBlockPosition);
+    // const setGenerateBlockPosition = useGenerateStore((state) => state.setGenerateBlockPosition);
+    // const [generateBlockPosition, setGenerateBlockPosition] = useState<string>('');
 
     const debouncedSave = useCallback((content: Block[]) => {
         if (timeoutRef.current) {
@@ -151,7 +153,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const prevPromptRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!prompt || prevPromptRef.current === prompt || state !== GenerateState.AwaitingPrompt) return;
+        if (!prompt || prevPromptRef.current === prompt || state !== GenerateState.Generating) return;
         
         prevPromptRef.current = prompt;
 
@@ -196,7 +198,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                   editor.transact((transaction) => {
                     transaction.setMeta('addToHistory', false);
                     if (blocks.length === 0) {
-                        editor.insertBlocks(blocksToAdd, insertBlockId);
+                        editor.insertBlocks(blocksToAdd, insertBlockId, 'after');
                       } else {
                         editor.replaceBlocks(
                             blocks.map((block) => block.id),
@@ -215,7 +217,18 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 
                 editor.transact(() => {
                     editor.insertBlocks([], insertBlockId);
-                    editor.insertBlocks(blocks, insertBlockId);
+                    editor.insertBlocks(blocks, insertBlockId, 'after');
+
+                    if (generateBlockPosition) {
+                        const { insertedBlocks } = editor.replaceBlocks([generateBlockPosition], [{
+                            type: "generatePromptInput",
+                            props: {
+                                prevPrompt: prompt,
+                            },
+                        }]);
+                        // set new generate block position here
+                        setGenerateBlockPosition(insertedBlocks[0]!.id);
+                    }
                 });
 
                 // Set the generated block IDs in the store
@@ -224,15 +237,25 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             };
 
             await streamMarkdownToEditor(result, editor, insertBlockId);
+            setState(GenerateState.GeneratedResponse)
+            console.log(prompt);
+
+            // if (generateBlockPosition) {
+            //     editor.replaceBlocks([generateBlockPosition], [{
+            //         type: "generatePromptInput",
+            //         props: {
+            //             prevPrompt: prompt,
+            //         },
+            //     }]);
+            // }
         };
 
-        setState(GenerateState.Generating);
-        void handleGenerateActionPromptSubmitted(prompt, editor).then(() => setState(GenerateState.GeneratedResponse));
+        void handleGenerateActionPromptSubmitted(prompt, editor);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prompt, editor, generateForPrompt]);
 
-    // Handle rejection by removing generated blocks
+    // Handle accept or reject response
     useEffect(() => {
 
         const resetGenerateStore = () => {
@@ -246,23 +269,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
       
           if (s.state === GenerateState.RejectedResponse && s.generatedBlockIds.length > 0) {
             editor.transact(() => {
-              editor.removeBlocks(s.generatedBlockIds);
+              editor.removeBlocks([...s.generatedBlockIds, s.generateBlockPosition]);
             });
-      
-            const generatePromptInputBlock = editor.getPrevBlock(s.generateBlockPosition);
-            if (generatePromptInputBlock) {
-              editor.removeBlocks([generatePromptInputBlock.id]);
-            }
-      
             resetGenerateStore();
           }
       
           if (s.state === GenerateState.AcceptedResponse && s.generatedBlockIds.length > 0) {
-            const maybeInput = editor.getPrevBlock(editor.getPrevBlock(s.generateBlockPosition ?? "")?.id ?? "");
-            if (maybeInput) {
-              editor.removeBlocks([maybeInput.id]);
-            }
-      
+            editor.removeBlocks([s.generateBlockPosition]);
             resetGenerateStore();
           }
         });
@@ -275,23 +288,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         const content = editor.document as Block[];
         void saveToStorage(content);
         debouncedSave(content);
-
-        // Check if generated blocks were deleted/undone
-        const { generatedBlockIds, state } = useGenerateStore.getState();
-        
-        // Only care if we had a generated response
-        if (state === GenerateState.GeneratedResponse && generatedBlockIds.length > 0) {
-            const stillExists = generatedBlockIds.some(id =>
-                editor.getBlock(id) != null
-            );
-
-            if (!stillExists) {
-                // Generated blocks were deleted/undone → reset
-                useGenerateStore.getState().setGeneratedBlockIds([]);
-                useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
-                useGenerateStore.getState().setPrompt(null);
-            }
-        }
     }, [editor, debouncedSave]);
 
     // Add keyboard shortcut handler for Cmd/Ctrl + /
@@ -304,10 +300,10 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 // Get current cursor position
                 const cursorPosition = editor.getTextCursorPosition();
                 const currentBlockId = cursorPosition.block.id;
-                setGenerateBlockPosition(currentBlockId);
+                // setGenerateBlockPosition(currentBlockId);
                 
                 // Insert error block after current block
-                editor.insertBlocks(
+                const generatePromptInputBlock = editor.insertBlocks(
                     [
                         {
                             type: "generatePromptInput",
@@ -320,6 +316,9 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     ],
                     currentBlockId
                 );
+
+                // TODO: Persist this state to localStorage
+                setGenerateBlockPosition(generatePromptInputBlock[0]!.id);
             }
         };
 

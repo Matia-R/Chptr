@@ -5,7 +5,7 @@ import { TableButton } from "./generate-suggestion-chip";
 import React, { useRef, useEffect } from "react";
 import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
 
-const PromptInputComponent = () => {
+const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { submitPrompt, state, prompt, setState } = useGenerateStore();
 
@@ -25,6 +25,7 @@ const PromptInputComponent = () => {
     if (!value) return;
 
     submitPrompt(value);
+    setState(GenerateState.Generating);
 
     // Optional: clear textarea after submit
     // textareaRef.current.value = "";
@@ -74,9 +75,9 @@ const PromptInputComponent = () => {
       contentEditable={false}
       className="flex shadow-md border border-accent-foreground h-full w-full flex-col rounded-md bg-background text-popover-foreground my-3"
     >
-      {state === GenerateState.GeneratedResponse && (
-        <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between items-center">
-          <p className="text-sm text-muted-foreground">{prompt}</p>
+      {prevPrompt && (
+        <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between gap-x-2 items-center">
+          <p className="text-sm text-muted-foreground truncate">{prevPrompt}</p>
            <div className="flex gap-2">
            <Button
                variant="ghost"
@@ -107,7 +108,7 @@ const PromptInputComponent = () => {
       <div className="flex flex-col gap-y-2 px-3 pt-3 pb-2">
         <textarea
           ref={setTextareaRef}
-          placeholder={state === GenerateState.GeneratedResponse ? "Follow-up..." : "Enter your prompt here..."}
+          placeholder={prevPrompt ? "Follow-up..." : "Enter your prompt here..."}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           disabled={state === GenerateState.Generating}
@@ -157,7 +158,12 @@ const PromptInputComponent = () => {
 export const GeneratePromptInput = createReactBlockSpec(
   {
     type: "generatePromptInput",
-    propSchema: {},
+    propSchema: {
+      prevPrompt: {
+        default: undefined,
+        type: "string",
+      }
+    },
     content: "inline",
   },
   {
