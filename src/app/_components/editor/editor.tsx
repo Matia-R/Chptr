@@ -237,17 +237,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             };
 
             await streamMarkdownToEditor(result, editor, insertBlockId);
-            setState(GenerateState.GeneratedResponse)
-            console.log(prompt);
-
-            // if (generateBlockPosition) {
-            //     editor.replaceBlocks([generateBlockPosition], [{
-            //         type: "generatePromptInput",
-            //         props: {
-            //             prevPrompt: prompt,
-            //         },
-            //     }]);
-            // }
+            setState(GenerateState.GeneratedResponse);
         };
 
         void handleGenerateActionPromptSubmitted(prompt, editor);
@@ -258,11 +248,11 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     // Handle accept or reject response
     useEffect(() => {
 
-        const resetGenerateStore = () => {
-            useGenerateStore.getState().setGeneratedBlockIds([]);
-            useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
-            useGenerateStore.getState().setPrompt(null);
-        }
+        // const resetGenerateStore = () => {
+        //     useGenerateStore.getState().setGeneratedBlockIds([]);
+        //     useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+        //     useGenerateStore.getState().setPrompt(null);
+        // }
 
         const unsub = useGenerateStore.subscribe((s) => {
           if (!editor) return;
@@ -271,12 +261,12 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             editor.transact(() => {
               editor.removeBlocks([...s.generatedBlockIds, s.generateBlockPosition]);
             });
-            resetGenerateStore();
+            // resetGenerateStore();
           }
       
           if (s.state === GenerateState.AcceptedResponse && s.generatedBlockIds.length > 0) {
             editor.removeBlocks([s.generateBlockPosition]);
-            resetGenerateStore();
+            // resetGenerateStore();
           }
         });
       
@@ -296,6 +286,12 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             // Check if Cmd (Mac) or Ctrl (Windows/Linux) + / is pressed
             if ((event.metaKey || event.ctrlKey) && event.key === "/") {
                 event.preventDefault();
+
+                const resetGenerateStore = () => {
+                    useGenerateStore.getState().setGeneratedBlockIds([]);
+                    useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
+                    useGenerateStore.getState().setPrompt(null);
+                }
                 
                 // Get current cursor position
                 const cursorPosition = editor.getTextCursorPosition();
@@ -307,17 +303,14 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     [
                         {
                             type: "generatePromptInput",
-                            props: {
-                                    // placeholder: "Enter your prompt here...",
-                                    // buttonText: "Generate",
-                                    // getGenerateActionSuggestions: getGenerateActionSuggestions(),
-                            },
+                            props: {},
                         },
                     ],
                     currentBlockId
                 );
 
-                // TODO: Persist this state to localStorage
+                resetGenerateStore();
+
                 setGenerateBlockPosition(generatePromptInputBlock[0]!.id);
             }
         };
