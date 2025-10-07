@@ -61,7 +61,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
 
     const generateForPrompt = api.atActions.generateForPrompt.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
-    const { prompt, state, generateBlockPosition } = useGenerateStore();
+    const { prompts, state, generateBlockPosition } = useGenerateStore();
     const setState = useGenerateStore((state) => state.setState);
     const setGeneratedBlockIds = useGenerateStore((state) => state.setGeneratedBlockIds);
     const setGenerateBlockPosition = useGenerateStore((state) => state.setGenerateBlockPosition);
@@ -150,18 +150,32 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     }, [currentTheme]);
 
-    const prevPromptRef = useRef<string | null>(null);
+    const prevPromptsLengthRef = useRef<number>(0);
 
     useEffect(() => {
-        if (!prompt || prevPromptRef.current === prompt || state !== GenerateState.Generating) return;
+        // Check if we have new prompts and are in generating state
+        if (prompts.length === 0 || prevPromptsLengthRef.current === prompts.length || state !== GenerateState.Generating) return;
         
-        prevPromptRef.current = prompt;
+        prevPromptsLengthRef.current = prompts.length;
+        const currentPrompt = prompts[prompts.length - 1]!; // Get the latest prompt
+        const isFollowUp = prompts.length > 1;
 
-        const handleGenerateActionPromptSubmitted = async (
-            prompt: string,
+        const handleGeneratePromptSubmitted = async (
+            promptToUse: string,
             editor: typeof schema.BlockNoteEditor
         ) => {
             const insertBlockId = generateBlockPosition;
+
+            // If this is a follow-up, remove existing generated blocks first
+            if (isFollowUp) {
+                const { generatedBlockIds } = useGenerateStore.getState();
+                if (generatedBlockIds.length > 0) {
+                    editor.transact(() => {
+                        editor.removeBlocks(generatedBlockIds);
+                    });
+                    useGenerateStore.getState().setGeneratedBlockIds([]);
+                }
+            }
 
             const blocks = editor.document;
             const contentUpToBlock = blocks.slice(
@@ -170,8 +184,13 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             );
             const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
+            // Combine all prompts if it's a follow-up
+            const combinedPrompt = isFollowUp 
+                ? prompts.map((p, i) => i === 0 ? p : `Follow-up ${i}: ${p}`).join('\n\n')
+                : promptToUse;
+
             const result = await generateForPrompt.mutateAsync({
-                prompt,
+                prompt: combinedPrompt,
                 content: contentToProcess,
             });
 
@@ -223,7 +242,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                         const { insertedBlocks } = editor.replaceBlocks([generateBlockPosition], [{
                             type: "generatePromptInput",
                             props: {
-                                prevPrompt: prompt,
+                                prevPrompt: prompts[0] ?? undefined,
                             },
                         }]);
                         // set new generate block position here
@@ -240,10 +259,10 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             setState(GenerateState.GeneratedResponse);
         };
 
-        void handleGenerateActionPromptSubmitted(prompt, editor);
+        void handleGeneratePromptSubmitted(currentPrompt, editor);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [prompt, editor, generateForPrompt]);
+    }, [prompts, editor, generateForPrompt]);
 
     // Handle accept or reject response
     useEffect(() => {
@@ -290,7 +309,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 const resetGenerateStore = () => {
                     useGenerateStore.getState().setGeneratedBlockIds([]);
                     useGenerateStore.getState().setState(GenerateState.AwaitingPrompt);
-                    useGenerateStore.getState().setPrompt(null);
+                    useGenerateStore.getState().setPrompts([]);
                 }
                 
                 // Get current cursor position

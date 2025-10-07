@@ -10,29 +10,29 @@ export enum GenerateState {
 }
 
 interface GenerateStore {
-  prompt: string | null;
+  prompts: string[];
   state: GenerateState;
   generatedBlockIds: string[];
   generateBlockPosition: string;
 
-  submitPrompt: (prompt: string | null) => void;
+  submitPrompt: (prompt: string) => void;
   setState: (state: GenerateState) => void;
   setGeneratedBlockIds: (blockIds: string[]) => void;
   setGenerateBlockPosition: (position: string) => void;
-  setPrompt: (prompt: string | null) => void;
+  setPrompts: (prompts: string[]) => void;
 }
 
 export const useGenerateStore = create<GenerateStore>()(
   persist(
     (set) => ({
-      prompt: null,
+      prompts: [],
       state: GenerateState.AwaitingPrompt,
       generatedBlockIds: [],
       generateBlockPosition: "",
 
-      submitPrompt: (prompt) => set({ prompt }),
+      submitPrompt: (prompt) => set((state) => ({ prompts: [...state.prompts, prompt] })),
       setState: (state) => set({ state }),
-      setPrompt: (prompt) => set({ prompt }),
+      setPrompts: (prompts) => set({ prompts }),
       setGeneratedBlockIds: (generatedBlockIds) => set({ generatedBlockIds }),
       setGenerateBlockPosition: (generateBlockPosition) => set({ generateBlockPosition }),
     }),

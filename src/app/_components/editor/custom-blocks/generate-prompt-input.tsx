@@ -1,13 +1,13 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { Button } from "../../ui/button";
-import { ArrowUp, RotateCcw, X, Check } from "lucide-react";
+import { ArrowUp, X, Check } from "lucide-react";
 import { TableButton } from "./generate-suggestion-chip";
 import React, { useRef, useEffect } from "react";
 import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
 
 const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { submitPrompt, state, prompt, setState } = useGenerateStore();
+  const { submitPrompt, state, setState } = useGenerateStore();
 
   // Auto-resize function to adjust textarea height based on content
   const adjustTextareaHeight = () => {
@@ -79,13 +79,13 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
         <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between gap-x-2 items-center">
           <p className="text-sm text-muted-foreground truncate">{prevPrompt}</p>
            <div className="flex gap-2">
-           <Button
+           {/* <Button
                variant="ghost"
                size="sm"
                className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
              >
                <RotateCcw className="h-4 w-4" />
-             </Button>
+             </Button> */}
              <Button
                variant="ghost"
                size="sm"
