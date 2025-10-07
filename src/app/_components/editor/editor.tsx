@@ -60,6 +60,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     });
 
     const generateForPrompt = api.atActions.generateForPrompt.useMutation();
+    const generateForFollowUp = api.atActions.generateForFollowUp.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
     const { prompts, state, generateBlockPosition } = useGenerateStore();
     const setState = useGenerateStore((state) => state.setState);
@@ -166,10 +167,18 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         ) => {
             const insertBlockId = generateBlockPosition;
 
-            // If this is a follow-up, remove existing generated blocks first
+            let lastGeneratedContent = "";
+            
+            // If this is a follow-up, capture the last generated content before removing blocks
             if (isFollowUp) {
                 const { generatedBlockIds } = useGenerateStore.getState();
                 if (generatedBlockIds.length > 0) {
+                    // Get the markdown content of the generated blocks before removing them
+                    const generatedBlocks = generatedBlockIds
+                        .map(id => editor.getBlock(id))
+                        .filter((block): block is NonNullable<typeof block> => block !== null);
+                    lastGeneratedContent = await editor.blocksToMarkdownLossy(generatedBlocks);
+                    
                     editor.transact(() => {
                         editor.removeBlocks(generatedBlockIds);
                     });
@@ -184,15 +193,18 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             );
             const contentToProcess = await editor.blocksToMarkdownLossy(contentUpToBlock);
 
-            // Combine all prompts if it's a follow-up
-            const combinedPrompt = isFollowUp 
-                ? prompts.map((p, i) => i === 0 ? p : `Follow-up ${i}: ${p}`).join('\n\n')
-                : promptToUse;
-
-            const result = await generateForPrompt.mutateAsync({
-                prompt: combinedPrompt,
-                content: contentToProcess,
-            });
+            // Use the appropriate route based on whether it's a follow-up
+            const result = isFollowUp 
+                ? await generateForFollowUp.mutateAsync({
+                    initialPrompt: prompts[0]!,
+                    followUp: currentPrompt,
+                    lastGeneratedContent,
+                    content: contentToProcess,
+                })
+                : await generateForPrompt.mutateAsync({
+                    prompt: promptToUse,
+                    content: contentToProcess,
+                });
 
             const streamMarkdownToEditor = async (
                 result: AsyncIterable<string>,
@@ -262,7 +274,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         void handleGeneratePromptSubmitted(currentPrompt, editor);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [prompts, editor, generateForPrompt]);
+    }, [prompts, editor, generateForPrompt, generateForFollowUp]);
 
     // Handle accept or reject response
     useEffect(() => {
