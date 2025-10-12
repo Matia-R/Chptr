@@ -253,9 +253,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     if (generateBlockPosition) {
                         const { insertedBlocks } = editor.replaceBlocks([generateBlockPosition], [{
                             type: "generatePromptInput",
-                            props: {
-                                prevPrompt: prompts[0] ?? undefined,
-                            },
+                            props: {},
                         }]);
                         // set new generate block position here
                         setGenerateBlockPosition(insertedBlocks[0]!.id);

@@ -1,14 +1,15 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { Button } from "../../ui/button";
-import { ArrowUp, X, Check } from "lucide-react";
+import { ArrowUp, X, Check, CornerDownRight } from "lucide-react";
 import { TableButton } from "./generate-suggestion-chip";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo, useCallback } from "react";
 import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
+import { motion, AnimatePresence } from "framer-motion";
 
-const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }) => {
+const PromptInputComponent = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { submitPrompt, state, setState } = useGenerateStore();
-
+  const { submitPrompt, state, setState, prompts } = useGenerateStore();
+  
   // Auto-resize function to adjust textarea height based on content
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -42,13 +43,85 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
     adjustTextareaHeight();
   };
 
-  const handleReject = () => {
+  const handleReject = useCallback(() => {
     setState(GenerateState.RejectedResponse);
-  };
+  }, [setState]);
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
     setState(GenerateState.AcceptedResponse);
-  };
+  }, [setState]);
+
+  // Render the history of prompts
+  // Show n-1 prompts when generating (exclude the current prompt being processed)
+  // Show all prompts when in GeneratedResponse state (including the last one that just got a response)
+  const promptHistory = useMemo(() => {
+    if (prompts.length === 0) {
+      return null;
+    }
+    
+    // Determine which prompts to show based on state
+    const promptsToShow = state === GenerateState.Generating 
+      ? prompts.slice(0, -1)  // Show all except the last one while generating
+      : prompts;              // Show all prompts otherwise (including GeneratedResponse)
+    
+    if (promptsToShow.length === 0) {
+      return null;
+    }
+    
+    return (
+      <AnimatePresence initial={false}>
+        {promptsToShow.map((prompt, index) => {
+          const isLastPrompt = index === promptsToShow.length - 1;
+          const showActions = isLastPrompt && state === GenerateState.GeneratedResponse;
+          const isFollowUp = index > 0;
+          
+          return (
+            <motion.div
+              key={index}
+              initial={{ height: 0, opacity: 0, y: 20 }}
+              animate={{ height: "auto", opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between gap-x-2 items-center">
+                <div className={`flex items-center flex-1 min-w-0 ${isFollowUp ? '' : 'gap-x-2'}`}>
+                  {isFollowUp ? (
+                    <div className="inline-flex items-center justify-center h-8 w-8 rounded-md">
+                      <CornerDownRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="h-8" />
+                  )}
+                  <p className={`text-sm text-muted-foreground truncate ${isFollowUp ? 'italic' : ''}`}>{prompt}</p>
+                </div>
+                {showActions && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                      onClick={handleReject}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                      onClick={handleAccept}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    );
+  }, [state, prompts, handleReject, handleAccept]);
 
   // Clear textarea when state becomes GeneratedResponse
   useEffect(() => {
@@ -75,40 +148,11 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
       contentEditable={false}
       className="flex shadow-md border border-accent-foreground h-full w-full flex-col rounded-md bg-background text-popover-foreground my-3"
     >
-      {prevPrompt && (
-        <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between gap-x-2 items-center">
-          <p className="text-sm text-muted-foreground truncate">{prevPrompt}</p>
-           <div className="flex gap-2">
-           {/* <Button
-               variant="ghost"
-               size="sm"
-               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-             >
-               <RotateCcw className="h-4 w-4" />
-             </Button> */}
-             <Button
-               variant="ghost"
-               size="sm"
-               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-               onClick={handleReject}
-             >
-               <X className="h-4 w-4" />
-             </Button>
-             <Button
-               variant="ghost"
-               size="sm"
-               className="text-xs text-popover-foreground hover:text-foreground transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-               onClick={handleAccept}
-             >
-               <Check className="h-4 w-4" />
-             </Button>
-           </div>
-        </div>
-      )}
+      {promptHistory}
       <div className="flex flex-col gap-y-2 px-3 pt-3 pb-2">
         <textarea
           ref={setTextareaRef}
-          placeholder={prevPrompt ? "Follow-up..." : "Enter your prompt here..."}
+          placeholder={prompts.length > 0 ? "Follow-up..." : "Enter your prompt here..."}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           disabled={state === GenerateState.Generating}
@@ -116,7 +160,7 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
           style={{ resize: 'none' }}
           rows={1}
         />
-        <div className="flex gap-x-3 overflow-x-auto w-full text-nowrap scrollbar-hide">
+        {/* <div className="flex gap-x-3 overflow-x-auto w-full text-nowrap scrollbar-hide">
           <TableButton label="Add Table" />
           <TableButton label="Add Table" />
           <TableButton label="Add Table" />
@@ -127,7 +171,7 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
           <TableButton label="Add Table" />
           <TableButton label="Add Table" />
           <TableButton label="Add Table" />
-        </div>
+        </div> */}
       </div>
 
       <div className="flex bg-sidebar border-t border-input items-center justify-between px-3 py-2 rounded-b-md">
@@ -158,15 +202,10 @@ const PromptInputComponent = ({ prevPrompt }: { prevPrompt: string | undefined }
 export const GeneratePromptInput = createReactBlockSpec(
   {
     type: "generatePromptInput",
-    propSchema: {
-      prevPrompt: {
-        default: undefined,
-        type: "string",
-      }
-    },
+    propSchema: {},
     content: "inline",
   },
   {
-    render: (props) => <PromptInputComponent {...props.block.props} />,
+    render: () => <PromptInputComponent />,
   }
 );
