@@ -12,7 +12,7 @@ export const generateActionsRouter = createTRPCRouter({
         }))
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
-                model: google("gemini-1.5-flash"),
+                model: google("gemini-2.0-flash"),
                 system: systemPrompt,
                 prompt: `${generateActionsConfig[input.action].prompt} ${input.content}`,
                 experimental_transform: smoothStream({
@@ -32,7 +32,7 @@ export const generateActionsRouter = createTRPCRouter({
     }))
     .mutation(async function* ({ input }) {
         const { textStream } = streamText({
-            model: google("gemini-2.5-flash"),
+            model: google("gemini-2.0-flash"),
             system: systemPrompt,
             prompt: input.prompt + input.content,
             experimental_transform: smoothStream({
@@ -60,7 +60,7 @@ export const generateActionsRouter = createTRPCRouter({
     }))
     .mutation(async function* ({ input }) {
         const { textStream } = streamText({
-            model: google("gemini-2.5-flash"),
+            model: google("gemini-2.0-flash"),
             system: systemPrompt,
             prompt: `${systemPrompt}\n\nInitial prompt: ${input.initialPrompt}\n\nLast generated content: ${input.lastGeneratedContent}\n\nFollow-up request: ${input.followUp}\n\nCurrent document content: ${input.content}`,
             experimental_transform: smoothStream({

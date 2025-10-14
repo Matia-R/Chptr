@@ -84,10 +84,10 @@ const PromptInputComponent = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="overflow-hidden"
             >
-              <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between gap-x-2 items-center">
-                <div className={`flex items-center flex-1 min-w-0 ${isFollowUp ? '' : 'gap-x-2'}`}>
+              <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between items-center">
+                <div className={`flex items-center flex-1 min-w-0`}>
                   {isFollowUp ? (
-                    <div className="inline-flex items-center justify-center h-8 w-8 rounded-md">
+                    <div className="inline-flex items-center h-8 w-6 rounded-md">
                       <CornerDownRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   ) : (
