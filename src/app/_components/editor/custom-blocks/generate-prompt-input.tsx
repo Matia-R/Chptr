@@ -1,7 +1,6 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { Button } from "../../ui/button";
 import { ArrowUp, X, Check, CornerDownRight } from "lucide-react";
-import { TableButton } from "./generate-suggestion-chip";
 import React, { useRef, useEffect, useMemo, useCallback } from "react";
 import { useGenerateStore, GenerateState } from "~/hooks/use-generate-store";
 import { motion, AnimatePresence } from "framer-motion";
@@ -85,15 +84,15 @@ const PromptInputComponent = () => {
               className="overflow-hidden"
             >
               <div className="flex gap-y-2 px-3 py-1 border-b border-input justify-between items-center">
-                <div className={`flex items-center flex-1 min-w-0`}>
-                  {isFollowUp ? (
-                    <div className="inline-flex items-center h-8 w-6 rounded-md">
+                <div className="flex items-center flex-1 min-w-0">
+                  {isFollowUp && (
+                    <div className="inline-flex items-center h-8 w-6 flex-shrink-0">
                       <CornerDownRight className="h-4 w-4 text-muted-foreground" />
                     </div>
-                  ) : (
-                    <div className="h-8" />
                   )}
-                  <p className={`text-sm text-muted-foreground truncate ${isFollowUp ? 'italic' : ''}`}>{prompt}</p>
+                  <div className="flex items-center h-8 min-w-0 flex-1">
+                    <p className={`text-sm text-muted-foreground truncate ${isFollowUp ? 'italic !pr-1' : ''}`}>{prompt}</p>
+                  </div>
                 </div>
                 {showActions && (
                   <div className="flex gap-2">
