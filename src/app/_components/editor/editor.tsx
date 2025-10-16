@@ -151,6 +151,55 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     }, [currentTheme]);
 
+    // Detect undo/redo operations involving generatePromptInput blocks
+    useEffect(() => {
+        if (!editor) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleEditorChange = (editor: typeof schema.BlockNoteEditor, { getChanges }: { getChanges: () => any[] }) => {
+            const changes = getChanges();
+            const storeState = useGenerateStore.getState();
+
+            console.log('changes', changes);
+            
+            // Only process undo/redo operations
+            const undoRedoChanges = changes.filter(change => 
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                change.source.type === "undo" || change.source.type === "redo" || change.source.type === "undo-redo"
+            );
+            
+            if (undoRedoChanges.length === 0) return;
+            
+            // Check if undo/redo involves generatePromptInput blocks
+            let hasGeneratePromptInput = false;
+            let hasGeneratedBlocks = false;
+
+            console.log('undoRedoChanges', undoRedoChanges);
+            
+            for (const change of undoRedoChanges) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                if (change.block.type === "generatePromptInput") {
+                    hasGeneratePromptInput = true;
+                }
+                // Check if this is a previously generated block being restored
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+                if (storeState.generatedBlockIds.includes(change.block.id)) {
+                    hasGeneratedBlocks = true;
+                }
+            }
+            
+            // If undo/redo involves our blocks and state is still accepted/rejected, reset to GeneratedResponse
+            if ((hasGeneratePromptInput || hasGeneratedBlocks) && 
+                (storeState.state === GenerateState.AcceptedResponse || storeState.state === GenerateState.RejectedResponse)) {
+                // Reset state to GeneratedResponse to allow follow-ups
+                useGenerateStore.getState().setState(GenerateState.GeneratedResponse);
+            }
+        };
+
+        const unsubscribe = editor.onChange(handleEditorChange);
+        return unsubscribe;
+    }, [editor]);
+
     const prevPromptsLengthRef = useRef<number>(0);
 
     useEffect(() => {
@@ -289,6 +338,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
           if (s.state === GenerateState.RejectedResponse && s.generatedBlockIds.length > 0) {
             editor.transact(() => {
               editor.removeBlocks([...s.generatedBlockIds, s.generateBlockPosition]);
+              console.log('removing blocks')
             });
             // resetGenerateStore();
           }
@@ -322,12 +372,21 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                     useGenerateStore.getState().setPrompts([]);
                 }
                 
+                // Check if a generatePromptInput block already exists
+                const existingPromptBlocks = editor.document.filter(block => 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                    (block as any).type === "generatePromptInput"
+                );
+                if (existingPromptBlocks.length > 0) {
+                    // Don't add another one if one already exists
+                    return;
+                }
+
                 // Get current cursor position
                 const cursorPosition = editor.getTextCursorPosition();
                 const currentBlockId = cursorPosition.block.id;
-                // setGenerateBlockPosition(currentBlockId);
                 
-                // Insert error block after current block
+                // Insert generatePromptInput block after current block
                 const generatePromptInputBlock = editor.insertBlocks(
                     [
                         {

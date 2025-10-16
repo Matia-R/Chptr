@@ -71,7 +71,7 @@ const PromptInputComponent = () => {
       <AnimatePresence initial={false}>
         {promptsToShow.map((prompt, index) => {
           const isLastPrompt = index === promptsToShow.length - 1;
-          const showActions = isLastPrompt && state === GenerateState.GeneratedResponse;
+          const showActions = isLastPrompt;
           const isFollowUp = index > 0;
           
           return (
