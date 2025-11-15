@@ -50,7 +50,7 @@ export const Alert = createReactBlockSpec(
             )!;
             const Icon = alertType.icon;
             return (
-                <div contentEditable={false} className={`rounded-lg w-full p-4 my-4 ${props.block.props.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/30' :
+                <div contentEditable={false} className={`rounded-lg w-full p-4 ${props.block.props.type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/30' :
                     props.block.props.type === 'error' ? 'bg-red-50 dark:bg-red-900/30' :
                         props.block.props.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/30' :
                             'bg-green-50 dark:bg-green-900/30'}`}
