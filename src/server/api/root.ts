@@ -1,6 +1,6 @@
 import { postRouter } from "~/server/api/routers/post";
 import { documentRouter } from "~/server/api/routers/document";
-import { atActionsRouter } from "~/server/api/routers/at-actions";
+import { aiGenerateRouter } from "~/server/api/routers/at-actions";
 import { userRouter } from "~/server/api/routers/user";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -12,7 +12,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 export const appRouter = createTRPCRouter({
   post: postRouter,
   document: documentRouter,
-  atActions: atActionsRouter,
+  aiGenerate: aiGenerateRouter,
   user: userRouter,
 });
 

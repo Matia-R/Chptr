@@ -4,7 +4,9 @@ import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
 import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
 
-export const atActionsRouter = createTRPCRouter({
+const model = google("gemini-2.0-flash");
+
+export const aiGenerateRouter = createTRPCRouter({
     generate: publicProcedure
         .input(z.object({
             action: z.nativeEnum(AtAction),
@@ -12,9 +14,29 @@ export const atActionsRouter = createTRPCRouter({
         }))
         .mutation(async function* ({ input }) {
             const { textStream } = streamText({
-                model: google("gemini-1.5-flash"),
+                model,
                 system: systemPrompt,
                 prompt: `${atActionsConfig[input.action].prompt} ${input.content}`,
+                experimental_transform: smoothStream({
+                    delayInMs: 20,
+                    chunking: "word"
+                }),
+            });
+
+            for await (const text of textStream) {
+                yield text;
+            }
+        }),
+    generateForPrompt: publicProcedure
+        .input(z.object({
+            prompt: z.string(),
+            context: z.string()
+        }))
+        .mutation(async function* ({ input }) {
+            const { textStream } = streamText({
+                model,
+                system: systemPrompt,
+                prompt: `${input.prompt} ${input.context}`,
                 experimental_transform: smoothStream({
                     delayInMs: 20,
                     chunking: "word"

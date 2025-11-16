@@ -20,8 +20,9 @@ import {
 import { api } from "~/trpc/react";
 import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { Alert } from "./custom-blocks/Alert";
-
+import { AiPromptInputBlock } from "./custom-blocks/AIGenerateInput";
 import { createHighlighter } from "shiki";
+import { usePromptStore } from "~/hooks/use-prompt-store";
 
 type Theme = "light" | "dark" | "system";
 
@@ -44,6 +45,7 @@ const schema = BlockNoteSchema.create({
     blockSpecs: {
         ...defaultBlockSpecs,
         alert: Alert,
+        aiPromptInput: AiPromptInputBlock,
     },
 });
 
@@ -51,6 +53,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const utils = api.useUtils();
+    const streamTokens = usePromptStore((state) => state.streamTokens);
+    const streamTokensRef = useRef<Record<string, string[]>>({});
     const saveDocument = api.document.saveDocument.useMutation({
         onSuccess: () => {
             void Promise.all([
@@ -59,7 +63,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
             ]);
         },
     });
-    const generate = api.atActions.generate.useMutation();
+    const generate = api.aiGenerate.generate.useMutation();
     const timeoutRef = useRef<NodeJS.Timeout>();
 
     const streamMarkdownToEditor = async (
@@ -162,6 +166,26 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         };
     }, []);
 
+    // Consume stream tokens from AIGenerateInput
+    useEffect(() => {
+        // Check each storeId for new tokens
+        Object.keys(streamTokens).forEach((storeId) => {
+            const currentTokens = streamTokens[storeId] ?? [];
+            const previousTokens = streamTokensRef.current[storeId] ?? [];
+            
+            // If there are new tokens, log them
+            if (currentTokens.length > previousTokens.length) {
+                const newTokens = currentTokens.slice(previousTokens.length);
+                newTokens.forEach((token) => {
+                    console.log("Stream token from editor:", token);
+                });
+            }
+            
+            // Update ref to track what we've seen (store a copy of the array)
+            streamTokensRef.current[storeId] = [...currentTokens];
+        });
+    }, [streamTokens]);
+
     useEffect(() => {
         if (theme === "system") {
             const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -228,6 +252,55 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         void saveToStorage(content);
         debouncedSave(content);
     }, [editor, debouncedSave]);
+
+    useEffect(() => {
+        const handleKeyDown = async (event: KeyboardEvent) => {
+            // Check if Cmd (Mac) or Ctrl (Windows/Linux) + / is pressed
+            if ((event.metaKey || event.ctrlKey) && event.key === "/") {
+                event.preventDefault();
+
+                // Check if a generatePromptInput block already exists
+                const existingPromptBlocks = editor.document.filter(block => 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                    (block as any).type === "aiGenerateInput"
+                );
+                if (existingPromptBlocks.length > 0) {
+                    // Don't add another one if one already exists
+                    return;
+                }
+
+                // Get current cursor position
+                const cursorPosition = editor.getTextCursorPosition();
+                const currentBlockId = cursorPosition.block.id;
+
+                const contentUpToBlock = editor.document.slice(0, editor.document.findIndex(block => block.id === currentBlockId) + 1);
+
+                const context = await editor.blocksToMarkdownLossy(contentUpToBlock);
+
+                // Generate a unique ID for this prompt block
+                const promptStoreId = crypto.randomUUID();
+
+                // Insert generatePromptInput block after current block
+                editor.insertBlocks(
+                    [
+                        {
+                            type: "aiPromptInput",
+                            props: { context, promptStoreId },
+                        },
+                    ],
+                    currentBlockId
+                );
+            }
+        };
+
+        // Add event listener to the document
+        document.addEventListener("keydown", (event) => void handleKeyDown(event));
+
+        // Cleanup
+        return () => {
+            document.removeEventListener("keydown", (event) => void handleKeyDown(event));
+        };
+    }, [editor]);
 
     return (
         <BlockNoteView
