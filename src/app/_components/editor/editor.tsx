@@ -22,7 +22,7 @@ import { atActions, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { Alert } from "./custom-blocks/Alert";
 import { AiPromptInputBlock } from "./custom-blocks/AIGenerateInput";
 import { createHighlighter } from "shiki";
-import { usePromptStore, STREAM_END_MARKER } from "~/hooks/use-prompt-store";
+import { useStreamToEditor } from "./extensions/stream-to-editor";
 
 type Theme = "light" | "dark" | "system";
 
@@ -53,9 +53,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
     const { theme } = useTheme();
     const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
     const utils = api.useUtils();
-    const streamTokens = usePromptStore((state) => state.streamTokens);
-    const streamTokensRef = useRef<Record<string, string[]>>({});
-    const wasStreamingRef = useRef<Record<string, boolean>>({});
     const saveDocument = api.document.saveDocument.useMutation({
         onSuccess: () => {
             void Promise.all([
@@ -167,9 +164,6 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         };
     }, []);
 
-    // Track which blocks we're currently streaming to for each storeId
-    const streamingBlocksRef = useRef<Record<string, { blockIds: string[]; buffer: string; prevBuffer: string }>>({});
-
     useEffect(() => {
         if (theme === "system") {
             const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -231,106 +225,8 @@ export default function Editor({ initialContent: propInitialContent, documentId 
         ...(propInitialContent?.length ? { initialContent: propInitialContent } : {}),
     }, [currentTheme]);
 
-    // Consume stream tokens from AIGenerateInput and render to editor
-    useEffect(() => {
-        if (!editor) return;
-
-        // Process each storeId for new tokens
-        void (async () => {
-            for (const storeId of Object.keys(streamTokens)) {
-                const currentTokens = streamTokens[storeId] ?? [];
-                const previousTokens = streamTokensRef.current[storeId] ?? [];
-                const hasNewTokens = currentTokens.length > previousTokens.length;
-                
-                // Detect when stream is done: check if the last token is the end marker
-                if (hasNewTokens && currentTokens.length > 0) {
-                    const lastToken = currentTokens[currentTokens.length - 1];
-                    if (lastToken === STREAM_END_MARKER) {
-                        console.log("Stream Done!");
-                        delete wasStreamingRef.current[storeId];
-                        // Update ref to exclude the marker token
-                        const tokensWithoutMarker = currentTokens.slice(0, -1);
-                        streamTokensRef.current[storeId] = [...tokensWithoutMarker];
-                        continue;
-                    }
-                }
-
-                // If there are new tokens, process them
-                if (hasNewTokens) {
-                    // Mark that we're streaming
-                    wasStreamingRef.current[storeId] = true;
-                    
-                    // Find the aiPromptInput block with this promptStoreId
-                    const promptBlock = editor.document.find(
-                        (block) => 
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                            (block as any).type === "aiPromptInput" && 
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                            (block as any).props?.promptStoreId === storeId
-                    );
-
-                    if (!promptBlock) {
-                        // Update ref even if block not found to avoid reprocessing
-                        streamTokensRef.current[storeId] = [...currentTokens];
-                        continue;
-                    }
-
-                    // Get the accumulated markdown from all tokens (excluding the marker if present)
-                    const tokensForMarkdown = currentTokens.filter(token => token !== STREAM_END_MARKER);
-                    const accumulatedMarkdown = tokensForMarkdown.join("");
-                    
-                    // Get or initialize streaming state for this storeId
-                    let streamingState = streamingBlocksRef.current[storeId];
-                    if (!streamingState) {
-                        streamingState = {
-                            blockIds: [],
-                            buffer: "",
-                            prevBuffer: "",
-                        };
-                        streamingBlocksRef.current[storeId] = streamingState;
-                    }
-
-                    // Update buffer
-                    streamingState.buffer = accumulatedMarkdown;
-
-                    // Skip if current buffer (whitespace removed) is the same as previous
-                    const currentTrimmed = streamingState.buffer.trim();
-                    const prevTrimmed = streamingState.prevBuffer.trim();
-                    if (currentTrimmed === prevTrimmed) {
-                        // Update ref to track what we've seen
-                        streamTokensRef.current[storeId] = [...currentTokens];
-                        continue;
-                    }
-
-                    try {
-                        // Parse markdown to blocks
-                        const blocksToAdd = await editor.tryParseMarkdownToBlocks(streamingState.buffer);
-                        
-                        if (blocksToAdd.length > 0) {
-                            if (streamingState.blockIds.length === 0) {
-                                // First time: insert blocks after the prompt block
-                                editor.insertBlocks(blocksToAdd, promptBlock.id);
-                                streamingState.blockIds = blocksToAdd.map(block => block.id);
-                            } else {
-                                // Update existing blocks
-                                editor.replaceBlocks(streamingState.blockIds, blocksToAdd);
-                                streamingState.blockIds = blocksToAdd.map(block => block.id);
-                            }
-                        }
-                        
-                        streamingState.prevBuffer = streamingState.buffer;
-                    } catch (error) {
-                        if (error instanceof Error) {
-                            console.error("Error parsing markdown to blocks:", error.message);
-                        }
-                    }
-                }
-                
-                // Update ref to track what we've seen (store a copy of the array)
-                streamTokensRef.current[storeId] = [...currentTokens];
-            }
-        })();
-    }, [streamTokens, editor]);
+    // Use the stream-to-editor extension
+    useStreamToEditor(editor);
 
     const handleChange = useCallback(() => {
         const content = editor.document as Block[];
