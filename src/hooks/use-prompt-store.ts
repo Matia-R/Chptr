@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export const STREAM_END_MARKER = "__STREAM_END__";
+
 interface PromptEntry {
   prompt: string;
   timestamp: number;

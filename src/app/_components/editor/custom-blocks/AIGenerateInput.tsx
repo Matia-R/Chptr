@@ -3,7 +3,7 @@ import { Button } from "../../ui/button";
 import { ArrowUp, CornerDownRight } from "lucide-react";
 import React, { useRef, useState, useMemo } from "react";
 import { api } from "~/trpc/react";
-import { usePromptStore } from "~/hooks/use-prompt-store";
+import { usePromptStore, STREAM_END_MARKER } from "~/hooks/use-prompt-store";
 import { motion, AnimatePresence } from "framer-motion";
 
 const AiPromptInput = ({ context, promptStoreId }: { context: string, promptStoreId: string }) => {
@@ -55,9 +55,12 @@ const AiPromptInput = ({ context, promptStoreId }: { context: string, promptStor
       });
 
       for await (const token of result) {
-        console.log(token);
+        // console.log(token);
         addStreamToken(promptStoreId, token);
       }
+      
+      // Add end-of-stream marker
+      addStreamToken(promptStoreId, STREAM_END_MARKER);
     } finally {
         setIsGeneratingResponse(false);
     }
