@@ -261,7 +261,7 @@ export default function Editor({ initialContent: propInitialContent, documentId 
                 // Generate a unique ID for this prompt block
                 const promptStoreId = crypto.randomUUID();
 
-                // Insert generatePromptInput block after current block
+                // Insert generatePromptInput block
                 editor.insertBlocks(
                     [
                         {

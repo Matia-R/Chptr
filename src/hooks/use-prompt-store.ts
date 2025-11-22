@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { subscribeWithSelector } from "zustand/middleware";
 
 export const STREAM_END_MARKER = "__STREAM_END__";
 
@@ -18,56 +19,59 @@ interface PromptStore {
 }
 
 export const usePromptStore = create<PromptStore>()(
-  persist(
-    (set) => ({
-      prompts: {},
-      streamTokens: {},
-      addPrompt: (storeId: string, prompt: string) => {
-        set((state) => {
-          const existingPrompts = state.prompts[storeId] ?? [];
-          return {
-            prompts: {
-              ...state.prompts,
-              [storeId]: [
-                ...existingPrompts,
-                {
-                  prompt,
-                  timestamp: Date.now(),
-                },
-              ],
-            },
-          };
-        });
-      },
-      clearPrompts: (storeId: string) => {
-        set((state) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { [storeId]: _, ...rest } = state.prompts;
-          return { prompts: rest };
-        });
-      },
-      addStreamToken: (storeId: string, token: string) => {
-        set((state) => {
-          const currentTokens = state.streamTokens[storeId] ?? [];
-          return {
-            streamTokens: {
-              ...state.streamTokens,
-              [storeId]: [...currentTokens, token],
-            },
-          };
-        });
-      },
-      clearStreamTokens: (storeId: string) => {
-        set((state) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { [storeId]: _, ...rest } = state.streamTokens;
-          return { streamTokens: rest };
-        });
-      },
-    }),
-    {
-      name: "prompt-store",
-    }
+  subscribeWithSelector(
+    persist(
+      (set) => ({
+        prompts: {},
+        streamTokens: {},
+
+        addPrompt: (storeId: string, prompt: string) => {
+          set((state) => {
+            const existingPrompts = state.prompts[storeId] ?? [];
+            return {
+              prompts: {
+                ...state.prompts,
+                [storeId]: [
+                  ...existingPrompts,
+                  {
+                    prompt,
+                    timestamp: Date.now(),
+                  },
+                ],
+              },
+            };
+          });
+        },
+
+        clearPrompts: (storeId: string) => {
+          set((state) => {
+            const { [storeId]: _, ...rest } = state.prompts;
+            return { prompts: rest };
+          });
+        },
+
+        addStreamToken: (storeId: string, token: string) => {
+          set((state) => {
+            const currentTokens = state.streamTokens[storeId] ?? [];
+            return {
+              streamTokens: {
+                ...state.streamTokens,
+                [storeId]: [...currentTokens, token],
+              },
+            };
+          });
+        },
+
+        clearStreamTokens: (storeId: string) => {
+          set((state) => {
+            const { [storeId]: _, ...rest } = state.streamTokens;
+            return { streamTokens: rest };
+          });
+        },
+      }),
+      {
+        name: "prompt-store",
+      }
+    )
   )
 );
-
