@@ -151,3 +151,24 @@ export async function getCurrentUserProfile(): Promise<UserProfile | undefined> 
     if (error) throw new Error('Failed to fetch user profile');
     return data;
 }
+
+export async function persistDocumentUpdate(documentId: string, updateData: Uint8Array) {
+    const supabase = await createClient();
+    
+    // Convert Uint8Array to Buffer for BYTEA storage
+    const buffer = Buffer.from(updateData);
+    
+    const { error } = await supabase
+        .from('document_updates')
+        .insert({
+            document_id: documentId,
+            update_data: buffer
+        });
+
+    if (error) {
+        console.error('Failed to persist document update:', error);
+        throw new Error(`Failed to persist document update: ${error.message}`);
+    }
+    
+    return { success: true };
+}
