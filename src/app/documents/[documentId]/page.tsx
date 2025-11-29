@@ -37,13 +37,50 @@ export default function DocumentPage() {
         
         setCollabState({ ydoc, provider })
 
-        // Listen to Yjs updates and persist them
+        // Leader election state
+        let isLeader = false;
+        const clientId = provider.awareness.clientID;
+
+        // Function to calculate and set the leader
+        const calculateLeader = () => {
+            const states = provider.awareness.getStates();
+            const clientIds = Array.from(states.keys());
+            
+            if (clientIds.length === 0) {
+                isLeader = false;
+                return;
+            }
+
+            // Leader is the client with the lowest client ID (deterministic)
+            const leaderId = Math.min(...clientIds);
+            const wasLeader = isLeader;
+            isLeader = leaderId === clientId;
+
+            if (wasLeader !== isLeader) {
+                console.log(`Leader changed. Is leader: ${isLeader}`);
+            }
+        };
+
+        // Initial leader calculation
+        // Wait a bit for awareness to sync
+        const initialTimeout = setTimeout(() => {
+            calculateLeader();
+        }, 100);
+
+        // Listen to awareness changes to detect when clients join/leave
+        const handleAwarenessChange = () => {
+            calculateLeader();
+        };
+
+        provider.awareness.on('change', handleAwarenessChange);
+
+        // Listen to Yjs updates and persist them (only if leader)
         const handleUpdate = (update: Uint8Array, origin: unknown) => {
             // Only persist updates that originate from this client (not from provider sync)
-            // The provider will sync updates from other clients, but we only want to persist
-            // updates that we generate locally
-            if (origin !== provider) {
+            // AND only if this client is the leader
+            if (origin !== provider && isLeader) {
                 // Convert Uint8Array to base64 for transmission (browser-compatible)
+                // TODO: use a more efficient algorithm for base64 encoding
                 const binaryString = Array.from(update, byte => String.fromCharCode(byte)).join('');
                 const base64Update = btoa(binaryString);
                 
@@ -59,6 +96,8 @@ export default function DocumentPage() {
 
         // Cleanup on unmount or documentId change
         return () => {
+            clearTimeout(initialTimeout);
+            provider.awareness.off('change', handleAwarenessChange);
             ydoc.off('update', handleUpdate);
             provider.destroy()
             ydoc.destroy()
