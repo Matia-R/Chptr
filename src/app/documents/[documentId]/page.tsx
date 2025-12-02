@@ -20,94 +20,209 @@ export default function DocumentPage() {
         provider: WebrtcProvider;
     } | null>(null)
 
-    const persistUpdateMutation = api.document.persistDocumentUpdate.useMutation({
+    // Ref to track current provider for cleanup
+    const providerRef = useRef<WebrtcProvider | null>(null);
+    const ydocRef = useRef<Y.Doc | null>(null);
+
+    const persistSnapshotMutation = api.document.persistDocumentSnapshot.useMutation({
         onError: (error: unknown) => {
-            console.error('Failed to persist document update:', error);
+            console.error('Failed to persist document snapshot:', error);
         },
     });
 
     // Use ref to store the mutate function to avoid dependency issues
-    const persistUpdateRef = useRef(persistUpdateMutation.mutate);
-    persistUpdateRef.current = persistUpdateMutation.mutate;
+    const persistSnapshotRef = useRef(persistSnapshotMutation.mutate);
+    persistSnapshotRef.current = persistSnapshotMutation.mutate;
+
+    // Fetch latest snapshot
+    const { data: snapshotData } = api.document.getLatestDocumentSnapshot.useQuery(documentId, {
+        enabled: !!documentId,
+    });
 
     useEffect(() => {
-        // Create new Y.Doc and provider for this document
-        const ydoc = new Y.Doc()
-        const provider = new WebrtcProvider(documentId, ydoc)
-        
-        setCollabState({ ydoc, provider })
-
-        // Leader election state
-        let isLeader = false;
-        const clientId = provider.awareness.clientID;
-
-        // Function to calculate and set the leader
-        const calculateLeader = () => {
-            const states = provider.awareness.getStates();
-            const clientIds = Array.from(states.keys());
+        let isMounted = true;
+    
+        const initializeDocument = async () => {
+            // Clean up previous provider if it exists
+            if (providerRef.current) {
+                try {
+                    providerRef.current.destroy();
+                } catch (error) {
+                    console.warn('Error destroying previous provider:', error);
+                }
+                providerRef.current = null;
+            }
+            if (ydocRef.current) {
+                try {
+                    ydocRef.current.destroy();
+                } catch (error) {
+                    console.warn('Error destroying previous ydoc:', error);
+                }
+                ydocRef.current = null;
+            }
             
-            if (clientIds.length === 0) {
-                isLeader = false;
+            // Small delay to ensure cleanup completes before creating new provider
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            if (!isMounted) return;
+            
+            const ydoc = new Y.Doc();
+            const provider = new WebrtcProvider(documentId, ydoc);
+            
+            // Store refs for cleanup
+            providerRef.current = provider;
+            ydocRef.current = ydoc;
+    
+            // Track if Y.Doc receives any content from WebRTC sync
+            let hasReceivedContent = false;
+            const checkForContent = () => {
+                // Check if Y.Doc has any content by checking if it has been updated
+                // We'll track this via update events
+                hasReceivedContent = true;
+            };
+            ydoc.on('update', checkForContent);
+    
+            // Wait longer for WebRTC to reconnect and sync (1.5 seconds)
+            // This gives time for peers to connect and sync content
+            await new Promise(resolve => setTimeout(resolve, 1500));
+    
+            if (!isMounted) {
+                ydoc.off('update', checkForContent);
+                provider.destroy();
+                ydoc.destroy();
                 return;
             }
-
-            // Leader is the client with the lowest client ID (deterministic)
-            const leaderId = Math.min(...clientIds);
-            const wasLeader = isLeader;
-            isLeader = leaderId === clientId;
-
-            if (wasLeader !== isLeader) {
-                console.log(`Leader changed. Is leader: ${isLeader}`);
+    
+            // Check for active session (peers connected)
+            const states = provider.awareness.getStates();
+            const otherClients = Array.from(states.keys()).filter(id => id !== provider.awareness.clientID);
+            const hasActiveSession = otherClients.length > 0;
+    
+            // Check if Y.Doc has content (from WebRTC sync)
+            // If it has content, we're reconnecting to an active session
+            const docHasContent = hasReceivedContent || ydoc.share.size > 0;
+    
+            // Only load snapshot if:
+            // 1. No active session (no peers)
+            // 2. Y.Doc has no content (hasn't synced from WebRTC)
+            // 3. Snapshot exists
+            const shouldLoadSnapshot = !hasActiveSession && !docHasContent && snapshotData?.success && snapshotData.snapshot;
+    
+            if (shouldLoadSnapshot) {
+                try {
+                    const binary = Buffer.from(snapshotData.snapshot, "base64");
+                    Y.applyUpdate(ydoc, new Uint8Array(binary));
+                    console.log("Loaded snapshot (no active session detected)");
+                } catch (err) {
+                    console.error("Snapshot load failed:", err);
+                }
+            } else if (hasActiveSession || docHasContent) {
+                console.log("Active session detected or content synced from WebRTC - skipping snapshot load");
             }
-        };
-
-        // Initial leader calculation
-        // Wait a bit for awareness to sync
-        const initialTimeout = setTimeout(() => {
-            calculateLeader();
-        }, 100);
-
-        // Listen to awareness changes to detect when clients join/leave
-        const handleAwarenessChange = () => {
-            calculateLeader();
-        };
-
-        provider.awareness.on('change', handleAwarenessChange);
-
-        // Listen to Yjs updates and persist them (only if leader)
-        const handleUpdate = (update: Uint8Array, origin: unknown) => {
-            // Only persist updates that originate from this client (not from provider sync)
-            // AND only if this client is the leader
-            if (origin !== provider && isLeader) {
-                // Convert Uint8Array to base64 for transmission (browser-compatible)
-                // TODO: use a more efficient algorithm for base64 encoding
-                const binaryString = Array.from(update, byte => String.fromCharCode(byte)).join('');
-                const base64Update = btoa(binaryString);
+    
+            // Remove the temporary content check listener
+            ydoc.off('update', checkForContent);
+    
+            setCollabState({ ydoc, provider });
+    
+            // ---------------- Leader election ----------------
+    
+            let isLeader = false;
+            const clientId = provider.awareness.clientID;
+    
+            const calculateLeader = () => {
+                const states = provider.awareness.getStates();
+                const clientIds = Array.from(states.keys());
+                const leaderId = Math.min(...clientIds);
+                isLeader = clientId === leaderId;
+                console.log("Leader:", isLeader);
+            };
+    
+            provider.on("peers", calculateLeader);
+            provider.awareness.on("change", calculateLeader);
+    
+            // ---------------- Snapshot persistence ----------------
+    
+            const SNAPSHOT_MIN_INTERVAL = 5000; // 5s throttle
+            let lastSnapshotTime = 0;
+            let updateCount = 0;
+            const UPDATE_INTERVAL = 200; // Save every 200 updates
+    
+            const handleUpdate = (update: Uint8Array, origin: unknown) => {
+                const isLocal = origin !== null;  // IMPORTANT FIX
+    
+                if (!isLocal || !isLeader) return;
+    
+                updateCount++;
+                const now = Date.now();
+    
+                if (updateCount >= UPDATE_INTERVAL || now - lastSnapshotTime > SNAPSHOT_MIN_INTERVAL) {
+                    updateCount = 0;
+                    lastSnapshotTime = now;
+    
+                    const snapshot = Y.encodeStateAsUpdate(ydoc);
+                    const base64Snapshot = Buffer.from(snapshot).toString("base64");
+    
+                    persistSnapshotRef.current({
+                        documentId,
+                        snapshotData: base64Snapshot,
+                    });
+                }
+            };
+    
+            ydoc.on("update", handleUpdate);
+    
+            return () => {
+                provider.off("peers", calculateLeader);
+                provider.awareness.off("change", calculateLeader);
+                ydoc.off("update", handleUpdate);
+    
+                try {
+                    provider.destroy();
+                } catch (error) {
+                    console.warn('Error destroying provider in cleanup:', error);
+                }
+                try {
+                    ydoc.destroy();
+                } catch (error) {
+                    console.warn('Error destroying ydoc in cleanup:', error);
+                }
                 
-                // Persist the update using the ref
-                persistUpdateRef.current({
-                    documentId,
-                    updateData: base64Update,
-                });
+                providerRef.current = null;
+                ydocRef.current = null;
+                setCollabState(null);
+            };
+        };
+    
+        if (snapshotData !== undefined) {
+            void initializeDocument();
+        }
+    
+        return () => {
+            isMounted = false;
+            // Cleanup on unmount
+            if (providerRef.current) {
+                try {
+                    providerRef.current.destroy();
+                } catch (error) {
+                    console.warn('Error destroying provider on unmount:', error);
+                }
+                providerRef.current = null;
+            }
+            if (ydocRef.current) {
+                try {
+                    ydocRef.current.destroy();
+                } catch (error) {
+                    console.warn('Error destroying ydoc on unmount:', error);
+                }
+                ydocRef.current = null;
             }
         };
-
-        ydoc.on('update', handleUpdate);
-
-        // Cleanup on unmount or documentId change
-        return () => {
-            clearTimeout(initialTimeout);
-            provider.awareness.off('change', handleAwarenessChange);
-            ydoc.off('update', handleUpdate);
-            provider.destroy()
-            ydoc.destroy()
-            setCollabState(null)
-        }
-    }, [documentId])
+    }, [documentId, snapshotData]);
 
     const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
 
-    if (isLoading) {
+    if (isLoading || !collabState) {
         return (
             <MotionFade>
                 <div className="space-y-4 animate-pulse">
@@ -146,19 +261,19 @@ export default function DocumentPage() {
     }
 
     // Only render editor when provider is ready
-    if (!collabState) {
-        return (
-            <MotionFade>
-                <div className="space-y-4 animate-pulse">
-                    <div className="h-9 w-2/3 bg-muted rounded-lg" />
-                    <div className="space-y-3">
-                        <div className="h-4 bg-muted rounded" />
-                        <div className="h-4 bg-muted rounded w-[95%]" />
-                    </div>
-                </div>
-            </MotionFade>
-        )
-    }
+    // if (!collabState) {
+    //     return (
+    //         <MotionFade>
+    //             <div className="space-y-4 animate-pulse">
+    //                 <div className="h-9 w-2/3 bg-muted rounded-lg" />
+    //                 <div className="space-y-3">
+    //                     <div className="h-4 bg-muted rounded" />
+    //                     <div className="h-4 bg-muted rounded w-[95%]" />
+    //                 </div>
+    //             </div>
+    //         </MotionFade>
+    //     )
+    // }
 
     return (
         <MotionFade>

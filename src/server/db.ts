@@ -152,12 +152,20 @@ export async function getCurrentUserProfile(): Promise<UserProfile | undefined> 
     return data;
 }
 
-export async function persistDocumentUpdate(documentId: string, updateData: Uint8Array) {
+export async function persistDocumentSnapshot(documentId: string, snapshotData: Uint8Array) {
     const supabase = await createClient();
     
     // Convert Uint8Array to Buffer for BYTEA storage
-    const buffer = Buffer.from(updateData);
+    const buffer = Buffer.from(snapshotData);
     
+    // Delete old snapshots for this document (keep only the latest)
+    // This ensures we don't accumulate too many snapshots
+    await supabase
+        .from('document_updates')
+        .delete()
+        .eq('document_id', documentId);
+    
+    // Insert the new snapshot
     const { error } = await supabase
         .from('document_updates')
         .insert({
@@ -166,9 +174,36 @@ export async function persistDocumentUpdate(documentId: string, updateData: Uint
         });
 
     if (error) {
-        console.error('Failed to persist document update:', error);
-        throw new Error(`Failed to persist document update: ${error.message}`);
+        console.error('Failed to persist document snapshot:', error);
+        throw new Error(`Failed to persist document snapshot: ${error.message}`);
     }
     
     return { success: true };
+}
+
+export async function getLatestDocumentSnapshot(documentId: string) {
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+        .from('document_updates')
+        .select('update_data, created_at')
+        .eq('document_id', documentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (error) {
+        // If no snapshot exists, that's okay - return null
+        if (error.code === 'PGRST116') {
+            return { success: true, snapshot: null };
+        }
+        console.error('Failed to fetch document snapshot:', error);
+        throw new Error(`Failed to fetch document snapshot: ${error.message}`);
+    }
+    
+    // Convert Buffer to base64 string for tRPC transmission
+    const buf: Buffer = data.update_data as Buffer;
+    const snapshotBase64 = buf.toString("base64");
+    
+    return { success: true, snapshot: snapshotBase64 };
 }
