@@ -14,7 +14,7 @@ export default function DocumentPage() {
     const Editor = useMemo(() => dynamic(() => import("~/app/_components/editor/editor"), { ssr: false }), []);
 
     // Fetch latest snapshot
-    const { data: snapshotData } = api.document.getLatestDocumentSnapshot.useQuery(documentId, {
+    const { data: snapshotData, error } = api.document.getLatestDocumentSnapshot.useQuery(documentId, {
         enabled: !!documentId,
     });
 
@@ -40,7 +40,7 @@ export default function DocumentPage() {
         onSnapshotPersist: handleSnapshotPersist,
     });
 
-    const { data: documentData, error } = api.document.getDocumentById.useQuery(documentId)
+    // const { data: documentData, error } = api.document.getDocumentById.useQuery(documentId)
 
     if (!isReady || !ydoc || !provider) {
         return (
@@ -66,14 +66,6 @@ export default function DocumentPage() {
         return (
             <MotionFade>
                 <DocumentError title="Error loading document" message={error.message} />
-            </MotionFade>
-        )
-    }
-
-    if (!documentData?.document?.content) {
-        return (
-            <MotionFade>
-                <DocumentError title="Error loading document" message="Document content not found" />
             </MotionFade>
         )
     }
