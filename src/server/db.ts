@@ -152,58 +152,80 @@ export async function getCurrentUserProfile(): Promise<UserProfile | undefined> 
     return data;
 }
 
-export async function persistDocumentSnapshot(documentId: string, snapshotData: Uint8Array) {
+// Store snapshot as-is (base64)
+export async function persistDocumentSnapshot(documentId: string, snapshotBase64: string) {
     const supabase = await createClient();
-    
-    // Convert Uint8Array to Buffer for BYTEA storage
-    const buffer = Buffer.from(snapshotData);
-    
-    // Delete old snapshots for this document (keep only the latest)
-    // This ensures we don't accumulate too many snapshots
-    await supabase
-        .from('document_updates')
-        .delete()
-        .eq('document_id', documentId);
-    
-    // Insert the new snapshot
+  
+    await supabase.from("document_updates").delete().eq("document_id", documentId);
+  
     const { error } = await supabase
-        .from('document_updates')
-        .insert({
-            document_id: documentId,
-            update_data: buffer
-        });
-
-    if (error) {
-        console.error('Failed to persist document snapshot:', error);
-        throw new Error(`Failed to persist document snapshot: ${error.message}`);
-    }
-    
+      .from("document_updates")
+      .insert({ document_id: documentId, update_data: snapshotBase64 });
+  
+    if (error) throw new Error(`Failed to persist snapshot: ${error.message}`);
     return { success: true };
-}
-
-export async function getLatestDocumentSnapshot(documentId: string) {
+  }
+  
+  // Fetch latest snapshot
+  export async function getLatestDocumentSnapshot(documentId: string) {
     const supabase = await createClient();
-    
+  
     const { data, error } = await supabase
-        .from('document_updates')
-        .select('update_data, created_at')
-        .eq('document_id', documentId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-    if (error) {
-        // If no snapshot exists, that's okay - return null
-        if (error.code === 'PGRST116') {
-            return { success: true, snapshot: null };
-        }
-        console.error('Failed to fetch document snapshot:', error);
-        throw new Error(`Failed to fetch document snapshot: ${error.message}`);
+      .from("document_updates")
+      .select("update_data")
+      .eq("document_id", documentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+  
+    if (error?.code === "PGRST116") {
+      console.log('[getLatestDocumentSnapshot] No snapshot found (PGRST116)');
+      return { success: true, snapshot: null };
     }
+    if (error) {
+      console.error('[getLatestDocumentSnapshot] Error fetching snapshot:', error);
+      throw new Error(`Failed to fetch latest snapshot: ${error.message}`);
+    }
+  
+    // Ensure we return null if data is missing or update_data is null/undefined
+    if (!data?.update_data) {
+      console.log('[getLatestDocumentSnapshot] No update_data in response');
+      return { success: true, snapshot: null };
+    }
+  
+    // Log what we received
+    const updateData: unknown = data.update_data;
+    const updateDataType = typeof updateData;
+    const isString = updateDataType === 'string';
+    const constructorName = updateData && typeof updateData === 'object' && updateData !== null && 'constructor' in updateData
+      ? (updateData as { constructor?: { name?: string } }).constructor?.name
+      : undefined;
     
-    // Convert Buffer to base64 string for tRPC transmission
-    const buf: Buffer = data.update_data as Buffer;
-    const snapshotBase64 = buf.toString("base64");
+    console.log('[getLatestDocumentSnapshot] Received data:', {
+      type: updateDataType,
+      isString,
+      isNull: updateData === null,
+      isUndefined: updateData === undefined,
+      constructor: constructorName,
+      length: isString ? (updateData as string).length : 'N/A',
+      preview: isString 
+        ? (updateData as string).substring(0, 100) 
+        : String(updateData).substring(0, 100),
+    });
+  
+    // Ensure update_data is a string - if it's not, something went wrong
+    if (!isString) {
+      console.error('[getLatestDocumentSnapshot] update_data is not a string!', {
+        type: updateDataType,
+        value: String(updateData).substring(0, 100),
+        constructor: constructorName,
+      });
+      // Don't try to convert - return null instead to avoid issues
+      return { success: true, snapshot: null };
+    }
+  
+    const snapshot = updateData as string;
+    console.log('[getLatestDocumentSnapshot] Returning snapshot, length:', snapshot.length);
+    return { success: true, snapshot };
+  }
     
-    return { success: true, snapshot: snapshotBase64 };
-}

@@ -40,9 +40,9 @@ export default function DocumentPage() {
         onSnapshotPersist: handleSnapshotPersist,
     });
 
-    const { data: documentData, isLoading, error } = api.document.getDocumentById.useQuery(documentId)
+    const { data: documentData, error } = api.document.getDocumentById.useQuery(documentId)
 
-    if (isLoading || !isReady || !ydoc || !provider) {
+    if (!isReady || !ydoc || !provider) {
         return (
             <MotionFade>
                 <div className="space-y-4 animate-pulse">

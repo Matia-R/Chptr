@@ -55,16 +55,17 @@ export const documentRouter = createTRPCRouter({
         .query(async () => {
             return getDocumentsIdsForUser();
         }),
-    persistDocumentSnapshot: publicProcedure
+        persistDocumentSnapshot: publicProcedure
         .input(z.object({
-            documentId: z.string(),
-            snapshotData: z.string(), // base64 encoded Uint8Array (Y.Doc snapshot)
+          documentId: z.string(),
+          snapshotData: z.string(), // base64 string
         }))
         .mutation(async ({ input }) => {
-            // Decode base64 string to Uint8Array
-            const snapshotBuffer = Buffer.from(input.snapshotData, 'base64');
-            const snapshotData = new Uint8Array(snapshotBuffer);
-            return persistDocumentSnapshot(input.documentId, snapshotData);
+          // 🚫 DO NOT decode
+          return persistDocumentSnapshot(
+            input.documentId,
+            input.snapshotData
+          );
         }),
     getLatestDocumentSnapshot: publicProcedure
         .input(z.string())
