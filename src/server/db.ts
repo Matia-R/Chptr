@@ -166,6 +166,95 @@ export async function persistDocumentSnapshot(documentId: string, snapshotBase64
     return { success: true };
   }
   
+  /**
+   * Converts hex-encoded string to ASCII string.
+   * Used when hex is encoding a text string (like a base64 string).
+   */
+  function hexToAscii(hex: string): string {
+    let cleanHex = hex;
+    
+    // Remove \x or 0x prefix if present
+    if (hex.startsWith('\\x')) {
+      cleanHex = hex.slice(2);
+    } else if (hex.startsWith('0x') || hex.startsWith('0X')) {
+      cleanHex = hex.slice(2);
+    }
+    
+    // Remove whitespace
+    cleanHex = cleanHex.replace(/\s/g, '');
+    
+    // Validate hex string
+    if (cleanHex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(cleanHex)) {
+      throw new Error('Invalid hex string');
+    }
+    
+    // Convert hex to ASCII string
+    let ascii = '';
+    for (let i = 0; i < cleanHex.length; i += 2) {
+      const byte = parseInt(cleanHex.substring(i, i + 2), 16);
+      ascii += String.fromCharCode(byte);
+    }
+    
+    return ascii;
+  }
+
+  /**
+   * Normalizes snapshot data to base64 format.
+   * If the data is hex-encoded, it's likely encoding a base64 string.
+   * We decode hex to ASCII, and if that's base64, we use it directly.
+   * If it's already base64, returns as-is.
+   */
+  function normalizeToBase64(data: string): string {
+    const trimmed = data.trim();
+    
+    // Check if it's hex-encoded (starts with \x, 0x, or is pure hex)
+    const hasHexPrefix = trimmed.startsWith('\\x') || 
+                         trimmed.startsWith('0x') || 
+                         trimmed.startsWith('0X');
+    const isPureHex = /^[0-9a-fA-F]+$/.test(trimmed);
+    const isHex = hasHexPrefix || isPureHex;
+    
+    // Check if it's base64
+    const isBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(trimmed);
+    
+    if (isHex && !isBase64) {
+      // It's hex, decode it to see what we get
+      try {
+        const decoded = hexToAscii(trimmed);
+        
+        // Check if the decoded string is base64
+        const decodedIsBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(decoded);
+        
+        if (decodedIsBase64) {
+          // Hex was encoding a base64 string, return it directly
+          return decoded;
+        } else {
+          // Hex was encoding raw binary, convert to base64
+          // This is unlikely but handle it for completeness
+          const bytes = new Uint8Array(decoded.length);
+          for (let i = 0; i < decoded.length; i++) {
+            bytes[i] = decoded.charCodeAt(i);
+          }
+          
+          let binary = '';
+          for (const byte of bytes) {
+            binary += String.fromCharCode(byte);
+          }
+          
+          return btoa(binary);
+        }
+      } catch (err) {
+        throw new Error(`Failed to convert hex to base64: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else if (isBase64) {
+      // Already base64, return as-is
+      return trimmed;
+    } else {
+      // Unknown format
+      throw new Error(`Snapshot data is neither valid base64 nor valid hex. Preview: ${trimmed.substring(0, 50)}`);
+    }
+  }
+
   // Fetch latest snapshot
   export async function getLatestDocumentSnapshot(documentId: string) {
     const supabase = await createClient();
@@ -179,53 +268,31 @@ export async function persistDocumentSnapshot(documentId: string, snapshotBase64
       .single();
   
     if (error?.code === "PGRST116") {
-      console.log('[getLatestDocumentSnapshot] No snapshot found (PGRST116)');
       return { success: true, snapshot: null };
     }
     if (error) {
-      console.error('[getLatestDocumentSnapshot] Error fetching snapshot:', error);
       throw new Error(`Failed to fetch latest snapshot: ${error.message}`);
     }
   
     // Ensure we return null if data is missing or update_data is null/undefined
     if (!data?.update_data) {
-      console.log('[getLatestDocumentSnapshot] No update_data in response');
       return { success: true, snapshot: null };
     }
   
-    // Log what we received
-    const updateData: unknown = data.update_data;
-    const updateDataType = typeof updateData;
-    const isString = updateDataType === 'string';
-    const constructorName = updateData && typeof updateData === 'object' && updateData !== null && 'constructor' in updateData
-      ? (updateData as { constructor?: { name?: string } }).constructor?.name
-      : undefined;
-    
-    console.log('[getLatestDocumentSnapshot] Received data:', {
-      type: updateDataType,
-      isString,
-      isNull: updateData === null,
-      isUndefined: updateData === undefined,
-      constructor: constructorName,
-      length: isString ? (updateData as string).length : 'N/A',
-      preview: isString 
-        ? (updateData as string).substring(0, 100) 
-        : String(updateData).substring(0, 100),
-    });
-  
-    // Ensure update_data is a string - if it's not, something went wrong
-    if (!isString) {
-      console.error('[getLatestDocumentSnapshot] update_data is not a string!', {
-        type: updateDataType,
-        value: String(updateData).substring(0, 100),
-        constructor: constructorName,
-      });
-      // Don't try to convert - return null instead to avoid issues
+    // Ensure update_data is a string
+    if (typeof data.update_data !== 'string') {
+      // If it's not a string, something is wrong - return null to avoid errors
       return { success: true, snapshot: null };
     }
   
-    const snapshot = updateData as string;
-    console.log('[getLatestDocumentSnapshot] Returning snapshot, length:', snapshot.length);
-    return { success: true, snapshot };
+    // Normalize to base64 (handles both hex and base64 formats)
+    try {
+      const normalizedBase64 = normalizeToBase64(data.update_data);
+      return { success: true, snapshot: normalizedBase64 };
+    } catch (err) {
+      // If normalization fails, log and return null (document will start fresh)
+      console.error('[getLatestDocumentSnapshot] Failed to normalize snapshot:', err);
+      return { success: true, snapshot: null };
+    }
   }
     
