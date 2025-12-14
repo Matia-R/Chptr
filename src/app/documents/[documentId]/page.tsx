@@ -40,7 +40,13 @@ export default function DocumentPage() {
         onSnapshotPersist: handleSnapshotPersist,
     });
 
-    // const { data: documentData, error } = api.document.getDocumentById.useQuery(documentId)
+    if (error || (snapshotData && !snapshotData.success)) {
+        return (
+            <MotionFade>
+                <DocumentError title="Error loading document" message={error?.message ?? "Unknown error"} />
+            </MotionFade>
+        );
+    }
 
     if (!isReady || !ydoc || !provider) {
         return (
@@ -58,14 +64,6 @@ export default function DocumentPage() {
                         <div className="h-4 bg-muted rounded w-[92%]" />
                     </div>
                 </div>
-            </MotionFade>
-        )
-    }
-
-    if (error) {
-        return (
-            <MotionFade>
-                <DocumentError title="Error loading document" message={error.message} />
             </MotionFade>
         )
     }
