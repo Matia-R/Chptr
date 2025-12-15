@@ -18,6 +18,7 @@ import { Alert } from "./custom-blocks/Alert";
 import type * as Y from "yjs";
 import type { WebrtcProvider } from "y-webrtc";
 import { createHighlighter } from "shiki";
+import { renderCursor } from "./cursor-renderer";
 
 type Theme = "light" | "dark" | "system";
 
@@ -59,6 +60,7 @@ const editor = useCreateBlockNote(
           color: userColor,
         },
         showCursorLabels: "always",
+        renderCursor: renderCursor,
       },
       codeBlock: {
         indentLineWithTab: true,

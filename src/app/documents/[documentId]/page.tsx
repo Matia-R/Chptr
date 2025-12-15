@@ -8,10 +8,24 @@ import { DocumentError } from "~/app/_components/document-error"
 import { MotionFade } from "~/app/_components/motion-fade"
 import { useCollaborativeDoc } from "~/hooks/use-collaborative-doc"
 
+// Map color names to hex values
+const colorNameToHex: Record<string, string> = {
+    blue: "#3b82f6",
+    green: "#10b981",
+    red: "#ef4444",
+    yellow: "#eab308",
+    purple: "#a855f7",
+    pink: "#ec4899",
+    indigo: "#6366f1",
+}
+
 export default function DocumentPage() {
     const params = useParams()
     const documentId = params.documentId as string
     const Editor = useMemo(() => dynamic(() => import("~/app/_components/editor/editor"), { ssr: false }), []);
+
+    // Fetch user profile
+    const { data: userProfile } = api.user.getCurrentUserProfile.useQuery();
 
     // Fetch latest snapshot
     const { data: snapshotData, error } = api.document.getLatestDocumentSnapshot.useQuery(documentId, {
@@ -68,12 +82,20 @@ export default function DocumentPage() {
         )
     }
 
+    // Get user name and color from profile
+    const userName = userProfile 
+        ? `${userProfile.first_name} ${userProfile.last_name}` 
+        : "Anonymous User";
+    const userColor = userProfile?.default_avatar_background_color
+        ? colorNameToHex[userProfile.default_avatar_background_color] ?? "#3b82f6"
+        : "#3b82f6";
+
     return (
         <MotionFade>
             <Editor
                 documentId={documentId}
-                userName={"Matia Raspopovic"}
-                userColor={"#3b82f6"}
+                userName={userName}
+                userColor={userColor}
                 ydoc={ydoc}
                 provider={provider}
             />
