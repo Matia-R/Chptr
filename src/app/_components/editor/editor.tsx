@@ -98,7 +98,7 @@ const editor = useCreateBlockNote(
       ...(currentTheme && { theme: currentTheme }),
     };
   })(),
-  [currentTheme, userName, userColor, provider, ydoc]
+  [userName, userColor, provider, ydoc]
 );
 
 // --- Theme handling ---

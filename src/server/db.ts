@@ -258,7 +258,6 @@ export async function persistDocumentSnapshot(documentId: string, snapshotBase64
   // Fetch latest snapshot
   export async function getLatestDocumentSnapshot(documentId: string) {
 
-    // throw new Error(`Failed to fetch latest snapshot:`);
     const supabase = await createClient();
   
     const { data, error } = await supabase
