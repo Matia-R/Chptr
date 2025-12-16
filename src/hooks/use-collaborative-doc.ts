@@ -74,6 +74,9 @@ export function useCollaborativeDoc({
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const isLeaderRef = useRef(false);
+  const lastDocumentIdRef = useRef<string | null>(null);
+  const lastSnapshotRef = useRef<string | null>(null);
+  const isInitializedRef = useRef(false);
 
   const persistRef = useRef(onSnapshotPersist);
   useEffect(() => {
@@ -86,6 +89,26 @@ export function useCollaborativeDoc({
   useEffect(() => {
     let cancelled = false;
 
+    // Get the actual snapshot value for comparison
+    const currentSnapshot = snapshotData?.success && snapshotData.snapshot !== null && snapshotData.snapshot !== undefined
+      ? snapshotData.snapshot
+      : null;
+
+    // Only re-initialize if document ID changed or we haven't initialized yet
+    const documentIdChanged = lastDocumentIdRef.current !== documentId;
+
+    // Skip if snapshotData is undefined (still loading)
+    if (snapshotData === undefined) {
+      return;
+    }
+
+    // If document ID changed, we need to reinitialize
+    // If snapshot changed but we've already initialized with this document ID, skip to avoid clearing content
+    // Only apply snapshot on initial setup
+    if (!documentIdChanged && isInitializedRef.current) {
+      return;
+    }
+
     const setup = () => {
       // Cleanup any previous session
       cleanupRef.current?.();
@@ -97,13 +120,9 @@ export function useCollaborativeDoc({
 
       /* -------- APPLY SNAPSHOT BEFORE PROVIDER -------- */
 
-      if (snapshotData?.success && snapshotData.snapshot !== null && snapshotData.snapshot !== undefined) {
+      if (currentSnapshot && typeof currentSnapshot === 'string') {
         try {
-          if (typeof snapshotData.snapshot !== 'string') {
-            console.warn('[useCollaborativeDoc] Snapshot data is not a string, skipping');
-          } else {
-            applyBase64Snapshot(ydoc, snapshotData.snapshot);
-          }
+          applyBase64Snapshot(ydoc, currentSnapshot);
         } catch (err) {
           console.error("[useCollaborativeDoc] Failed to apply snapshot:", err);
           // Continue without snapshot - document will start fresh
@@ -119,6 +138,11 @@ export function useCollaborativeDoc({
         ydoc.destroy();
         return;
       }
+
+      // Update refs to track what we've initialized
+      lastDocumentIdRef.current = documentId;
+      lastSnapshotRef.current = currentSnapshot;
+      isInitializedRef.current = true;
 
       setState({ ydoc, provider });
       setIsReady(true);
@@ -196,9 +220,7 @@ export function useCollaborativeDoc({
       };
     };
 
-    if (snapshotData !== undefined) {
-      setup();
-    }
+    setup();
 
     return () => {
       cancelled = true;
@@ -206,6 +228,13 @@ export function useCollaborativeDoc({
       cleanupRef.current = null;
     };
   }, [documentId, snapshotData]);
+
+  // Reset initialization flag when document ID changes
+  useEffect(() => {
+    if (lastDocumentIdRef.current !== documentId) {
+      isInitializedRef.current = false;
+    }
+  }, [documentId]);
 
   return {
     ydoc: state?.ydoc ?? null,

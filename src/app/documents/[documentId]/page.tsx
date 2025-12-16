@@ -30,6 +30,9 @@ export default function DocumentPage() {
     // Fetch latest snapshot
     const { data: snapshotData, error } = api.document.getLatestDocumentSnapshot.useQuery(documentId, {
         enabled: !!documentId,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+        refetchOnReconnect: false,
     });
 
     // Setup snapshot persistence mutation
