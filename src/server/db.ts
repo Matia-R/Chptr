@@ -200,16 +200,17 @@ async function checkDocumentPermission(documentId: string): Promise<void> {
 
 // Store snapshot as-is (base64)
 export async function persistDocumentSnapshot(documentId: string, snapshotBase64: string) {
-    // Check authorization: user must have permission to access this document
+
     await checkDocumentPermission(documentId);
     
     const supabase = await createClient();
-  
-    await supabase.from("document_updates").delete().eq("document_id", documentId);
-  
+
     const { error } = await supabase
       .from("document_updates")
-      .insert({ document_id: documentId, update_data: snapshotBase64 });
+      .upsert(
+        { document_id: documentId, update_data: snapshotBase64 },
+        { onConflict: "document_id" }
+      );
   
     if (error) throw new Error(`Failed to persist snapshot: ${error.message}`);
     return { success: true };
