@@ -23,6 +23,7 @@ import { type Document } from "~/server/api/routers/document"
 import { useToast } from "../../hooks/use-toast"
 import { NavUser } from "./nav-user"
 import { useCommandMenuStore } from "~/hooks/use-command-menu"
+import { useUserProfile } from "~/hooks/use-user-profile"
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[]
@@ -63,8 +64,8 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     setShowBottomShadow(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
   }, [documents]);
 
-  // Fetch user profile and email
-  const { data: userProfile, isLoading: userLoading } = api.user.getCurrentUserProfile.useQuery();
+  // Fetch user profile and email (shared query, automatically deduplicated by React Query)
+  const { data: userProfile, isLoading: userLoading } = useUserProfile();
   const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
   const createDocument = api.document.createDocument.useMutation({
