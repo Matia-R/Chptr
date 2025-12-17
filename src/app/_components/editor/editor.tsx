@@ -23,7 +23,6 @@ import { renderCursor } from "./cursor-renderer";
 type Theme = "light" | "dark" | "system";
 
 interface EditorProps {
-    documentId: string;
     userName: string;
     userColor: string;
     ydoc: Y.Doc;
@@ -37,7 +36,7 @@ const schema = BlockNoteSchema.create({
     },
 });
 
-export default function CollaborativeEditor({ userName, userColor, ydoc, provider }: EditorProps) {
+export default function Editor({ userName, userColor, ydoc, provider }: EditorProps) {
 const { theme } = useTheme();
 const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
 
