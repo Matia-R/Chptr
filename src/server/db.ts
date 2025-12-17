@@ -1,5 +1,6 @@
 import { createClient } from '~/utils/supabase/server'
 import { randomUUID } from 'crypto'
+import { TRPCError } from '@trpc/server'
 import { type Document } from '~/server/api/routers/document'
 
 type DocumentSchema = {
@@ -152,8 +153,56 @@ export async function getCurrentUserProfile(): Promise<UserProfile | undefined> 
     return data;
 }
 
+/**
+ * Checks if the current user has permission to access a document.
+ * Throws a TRPCError if the user is not authenticated or doesn't have permission.
+ */
+async function checkDocumentPermission(documentId: string): Promise<void> {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Not authenticated',
+        });
+    }
+
+    const { data, error } = await supabase
+        .from('document_permissions')
+        .select('id')
+        .eq('document_id', documentId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (error?.code === 'PGRST116') {
+        // No permission found
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'You do not have permission to access this document',
+        });
+    }
+    
+    if (error) {
+        throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Failed to check document permission: ${error.message}`,
+        });
+    }
+
+    if (!data) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'You do not have permission to access this document',
+        });
+    }
+}
+
 // Store snapshot as-is (base64)
 export async function persistDocumentSnapshot(documentId: string, snapshotBase64: string) {
+    // Check authorization: user must have permission to access this document
+    await checkDocumentPermission(documentId);
+    
     const supabase = await createClient();
   
     await supabase.from("document_updates").delete().eq("document_id", documentId);
@@ -257,6 +306,8 @@ export async function persistDocumentSnapshot(documentId: string, snapshotBase64
 
   // Fetch latest snapshot
   export async function getLatestDocumentSnapshot(documentId: string) {
+    // Check authorization: user must have permission to access this document
+    await checkDocumentPermission(documentId);
 
     const supabase = await createClient();
   
