@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { createClient } from '../../utils/supabase/server'
+import { getRandomAvatarColor } from '../../lib/avatar-colors'
 
 export async function signup(formData: FormData) {
     const supabase = await createClient()
@@ -15,7 +16,7 @@ export async function signup(formData: FormData) {
             data: {
                 first_name: formData.get('firstName') as string,
                 last_name: formData.get('lastName') as string,
-                default_avatar_background_color: `${['blue', 'green', 'red', 'yellow', 'purple', 'pink', 'indigo'][Math.floor(Math.random() * 7)]}`
+                default_avatar_background_color: getRandomAvatarColor()
             }
         }
     }
