@@ -7,17 +7,7 @@ import { api } from "~/trpc/react"
 import { DocumentError } from "~/app/_components/document-error"
 import { MotionFade } from "~/app/_components/motion-fade"
 import { useCollaborativeDoc } from "~/hooks/use-collaborative-doc"
-
-// Map color names to hex values
-const colorNameToHex: Record<string, string> = {
-    blue: "#3b82f6",
-    green: "#10b981",
-    red: "#ef4444",
-    yellow: "#eab308",
-    purple: "#a855f7",
-    pink: "#ec4899",
-    indigo: "#6366f1",
-}
+import { getAvatarColorHex } from "~/lib/avatar-colors"
 
 export default function DocumentPage() {
     const params = useParams()
@@ -89,9 +79,7 @@ export default function DocumentPage() {
     const userName = userProfile 
         ? `${userProfile.first_name} ${userProfile.last_name}` 
         : "Anonymous User";
-    const userColor = userProfile?.default_avatar_background_color
-        ? colorNameToHex[userProfile.default_avatar_background_color] ?? "#3b82f6"
-        : "#3b82f6";
+    const userColor = getAvatarColorHex(userProfile?.default_avatar_background_color);
 
     return (
         <MotionFade>

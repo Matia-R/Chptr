@@ -36,6 +36,7 @@ import { cn } from "~/lib/utils"
 import { useRouter } from "next/navigation"
 import { createClient } from "~/utils/supabase/client"
 import { Skeleton } from "~/app/_components/skeleton"
+import { getAvatarColorTailwindClass, getAvatarColorHex } from "~/lib/avatar-colors"
 
 export function NavUser({
   user,
@@ -87,22 +88,19 @@ export function NavUser({
   }
 
   const initials = `${user.first_name[0]}${user.last_name[0]}`
-
-  // string formatting is problematic with tailwind classes, so we use an object to store the colors
-  const fallbackAvatarBackgroundColors = {
-    blue: "bg-blue-400",
-    green: "bg-green-400",
-    red: "bg-red-400",
-    yellow: "bg-yellow-400",
-    purple: "bg-purple-400",
-    pink: "bg-pink-400",
-    indigo: "bg-indigo-400"
+  const fallbackAvatarBackgroundClass = getAvatarColorTailwindClass(user.default_avatar_background_color)
+  const fallbackAvatarBackgroundColor = getAvatarColorHex(user.default_avatar_background_color)
+  
+  // Ensure the background class overrides the default bg-muted from AvatarFallback
+  // tailwind-merge should automatically remove bg-muted when we pass a conflicting bg-* class
+  // We also add an inline style as a fallback to ensure the color is applied
+  const avatarFallbackClassName = cn(
+    "rounded-lg text-black",
+    fallbackAvatarBackgroundClass
+  )
+  const avatarFallbackStyle = {
+    backgroundColor: fallbackAvatarBackgroundColor,
   }
-
-
-  const fallbackAvatarBackgroundClass = fallbackAvatarBackgroundColors[user.default_avatar_background_color as keyof typeof fallbackAvatarBackgroundColors] ?? "bg-blue-500"
-
-  console.log(fallbackAvatarBackgroundClass)
 
   return (
     <SidebarMenu>
@@ -117,7 +115,7 @@ export function NavUser({
                 {user.avatar_url ? (
                   <AvatarImage src={user.avatar_url} alt={`${user.first_name} ${user.last_name}`} />
                 ) : (
-                  <AvatarFallback className={cn("rounded-lg text-black", fallbackAvatarBackgroundClass)}>
+                  <AvatarFallback className={avatarFallbackClassName} style={avatarFallbackStyle}>
                     {initials}
                   </AvatarFallback>
                 )}
@@ -141,7 +139,7 @@ export function NavUser({
                   {user.avatar_url ? (
                     <AvatarImage src={user.avatar_url} alt={`${user.first_name} ${user.last_name}`} />
                   ) : (
-                    <AvatarFallback className={cn("rounded-lg text-black", fallbackAvatarBackgroundClass)}>
+                    <AvatarFallback className={avatarFallbackClassName} style={avatarFallbackStyle}>
                       {initials}
                     </AvatarFallback>
                   )}

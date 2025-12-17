@@ -4,7 +4,7 @@ import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "./style.css";
 import { useTheme } from "next-themes";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
 BlockNoteSchema,
 defaultBlockSpecs,
@@ -119,15 +119,10 @@ useEffect(() => {
     }
 }, [theme]);
 
-const handleChange = useCallback(() => {
-    // Optional: can save content locally or send to server
-}, []);
-
 return (
     <BlockNoteView
         editor={editor}
         theme={currentTheme as "light" | "dark"}
-        onChange={handleChange}
     >
         <SuggestionMenuController
             triggerCharacter="@"
