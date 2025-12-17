@@ -61,7 +61,6 @@ export default function Editor({
         supportedLanguages,
         createHighlighter: createCodeBlockHighlighter,
       },
-      ...(currentTheme && { theme: currentTheme }),
     },
     [userName, userColor, provider, ydoc],
   );
