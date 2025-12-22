@@ -9,7 +9,9 @@ import { AppSidebar } from "../_components/app-sidebar";
 import { Toaster } from "../_components/ui/toaster";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
-import { Header } from "../_components/header";
+import { DocumentLayoutWrapper } from "../_components/document-layout-wrapper";
+import { HeaderWrapper } from "../_components/header-wrapper";
+import { ScrollProvider } from "../_components/scroll-context";
 
 export const metadata: Metadata = {
     title: "Chptr",
@@ -36,28 +38,24 @@ export default async function RootLayout({
                 enableSystem
                 disableTransitionOnChange
             >
-                <SidebarProvider
-                    style={
-                        {
-                            "--sidebar-width": "19rem",
-                        } as React.CSSProperties
-                    }
-                >
-                    <AppSidebar initialDocuments={documents} />
-                    <SidebarInset>
-                        <div className="flex h-screen flex-col min-w-0">
-                            <Header />
-                            <main className="flex-1 overflow-auto h-screen">
-                                <div className="h-full md:p-8 lg:p-12">
-                                    <div className="mx-auto max-w-5xl h-full pt-16 min-w-0">
-                                        {children}
-                                    </div>
-                                </div>
-                            </main>
-                        </div>
-                    </SidebarInset>
-                    <Toaster />
-                </SidebarProvider>
+                <ScrollProvider>
+                    <SidebarProvider
+                        style={
+                            {
+                                "--sidebar-width": "19rem",
+                            } as React.CSSProperties
+                        }
+                    >
+                        <HeaderWrapper />
+                        <AppSidebar initialDocuments={documents} />
+                        <SidebarInset>
+                            <DocumentLayoutWrapper>
+                                {children}
+                            </DocumentLayoutWrapper>
+                        </SidebarInset>
+                        <Toaster />
+                    </SidebarProvider>
+                </ScrollProvider>
                 <CommandMenu />
             </ThemeProvider>
         </TRPCReactProvider>
