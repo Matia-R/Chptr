@@ -159,6 +159,14 @@ export function DocumentBreadcrumb() {
             </button>
           </div>
         </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem className="md:block">
+          <div className="group relative">
+            <button className="text-sm text-muted-foreground hover:text-foreground">
+              {document.document.name}
+            </button>
+          </div>
+        </BreadcrumbItem>
         <BreadcrumbSeparator /> */}
         <BreadcrumbItem className="md:block">
           <div className="group relative">

@@ -12,6 +12,7 @@ import { CommandMenu } from "../_components/command-menu";
 import { DocumentLayoutWrapper } from "../_components/document-layout-wrapper";
 import { HeaderWrapper } from "../_components/header-wrapper";
 import { ScrollProvider } from "../_components/scroll-context";
+import { FocusModeProvider } from "../_components/focus-mode-context";
 
 export const metadata: Metadata = {
     title: "Chptr",
@@ -39,22 +40,24 @@ export default async function RootLayout({
                 disableTransitionOnChange
             >
                 <ScrollProvider>
-                    <SidebarProvider
-                        style={
-                            {
-                                "--sidebar-width": "19rem",
-                            } as React.CSSProperties
-                        }
-                    >
-                        <HeaderWrapper />
-                        <AppSidebar initialDocuments={documents} />
-                        <SidebarInset>
-                            <DocumentLayoutWrapper>
-                                {children}
-                            </DocumentLayoutWrapper>
-                        </SidebarInset>
-                        <Toaster />
-                    </SidebarProvider>
+                    <FocusModeProvider>
+                        <SidebarProvider
+                            style={
+                                {
+                                    "--sidebar-width": "19rem",
+                                } as React.CSSProperties
+                            }
+                        >
+                            <HeaderWrapper />
+                            <AppSidebar initialDocuments={documents} />
+                            <SidebarInset>
+                                <DocumentLayoutWrapper>
+                                    {children}
+                                </DocumentLayoutWrapper>
+                            </SidebarInset>
+                            <Toaster />
+                        </SidebarProvider>
+                    </FocusModeProvider>
                 </ScrollProvider>
                 <CommandMenu />
             </ThemeProvider>

@@ -36,7 +36,7 @@ export function DocumentLayoutWrapper({
         className="flex-1 overflow-auto"
         onScroll={handleScroll}
       >
-        <div className="h-full md:p-8 lg:p-12">
+        <div className="h-full md:pb-8 md:pl-8 md:pr-4 md:pt-8 lg:pb-12 lg:pl-12 lg:pr-4 lg:pt-12">
           <div className="mx-auto h-full min-w-0 max-w-[720px]">{children}</div>
         </div>
       </main>

@@ -8,6 +8,7 @@ import { PanelLeft } from "lucide-react";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { cn } from "~/lib/utils";
 import { Button } from "~/app/_components/button";
+import { useFocusMode } from "./focus-mode-context";
 import { Input } from "~/app/_components/input";
 import { Separator } from "~/app/_components/separator";
 import {
@@ -75,25 +76,54 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
+    const { isFocusMode, previousSidebarOpen, setPreviousSidebarOpen } =
+      useFocusMode();
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen);
-    const open = openProp ?? _open;
+    const openState = openProp ?? _open;
+
+    // When focus mode is active, sidebar should be closed
+    // When focus mode is inactive, use the normal state
+    const open = isFocusMode ? false : openState;
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === "function" ? value(open) : value;
+        const newOpenState =
+          typeof value === "function" ? value(openState) : value;
         if (setOpenProp) {
-          setOpenProp(openState);
+          setOpenProp(newOpenState);
         } else {
-          _setOpen(openState);
+          _setOpen(newOpenState);
         }
 
         // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${newOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
       },
-      [setOpenProp, open],
+      [setOpenProp, openState],
     );
+
+    // Handle focus mode changes - save/restore sidebar state
+    React.useEffect(() => {
+      if (isFocusMode) {
+        // Entering focus mode - save current state and close sidebar
+        if (previousSidebarOpen === null) {
+          setPreviousSidebarOpen(openState);
+        }
+      } else {
+        // Exiting focus mode - restore previous state if we have one
+        if (previousSidebarOpen !== null) {
+          setOpen(previousSidebarOpen);
+          setPreviousSidebarOpen(null);
+        }
+      }
+    }, [
+      isFocusMode,
+      openState,
+      previousSidebarOpen,
+      setOpen,
+      setPreviousSidebarOpen,
+    ]);
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
@@ -155,7 +185,7 @@ const SidebarProvider = React.forwardRef<
               } as React.CSSProperties
             }
             className={cn(
-              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
+              "group/sidebar-wrapper flex min-h-svh w-full bg-background has-[[data-variant=inset]]:bg-sidebar",
               className,
             )}
             ref={ref}
@@ -239,20 +269,27 @@ const Sidebar = React.forwardRef<
         data-variant={variant}
         data-side={side}
       >
-        {/* Sidebar is always an overlay - no layout gap */}
-        <div className="w-0" />
+        {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            "fixed bottom-4 top-20 z-10 hidden w-[--sidebar-width] transition-transform duration-200 ease-linear md:flex",
+            "relative w-[--sidebar-width] bg-background transition-[width] duration-200 ease-linear",
+            "group-data-[collapsible=offcanvas]:w-0",
+            "group-data-[side=right]:rotate-180",
+            variant === "floating" || variant === "inset"
+              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
+              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+          )}
+        />
+        <div
+          className={cn(
+            "fixed bottom-4 top-20 z-10 hidden w-[--sidebar-width] transition-[left,right,width] duration-200 ease-linear md:flex",
             side === "left"
-              ? state === "expanded"
-                ? "left-0 translate-x-0"
-                : "left-0 -translate-x-full"
-              : state === "expanded"
-                ? "right-0 translate-x-0"
-                : "right-0 translate-x-full",
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
             // Adjust the padding for floating and inset variants.
-            variant === "floating" || variant === "inset" ? "py-4 pl-4" : "",
+            variant === "floating" || variant === "inset"
+              ? "py-4 pl-4 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
+              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
             className,
           )}
           {...props}
