@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Plus } from "lucide-react"
-import { api } from "~/trpc/react"
-import { useRouter, useParams } from "next/navigation"
-import Link from "next/link"
-import { ScrollArea } from "~/app/_components/scroll-area"
+import * as React from "react";
+import { Plus } from "lucide-react";
+import { api } from "~/trpc/react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import { ScrollArea } from "~/app/_components/scroll-area";
 
 import {
   Sidebar,
@@ -17,16 +17,16 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   useSidebar,
-} from "~/app/_components/sidebar"
-import { Button } from "./button"
-import { type Document } from "~/server/api/routers/document"
-import { useToast } from "../../hooks/use-toast"
-import { NavUser } from "./nav-user"
-import { useCommandMenuStore } from "~/hooks/use-command-menu"
-import { useUserProfile } from "~/hooks/use-user-profile"
+} from "~/app/_components/sidebar";
+import { Button } from "./button";
+import { type Document } from "~/server/api/routers/document";
+import { useToast } from "../../hooks/use-toast";
+import { NavUser } from "./nav-user";
+import { useCommandMenuStore } from "~/hooks/use-command-menu";
+import { useUserProfile } from "~/hooks/use-user-profile";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  initialDocuments: { id: string; name: string }[]
+  initialDocuments: { id: string; name: string }[];
 }
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
@@ -35,7 +35,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
   const { toast } = useToast();
-  const setOpen = useCommandMenuStore((state) => state.setOpen)
+  const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
 
   // State to track scroll position for shadow indicators
@@ -44,17 +44,23 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
   // Handle scroll events to detect when user is not at top or bottom
-  const handleScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    setShowTopShadow(target.scrollTop > 0);
-    setShowBottomShadow(target.scrollTop + target.clientHeight < target.scrollHeight - 1);
-  }, []);
+  const handleScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      setShowTopShadow(target.scrollTop > 0);
+      setShowBottomShadow(
+        target.scrollTop + target.clientHeight < target.scrollHeight - 1,
+      );
+    },
+    [],
+  );
 
   // Use TRPC query to keep documents in sync
-  const { data: documents } = api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
-    initialData: { success: true, documents: initialDocuments },
-    refetchOnMount: true
-  });
+  const { data: documents } =
+    api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
+      initialData: { success: true, documents: initialDocuments },
+      refetchOnMount: true,
+    });
 
   // Ensure shadow state is correct on mount and when content changes
   React.useEffect(() => {
@@ -75,14 +81,13 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         // Invalidate both the document list and the new document
         await Promise.all([
           utils.document.getDocumentIdsForAuthenticatedUser.invalidate(),
-          utils.document.getDocumentById.prefetch(doc.id)
+          utils.document.getDocumentById.prefetch(doc.id),
         ]);
         router.push(`/documents/${doc.id}`);
-      }
-      else {
+      } else {
         toast({
           title: "Failed to create document",
-          description: "The document was created but returned an invalid ID."
+          description: "The document was created but returned an invalid ID.",
         });
       }
     },
@@ -91,9 +96,12 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       toast({
         variant: "destructive",
         title: "Failed to create document",
-        description: error instanceof Error ? error.message : "An unexpected error occurred"
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
       });
-    }
+    },
   });
 
   // Setup document data prefetching
@@ -114,18 +122,18 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   }, [documents?.documents, utils, currentDocumentId]);
 
   return (
-    <Sidebar variant="sidebar" {...props}>
+    <Sidebar variant="inset" {...props}>
       <div className="flex h-full flex-col">
         <div className="flex-none">
           <SidebarHeader>
-            <div className="font-semibold text-xl font-sans px-1">Chptr</div>
+            <div className="px-1 font-sans text-xl font-semibold">Chptr</div>
             <div className="pt-2">
               <div className="mb-2">
                 <Button
                   className="w-full justify-start gap-2"
                   variant="outline"
                   onClick={() => createDocument.mutate()}
-                  disabled={createDocument.status === 'pending'}
+                  disabled={createDocument.status === "pending"}
                 >
                   <Plus className="size-4" />
                   New
@@ -134,11 +142,11 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             </div>
           </SidebarHeader>
           <SidebarHeader>
-            <div className="px-2 text-sm font-semibold flex items-center justify-between">
+            <div className="flex items-center justify-between px-2 text-sm font-semibold">
               <span>Notes</span>
               <button
                 onClick={() => setOpen(true)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors data-[highlight=true]:text-foreground focus-visible:ring-1 focus-visible:ring-ring outline-none"
+                className="text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[highlight=true]:text-foreground"
                 data-highlight="false"
                 data-search-button
               >
@@ -156,36 +164,43 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               onScroll={handleScroll}
             >
               {showTopShadow && (
-                <div className="border-t absolute pointer-events-none inset-x-0 top-0 h-4 bg-gradient-to-b from-border/20 to-transparent z-10" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 border-t bg-gradient-to-b from-border/20 to-transparent" />
               )}
               {showBottomShadow && (
-                <div className="border-b absolute pointer-events-none inset-x-0 bottom-0 h-4 bg-gradient-to-t from-border/20 to-transparent z-10" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 border-b bg-gradient-to-t from-border/20 to-transparent" />
               )}
               <SidebarContent>
                 <SidebarGroup>
                   <SidebarMenu>
                     <div
                       className="relative"
-                      style={{
-                        '--item-count': documents?.documents?.length ?? 0,
-                        height: 'calc(var(--item-count) * 48px)'
-                      } as React.CSSProperties}
+                      style={
+                        {
+                          "--item-count": documents?.documents?.length ?? 0,
+                          height: "calc(var(--item-count) * 48px)",
+                        } as React.CSSProperties
+                      }
                     >
                       {documents?.documents?.map((doc, index) => (
                         <SidebarMenuItem
                           key={doc.id}
-                          className={`absolute inset-x-0 top-0 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}
-                          style={{
-                            '--index': index,
-                            transform: 'translateY(calc(var(--index) * 48px))'
-                          } as React.CSSProperties}
+                          className={`ease-[cubic-bezier(0.4,0,0.2,1)] absolute inset-x-0 top-0 transform transition-transform duration-300`}
+                          style={
+                            {
+                              "--index": index,
+                              transform:
+                                "translateY(calc(var(--index) * 48px))",
+                            } as React.CSSProperties
+                          }
                         >
                           <SidebarMenuButton asChild>
                             <Link
                               href={`/documents/${doc.id}`}
                               prefetch={true}
                               onClick={() => {
-                                void utils.document.getDocumentById.invalidate(doc.id);
+                                void utils.document.getDocumentById.invalidate(
+                                  doc.id,
+                                );
                                 if (isMobile) {
                                   setOpenMobile(false);
                                 }
@@ -213,7 +228,8 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                   last_name: userProfile.last_name,
                   email: userEmail,
                   avatar_url: userProfile.avatar_url,
-                  default_avatar_background_color: userProfile.default_avatar_background_color,
+                  default_avatar_background_color:
+                    userProfile.default_avatar_background_color,
                 }}
               />
             ) : (
@@ -223,5 +239,5 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         </div>
       </div>
     </Sidebar>
-  )
+  );
 }
