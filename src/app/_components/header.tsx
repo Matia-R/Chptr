@@ -13,7 +13,7 @@ export function Header() {
     pathname.startsWith("/documents/") && pathname !== "/documents";
 
   return (
-    <header className="absolute left-0 right-0 top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-2 rounded-t-2xl border-b bg-background px-4">
+    <header className="absolute left-0 right-0 top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-2 rounded-t-2xl bg-background px-4">
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
         {isDocumentPage && (
