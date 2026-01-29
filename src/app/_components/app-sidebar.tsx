@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { Home, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
@@ -125,33 +125,46 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     <Sidebar variant="inset" {...props}>
       <div className="flex h-full flex-col">
         <div className="flex-none">
-          <SidebarHeader>
-            <div className="px-1 font-sans text-xl font-semibold">Chptr</div>
-            <div className="pt-2">
-              <div className="mb-2">
+          <SidebarHeader className="pb-0">
+            <div className="font-lora px-1 text-2xl font-medium">Chptr</div>
+            <div className="py-6">
+              <div className="space-y-2">
                 <Button
-                  className="w-full justify-start gap-2"
-                  variant="outline"
-                  onClick={() => createDocument.mutate()}
-                  disabled={createDocument.status === "pending"}
+                  className="h-9 w-full justify-between gap-2 px-2"
+                  variant="ghost"
+                  onClick={() => setOpen(true)}
                 >
-                  <Plus className="size-4" />
-                  New
+                  <div className="flex items-center gap-2">
+                    <Search className="size-4" />
+                    <span className="text-sm">Search</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">⌘K</span>
+                </Button>
+                <Button
+                  className="h-9 w-full justify-start gap-2 px-2"
+                  variant="ghost"
+                  asChild
+                >
+                  <Link href="/documents">
+                    <Home className="size-4" />
+                    <span className="text-sm">Home</span>
+                  </Link>
                 </Button>
               </div>
             </div>
           </SidebarHeader>
-          <SidebarHeader>
+          <SidebarHeader className="pt-0">
             <div className="flex items-center justify-between px-2 text-sm font-semibold">
-              <span>Notes</span>
-              <button
-                onClick={() => setOpen(true)}
-                className="text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-[highlight=true]:text-foreground"
-                data-highlight="false"
-                data-search-button
+              <span>Recents</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => createDocument.mutate()}
+                disabled={createDocument.status === "pending"}
               >
-                Search ⌘K
-              </button>
+                <Plus className="size-4" />
+              </Button>
             </div>
           </SidebarHeader>
         </div>

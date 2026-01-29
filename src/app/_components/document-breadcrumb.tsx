@@ -152,10 +152,10 @@ export function DocumentBreadcrumb() {
   return (
     <Breadcrumb>
       <BreadcrumbList>
-        <BreadcrumbItem className="md:block">
+        {/* <BreadcrumbItem className="md:block">
           <div>placeholder</div>
         </BreadcrumbItem>
-        <BreadcrumbSeparator />
+        <BreadcrumbSeparator /> */}
         <BreadcrumbItem className="md:block">
           <div className="group relative">
             {isEditing ? (

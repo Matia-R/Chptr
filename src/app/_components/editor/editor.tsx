@@ -16,6 +16,11 @@ import {
   supportedLanguages,
   createCodeBlockHighlighter,
 } from "./codeBlockSyntaxHighlighter";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "~/app/_components/popover";
 
 type Theme = "light" | "dark" | "system";
 
@@ -81,8 +86,21 @@ export default function Editor({
     }
   }, [theme]);
 
+  // --- Custom shadcn components for BlockNote ---
+  const shadCNComponents = {
+    Popover: {
+      Popover,
+      PopoverTrigger,
+      PopoverContent,
+    },
+  };
+
   return (
-    <BlockNoteView editor={editor} theme={currentTheme as "light" | "dark"}>
+    <BlockNoteView
+      editor={editor}
+      theme={currentTheme as "light" | "dark"}
+      shadCNComponents={shadCNComponents}
+    >
       <SuggestionMenuController
         triggerCharacter="@"
         getItems={async () => []} // placeholder

@@ -8,8 +8,16 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: [
-					'var(--font-geist-sans)',
+					'var(--font-inter)',
 					...fontFamily.sans
+				],
+				lora: [
+					'var(--font-lora)',
+					...fontFamily.serif
+				],
+				serif: [
+					'var(--font-noto-serif)',
+					...fontFamily.serif
 				]
 			},
 			borderRadius: {

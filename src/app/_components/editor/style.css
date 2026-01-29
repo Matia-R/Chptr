@@ -1004,7 +1004,7 @@
   --bn-colors-disabled-text: #3f3f3f;
   --bn-colors-disabled-background: #161616;
   --bn-colors-shadow: #0f0f0f;
-  --bn-colors-border: #161616;
+  --bn-colors-border: #404040;
   --bn-colors-side-menu: #7f7f7f;
   --bn-colors-highlights-gray-text: #bebdb8;
   --bn-colors-highlights-gray-background: #9b9a97;
@@ -1769,7 +1769,7 @@
 }
 
 .bn-shadcn.dark {
-  --background: 0 0% 3.9%;
+  --background: 0 0% 10%;
   --foreground: 0 0% 98%;
   --card: 0 0% 3.9%;
   --card-foreground: 0 0% 98%;
@@ -1781,11 +1781,11 @@
   --secondary-foreground: 0 0% 98%;
   --muted: 0 0% 14.9%;
   --muted-foreground: 0 0% 63.9%;
-  --accent: 0 0% 14.9%;
+  --accent: 0 0% 20%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 14.9%;
+  --border: 0 0% 25%;
   --input: 0 0% 14.9%;
   --ring: 0 0% 83.1%;
   --chart-1: 220 70% 50%;
@@ -2172,4 +2172,43 @@
 
 [data-floating-ui-focusable] {
   z-index: 5 !important;
+}
+
+/* Override BlockNote font to use Inter */
+.bn-container {
+  --bn-font-family: var(--font-inter), "Inter", sans-serif;
+}
+
+.bn-container .bn-editor * {
+  font-family: var(--font-inter), "Inter", sans-serif;
+}
+
+/* Override toolbar background to match bg-background in light mode, bg-sidebar in dark mode */
+.bn-container .bn-toolbar.bn-formatting-toolbar {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .bn-container .bn-toolbar.bn-formatting-toolbar {
+  background-color: hsl(var(--sidebar-background)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Override popover/menu/dropdown backgrounds in dark mode to use bg-sidebar for better contrast */
+.dark .bn-container :is(.bn-bg-popover) {
+  background-color: hsl(var(--sidebar-background)) !important;
+}
+
+/* Override block type dropdown button in toolbar to match bg-sidebar in dark mode */
+.dark .bn-container .bn-toolbar.bn-formatting-toolbar :is(.bn-bg-background) {
+  background-color: hsl(var(--sidebar-background)) !important;
+}
+
+/* Make toolbar button hover states match sidebar button hover (using --accent) */
+.dark .bn-container .bn-toolbar.bn-formatting-toolbar button:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+.dark .bn-container .bn-toolbar.bn-formatting-toolbar :is(.hover\:bn-bg-accent:hover),
+.dark .bn-container .bn-toolbar.bn-formatting-toolbar :is(.hover\:bn-bg-muted:hover) {
+  background-color: hsl(var(--accent)) !important;
 }
