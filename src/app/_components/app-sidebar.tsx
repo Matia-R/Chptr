@@ -126,7 +126,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       <div className="flex h-full flex-col">
         <div className="flex-none">
           <SidebarHeader className="pb-0">
-            <div className="font-lora px-1 text-2xl font-medium">Chptr</div>
+            <div className="px-1 font-lora text-2xl font-medium">Chptr</div>
             <div className="py-6">
               <div className="space-y-2">
                 <Button
