@@ -509,6 +509,19 @@ export async function saveDocumentChange(
     if (createError && createError.code !== '23505') {
       throw new Error(`Failed to create document: ${createError.message}`);
     }
+
+    // Create permission for the creator (required by RLS)
+    const { error: permError } = await supabase
+      .from('document_permissions')
+      .insert({
+        user_id: user.id,
+        document_id: documentId,
+        permission: 'owner'
+      });
+
+    if (permError && permError.code !== '23505') {
+      throw new Error(`Failed to create document permission: ${permError.message}`);
+    }
   }
 
   // Insert the change (unique constraint handles duplicates)
@@ -582,6 +595,19 @@ export async function saveDocumentChanges(
 
     if (createError && createError.code !== '23505') {
       throw new Error(`Failed to create document: ${createError.message}`);
+    }
+
+    // Create permission for the creator (required by RLS)
+    const { error: permError } = await supabase
+      .from('document_permissions')
+      .insert({
+        user_id: user.id,
+        document_id: documentId,
+        permission: 'owner'
+      });
+
+    if (permError && permError.code !== '23505') {
+      throw new Error(`Failed to create document permission: ${permError.message}`);
     }
   }
 
