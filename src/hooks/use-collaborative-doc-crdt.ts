@@ -21,19 +21,10 @@ interface UseCollaborativeDocCrdtResult {
 
 /* -------------------------------- Helpers -------------------------------- */
 
-/**
- * Generate a unique client ID for this hook instance.
- * Each hook initialization gets a new ID to ensure clock values never collide.
- * This is important because after a refresh, the clock resets to 0 but if we
- * reuse the same clientId, new saves would have duplicate (clientId, clock) keys.
- */
 function generateClientId(): string {
   return crypto.randomUUID();
 }
 
-/**
- * Decodes a base64 string to Uint8Array for Yjs.
- */
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64.trim());
   const bytes = new Uint8Array(binary.length);
@@ -43,9 +34,6 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Encodes a Uint8Array to base64 string.
- */
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) {
@@ -70,33 +58,34 @@ export function useCollaborativeDocCrdt({
   // Refs for cleanup and tracking
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastDocumentIdRef = useRef<string | null>(null);
-  const isInitializedRef = useRef(false);
-  // Generate a new clientId for each hook instance
-  // This ensures clock values never collide after refresh/navigation
   const clientIdRef = useRef<string>(generateClientId());
   const clockRef = useRef<number>(0);
   const pendingChangesRef = useRef<Array<{ clientId: string; clock: number; updateData: string }>>([]);
   const flushTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const documentIdRef = useRef(documentId);
-  
-  // Ref to capture initial changes data (only used once for initialization)
-  const initialChangesRef = useRef<{ clientId: string; clock: number; updateData: string; createdAt: string }[] | null>(null);
 
   // Keep documentId ref updated
   useEffect(() => {
     documentIdRef.current = documentId;
   }, [documentId]);
 
-  // tRPC utils for cache updates
+  // tRPC utils
   const utils = api.useUtils();
 
-  // Mutation for batch saving changes - use ref to avoid dependency issues
+  // Invalidate cache when documentId changes to ensure fresh data
+  useEffect(() => {
+    if (lastDocumentIdRef.current !== null && lastDocumentIdRef.current !== documentId) {
+      // Navigating to a different document - invalidate cache to get fresh data
+      void utils.document.getDocumentChanges.invalidate(documentId);
+    }
+  }, [documentId, utils.document.getDocumentChanges]);
+
+  // Mutation for batch saving changes
   const saveChangesMutation = api.document.saveDocumentChanges.useMutation({
     onError: (err) => {
       console.error("[CRDT] Failed to save changes:", err);
     },
     onSuccess: () => {
-      // Invalidate sidebar when changes are saved (document may have been created)
       void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
     },
   });
@@ -105,44 +94,40 @@ export function useCollaborativeDocCrdt({
     mutateRef.current = saveChangesMutation.mutate;
   }, [saveChangesMutation.mutate]);
 
-  // Fetch existing changes for the document (only once on mount)
+  // Fetch existing changes for the document
   const {
     data: changesData,
     isLoading: isChangesLoading,
     error: changesError,
     isSuccess: changesSuccess,
+    dataUpdatedAt,
   } = api.document.getDocumentChanges.useQuery(documentId, {
     enabled: !!documentId && !isNew,
-    refetchOnMount: false,      // Only fetch once
-    refetchOnWindowFocus: false, // Don't refetch on focus
-    staleTime: Infinity,        // Never consider stale
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Always refetch when navigating
   });
 
-  // Capture initial changes data when query succeeds (only once)
-  useEffect(() => {
-    if (changesSuccess && changesData && initialChangesRef.current === null) {
-      initialChangesRef.current = changesData.changes;
-    }
-  }, [changesSuccess, changesData]);
+  // Track if we've initialized for a specific documentId + dataUpdatedAt combination
+  const initializedForRef = useRef<string | null>(null);
 
-  // Main setup effect - only run once per documentId
+  // Main setup effect
   useEffect(() => {
     let cancelled = false;
 
     // For new documents, initialize immediately
     // For existing documents, wait for query to complete
-    const shouldInitialize = isNew || changesSuccess;
-
-    if (!shouldInitialize) {
+    if (!isNew && !changesSuccess) {
       return;
     }
 
-    // Skip if already initialized for this document
-    if (isInitializedRef.current && lastDocumentIdRef.current === documentId) {
+    // Create a unique key for this documentId + data version
+    const initKey = isNew ? `new-${documentId}` : `${documentId}-${dataUpdatedAt}`;
+
+    // Skip if already initialized for this exact data
+    if (initializedForRef.current === initKey) {
       return;
     }
 
-    // Handle error
     if (changesError) {
       setError(new Error(changesError.message));
       return;
@@ -155,18 +140,19 @@ export function useCollaborativeDocCrdt({
 
       setError(null);
 
-      /* ---------------- Create doc ---------------- */
+      // Reset clock and clientId for new document
+      if (lastDocumentIdRef.current !== documentId) {
+        clockRef.current = 0;
+        clientIdRef.current = generateClientId();
+        pendingChangesRef.current = [];
+      }
 
       const ydoc = new Y.Doc();
 
-      /* -------- APPLY ALL CHANGES FROM DB -------- */
-
-      // Use the captured initial changes (from ref, not from query)
-      const changes = initialChangesRef.current ?? changesData?.changes ?? [];
-      
+      // Apply all changes from DB
+      const changes = changesData?.changes ?? [];
       if (!isNew && changes.length > 0) {
         console.log(`[CRDT] Applying ${changes.length} changes from database`);
-        
         for (const change of changes) {
           try {
             const update = base64ToUint8Array(change.updateData);
@@ -177,8 +163,6 @@ export function useCollaborativeDocCrdt({
         }
       }
 
-      /* ---------------- Create provider ---------------- */
-
       const provider = new WebrtcProvider(documentId, ydoc);
 
       if (cancelled) {
@@ -187,24 +171,17 @@ export function useCollaborativeDocCrdt({
         return;
       }
 
-      // Update refs
       lastDocumentIdRef.current = documentId;
-      isInitializedRef.current = true;
-
+      initializedForRef.current = initKey;
       setState({ ydoc, provider });
       setIsReady(true);
 
-      /* ---------------- Save ALL updates (local and remote) ---------------- */
-
-      // Flush function - uses refs to avoid stale closures
+      // Flush function
       const flushChanges = () => {
         if (pendingChangesRef.current.length === 0) return;
-
         const changes = [...pendingChangesRef.current];
         pendingChangesRef.current = [];
-
         console.log(`[CRDT] Flushing ${changes.length} changes to server`);
-        
         mutateRef.current({
           documentId: documentIdRef.current,
           changes,
@@ -219,8 +196,6 @@ export function useCollaborativeDocCrdt({
           clock: clockRef.current,
           updateData: uint8ArrayToBase64(update),
         });
-
-        // Schedule flush with debounce
         if (flushTimeoutRef.current) {
           clearTimeout(flushTimeoutRef.current);
         }
@@ -228,19 +203,13 @@ export function useCollaborativeDocCrdt({
       };
 
       const onUpdate = (update: Uint8Array, _origin: unknown) => {
-        // Save every update - both local and remote
-        // The unique constraint on (document_id, client_id, clock) prevents duplicates
         queueUpdate(update);
       };
 
       ydoc.on("update", onUpdate);
 
-      /* ---------------- Cleanup ---------------- */
-
       cleanupRef.current = () => {
         ydoc.off("update", onUpdate);
-
-        // Flush any pending changes before cleanup
         if (flushTimeoutRef.current) {
           clearTimeout(flushTimeoutRef.current);
           flushTimeoutRef.current = null;
@@ -248,15 +217,8 @@ export function useCollaborativeDocCrdt({
         if (pendingChangesRef.current.length > 0) {
           flushChanges();
         }
-
-        try {
-          provider.destroy();
-        } catch {}
-
-        try {
-          ydoc.destroy();
-        } catch {}
-
+        try { provider.destroy(); } catch {}
+        try { ydoc.destroy(); } catch {}
         setState(null);
         setIsReady(false);
       };
@@ -269,19 +231,8 @@ export function useCollaborativeDocCrdt({
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-    // Note: Only depend on documentId, isNew, changesSuccess, changesError
-    // NOT changesData - we use initialChangesRef instead to avoid re-runs
-  }, [documentId, isNew, changesSuccess, changesError]);
-
-  // Reset when document ID changes
-  useEffect(() => {
-    if (lastDocumentIdRef.current !== documentId) {
-      isInitializedRef.current = false;
-      initialChangesRef.current = null; // Reset initial changes for new document
-      clockRef.current = 0;
-      pendingChangesRef.current = [];
-    }
-  }, [documentId]);
+    // dataUpdatedAt ensures we re-run when fresh data arrives after navigation
+  }, [documentId, isNew, changesSuccess, changesError, changesData, dataUpdatedAt]);
 
   return {
     ydoc: state?.ydoc ?? null,
