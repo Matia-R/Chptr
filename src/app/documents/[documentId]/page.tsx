@@ -29,6 +29,8 @@ export default function DocumentPage() {
   // isNew = false means user landed on URL (pessimistic - wait for query)
   const { isNew, clearFlag } = useNewDocumentFlag();
 
+  const utils = api.useUtils();
+
   const Editor = useMemo(
     () =>
       dynamic(() => import("~/app/_components/editor/editor"), { ssr: false }),
@@ -87,7 +89,14 @@ export default function DocumentPage() {
   // Setup snapshot persistence mutation
   const persistSnapshotMutation =
     api.document.persistDocumentSnapshot.useMutation({
-      onSuccess: () => clearFlag(), // Clear "new" flag on first successful persistence
+      onSuccess: () => {
+        // Clear "new" flag on first successful persistence
+        if (isNew) {
+          clearFlag();
+          // Refresh sidebar document list (the doc was just created in DB)
+          void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
+        }
+      },
       onError: (error: unknown) => {
         console.error("Failed to persist document snapshot:", error);
       },

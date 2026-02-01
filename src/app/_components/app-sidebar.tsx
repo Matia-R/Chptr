@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Home, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ScrollArea } from "~/app/_components/scroll-area";
 
@@ -30,8 +30,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
-  const params = useParams();
-  const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
@@ -72,30 +70,29 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const { data: userProfile, isLoading: userLoading } = useUserProfile();
   const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
-  // Instant document creation - navigate immediately with a new UUID
-  // The document will be created in the database when the user first edits it
+  // Instant document creation with optimistic sidebar update
   const handleCreateDocument = React.useCallback(() => {
     const newId = crypto.randomUUID();
+
+    // Mark as new for the document page
     markDocumentAsNew(newId);
+
+    // Optimistically add to sidebar list
+    utils.document.getDocumentIdsForAuthenticatedUser.setData(
+      undefined,
+      (old) => {
+        if (!old?.documents) return old;
+        // Add new doc at the beginning of the list
+        return {
+          ...old,
+          documents: [{ id: newId, name: "Untitled" }, ...old.documents],
+        };
+      },
+    );
+
+    // Navigate to the new document
     router.push(`/documents/${newId}`);
-  }, [router]);
-
-  // Setup document data prefetching
-  React.useEffect(() => {
-    documents?.documents?.forEach((doc) => {
-      // Always prefetch the document data
-      void utils.document.getDocumentById.prefetch(doc.id);
-
-      // If this is the current document, set up periodic revalidation
-      if (doc.id === currentDocumentId) {
-        const interval = setInterval(() => {
-          void utils.document.getDocumentById.invalidate(doc.id);
-        }, 30000); // Revalidate every 30 seconds
-
-        return () => clearInterval(interval);
-      }
-    });
-  }, [documents?.documents, utils, currentDocumentId]);
+  }, [router, utils]);
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -186,9 +183,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                               href={`/documents/${doc.id}`}
                               prefetch={true}
                               onClick={() => {
-                                void utils.document.getDocumentById.invalidate(
-                                  doc.id,
-                                );
                                 if (isMobile) {
                                   setOpenMobile(false);
                                 }

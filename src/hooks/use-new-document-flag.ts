@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useRef, useCallback, useSyncExternalStore } from "react";
+import { useRef, useCallback } from "react";
 
 /**
  * In-memory store for tracking "new" document IDs.
@@ -12,27 +12,12 @@ import { useRef, useCallback, useSyncExternalStore } from "react";
  * - If user refreshes, it's cleared → fetches from DB (correct behavior)
  */
 const newDocumentIds = new Set<string>();
-const listeners = new Set<() => void>();
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot() {
-  return newDocumentIds;
-}
-
-function notifyListeners() {
-  listeners.forEach((listener) => listener());
-}
 
 /**
  * Mark a document ID as "new" (call before navigating to the new document)
  */
 export function markDocumentAsNew(documentId: string) {
   newDocumentIds.add(documentId);
-  notifyListeners();
 }
 
 /**
@@ -40,7 +25,6 @@ export function markDocumentAsNew(documentId: string) {
  */
 export function clearNewDocumentFlag(documentId: string) {
   newDocumentIds.delete(documentId);
-  notifyListeners();
 }
 
 /**
@@ -53,8 +37,8 @@ export function isDocumentNew(documentId: string): boolean {
 /**
  * Hook to check if the current document is "new" and get a cleanup function.
  * 
- * - Returns frozen state to prevent re-renders during cleanup
- * - Provides clearFlag function to call on first successful persistence
+ * This hook freezes the "isNew" state per documentId to prevent re-renders
+ * when the flag is cleared. The frozen state is reset when documentId changes.
  * 
  * @returns {Object} { isNew, clearFlag }
  */
@@ -62,25 +46,30 @@ export function useNewDocumentFlag() {
   const params = useParams();
   const documentId = params.documentId as string;
   
-  // Subscribe to store changes (needed for useSyncExternalStore)
-  const store = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  // Track which documentId we've frozen the isNew state for
+  const frozenStateRef = useRef<{ documentId: string; isNew: boolean } | null>(null);
   
-  // Freeze the initial isNew value on first render
-  // This prevents re-renders when we clear the flag
-  const isNewRef = useRef<boolean | null>(null);
-  if (isNewRef.current === null) {
-    isNewRef.current = store.has(documentId);
+  // Reset frozen state when documentId changes, or initialize it
+  if (!frozenStateRef.current || frozenStateRef.current.documentId !== documentId) {
+    frozenStateRef.current = {
+      documentId,
+      isNew: newDocumentIds.has(documentId),
+    };
   }
+  
+  const isNew = frozenStateRef.current.isNew;
   
   // Clear the flag (call on first successful persistence)
   const clearFlag = useCallback(() => {
-    if (isNewRef.current && documentId) {
+    if (documentId) {
       clearNewDocumentFlag(documentId);
+      // Note: we don't update frozenStateRef here intentionally
+      // The frozen state stays true until navigation to prevent flicker
     }
   }, [documentId]);
   
   return {
-    isNew: isNewRef.current,
+    isNew,
     clearFlag,
   };
 }
