@@ -2,29 +2,26 @@
 
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
-import {
-  BreadcrumbItem,
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "./breadcrumb";
+import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
 import * as React from "react";
 import { cn } from "~/lib/utils";
 import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
+import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 
 export function DocumentBreadcrumb() {
   const params = useParams();
   const documentId = params.documentId as string;
+  const { isNew, clearFlag } = useNewDocumentFlag();
   const utils = api.useUtils();
   const { toast } = useToast();
 
-  // Todo: create a query to just get the name so we're not fetching the whole document
+  // Don't fetch document data for new documents - show "Untitled" optimistically
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId,
+      enabled: !!documentId && !isNew,
     },
   );
 
@@ -59,20 +56,24 @@ export function DocumentBreadcrumb() {
   React.useEffect(() => {
     if (document?.document?.name) {
       setEditingName(document.document.name);
+    } else if (isNew) {
+      setEditingName("Untitled");
     }
-  }, [document?.document?.name]);
+  }, [document?.document?.name, isNew]);
 
   const handleSave = () => {
     const trimmedName = editingName.trim();
+    const currentName = document?.document?.name ?? "Untitled";
 
     // If no valid name or no change, just cancel
-    if (
-      !trimmedName ||
-      !document?.document?.name ||
-      trimmedName === document.document.name
-    ) {
+    if (!trimmedName || trimmedName === currentName) {
       handleCancel();
       return;
+    }
+
+    // Clear the "new" flag when user changes the name
+    if (isNew) {
+      clearFlag();
     }
 
     // Snapshot the previous values
@@ -126,18 +127,16 @@ export function DocumentBreadcrumb() {
   };
 
   const handleCancel = () => {
-    // Always revert to the current document name
-    if (document?.document?.name) {
-      setEditingName(document.document.name);
-    }
+    // Revert to the current document name (or "Untitled" for new docs)
+    setEditingName(document?.document?.name ?? "Untitled");
     setIsEditing(false);
   };
 
   const sharedStyles =
     "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
 
-  // Don't render anything until we have the document data
-  if (isLoading || !document?.document?.name) {
+  // Show loading skeleton only for existing documents that are loading
+  if (isLoading && !isNew) {
     return (
       <Breadcrumb>
         <BreadcrumbList>
@@ -149,13 +148,12 @@ export function DocumentBreadcrumb() {
     );
   }
 
+  // Get the display name - "Untitled" for new docs, or the actual name
+  const displayName = document?.document?.name ?? "Untitled";
+
   return (
     <Breadcrumb>
       <BreadcrumbList>
-        {/* <BreadcrumbItem className="md:block">
-          <div>placeholder</div>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator /> */}
         <BreadcrumbItem className="md:block">
           <div className="group relative">
             {isEditing ? (
@@ -201,9 +199,9 @@ export function DocumentBreadcrumb() {
                     sharedStyles,
                     "truncate pr-8 text-left hover:bg-accent hover:text-accent-foreground",
                   )}
-                  title={document.document.name}
+                  title={displayName}
                 >
-                  {document.document.name}
+                  {displayName}
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}
