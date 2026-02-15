@@ -118,19 +118,92 @@ export const getDocumentIdsForUser = async () => {
 }
 
 export async function updateDocumentName(documentId: string, name: string) {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    const supabase = await createClient()
+    if (userError || !user) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Not authenticated',
+        });
+    }
 
-    const { error } = await supabase
+    // Check if document exists
+    const { data: existingDoc, error: docError } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .single();
+
+    if (docError && docError.code !== 'PGRST116') {
+        throw new Error(`Failed to check document: ${docError.message}`);
+    }
+
+    if (!existingDoc) {
+        // Document doesn't exist - create it with the given name
+        const { error: createError } = await supabase
+            .from('documents')
+            .insert({
+                id: documentId,
+                creator_id: user.id,
+                name,
+                content: [],
+                last_updated: new Date()
+            });
+
+        if (createError && createError.code !== '23505') {
+            throw new Error(`Failed to create document: ${createError.message}`);
+        }
+
+        // Create permission for the creator
+        const { error: permError } = await supabase
+            .from('document_permissions')
+            .insert({
+                user_id: user.id,
+                document_id: documentId,
+                permission: 'owner'
+            });
+
+        if (permError && permError.code !== '23505') {
+            throw new Error(`Failed to create document permission: ${permError.message}`);
+        }
+
+        return { success: true, created: true };
+    }
+
+    // Document exists - check permission
+    const { data: permission, error: permCheckError } = await supabase
+        .from('document_permissions')
+        .select('id')
+        .eq('document_id', documentId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (permCheckError && permCheckError.code !== 'PGRST116') {
+        throw new Error(`Failed to check permission: ${permCheckError.message}`);
+    }
+
+    if (!permission) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to edit this document',
+        });
+    }
+
+    // Update the document name
+    const { error: updateError } = await supabase
         .from('documents')
         .update({
             name,
             last_updated: new Date()
         })
-        .eq('id', documentId)
+        .eq('id', documentId);
 
-    if (error) throw new Error(`Failed to update document name: ${error.message}`)
-    return { success: true }
+    if (updateError) {
+        throw new Error(`Failed to update document name: ${updateError.message}`);
+    }
+
+    return { success: true, created: false };
 }
 
 export async function getCurrentUser(): Promise<string | undefined> {

@@ -25,17 +25,13 @@ export function DocumentBreadcrumb() {
     },
   );
 
+  // Track the previous name for reverting on error
+  const previousNameRef = React.useRef<string>("Untitled");
+
   const updateName = api.document.updateDocumentName.useMutation({
     onError: (err) => {
-      // Always revert to the current document name
-      if (document?.document?.name) {
-        setEditingName(document.document.name);
-      }
-
-      // Revert both caches on error
-      if (document?.document) {
-        utils.document.getDocumentById.setData(documentId, document);
-      }
+      // Revert to the previous name
+      setEditingName(previousNameRef.current);
 
       toast({
         variant: "destructive",
@@ -46,20 +42,26 @@ export function DocumentBreadcrumb() {
     },
     onSettled: () => {
       void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
+      void utils.document.getDocumentById.invalidate(documentId);
     },
   });
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editingName, setEditingName] = useState("");
+  const [editingName, setEditingName] = useState("Untitled");
 
-  // Update editing state when document name changes or when starting to edit
+  // Sync editingName with document data or reset for new documents
   React.useEffect(() => {
     if (document?.document?.name) {
+      // Existing document loaded - use its name
       setEditingName(document.document.name);
     } else if (isNew) {
+      // New document - use "Untitled"
       setEditingName("Untitled");
+    } else {
+      // Existing document loading - reset to empty (skeleton will show)
+      setEditingName("");
     }
-  }, [document?.document?.name, isNew]);
+  }, [documentId, document?.document?.name, isNew]);
 
   const handleSave = () => {
     const trimmedName = editingName.trim();
@@ -71,58 +73,52 @@ export function DocumentBreadcrumb() {
       return;
     }
 
+    // Store the previous name for potential revert
+    previousNameRef.current = currentName;
+
     // Clear the "new" flag when user changes the name
     if (isNew) {
       clearFlag();
     }
 
-    // Snapshot the previous values
-    const prevDocs =
-      utils.document.getDocumentIdsForAuthenticatedUser.getData();
-    const prevDoc = utils.document.getDocumentById.getData(documentId);
+    // Optimistically update the input immediately
+    setEditingName(trimmedName);
 
-    // Optimistically update the documents list
+    // Optimistically update the documents list (add if new, update if exists)
     utils.document.getDocumentIdsForAuthenticatedUser.setData(
       undefined,
       (old) => {
-        if (!old?.documents) return old;
-        return {
-          ...old,
-          documents: old.documents.map((doc) =>
-            doc.id === documentId ? { ...doc, name: trimmedName } : doc,
-          ),
-        };
+        if (!old?.documents) {
+          // No documents yet - create the list with this one
+          return {
+            success: true,
+            documents: [{ id: documentId, name: trimmedName }],
+          };
+        }
+
+        const exists = old.documents.some((doc) => doc.id === documentId);
+        if (exists) {
+          // Update existing
+          return {
+            ...old,
+            documents: old.documents.map((doc) =>
+              doc.id === documentId ? { ...doc, name: trimmedName } : doc,
+            ),
+          };
+        } else {
+          // Add new document to list
+          return {
+            ...old,
+            documents: [
+              { id: documentId, name: trimmedName },
+              ...old.documents,
+            ],
+          };
+        }
       },
     );
 
-    // Optimistically update the document data
-    if (document?.document) {
-      utils.document.getDocumentById.setData(documentId, {
-        ...document,
-        document: {
-          ...document.document,
-          name: trimmedName,
-        },
-      });
-    }
-
-    updateName.mutate(
-      { id: documentId, name: trimmedName },
-      {
-        onError: () => {
-          // Revert both caches on error
-          if (prevDocs) {
-            utils.document.getDocumentIdsForAuthenticatedUser.setData(
-              undefined,
-              prevDocs,
-            );
-          }
-          if (prevDoc) {
-            utils.document.getDocumentById.setData(documentId, prevDoc);
-          }
-        },
-      },
-    );
+    updateName.mutate({ id: documentId, name: trimmedName });
     setIsEditing(false);
   };
 
@@ -148,8 +144,9 @@ export function DocumentBreadcrumb() {
     );
   }
 
-  // Get the display name - "Untitled" for new docs, or the actual name
-  const displayName = document?.document?.name ?? "Untitled";
+  // Use editingName for display - it's kept in sync with document name
+  // and updated optimistically when user saves
+  const displayName = editingName || "Untitled";
 
   return (
     <Breadcrumb>
