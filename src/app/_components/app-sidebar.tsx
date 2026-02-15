@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Home, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ScrollArea } from "~/app/_components/scroll-area";
 
@@ -19,11 +19,10 @@ import {
   useSidebar,
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
-import { type Document } from "~/server/api/routers/document";
-import { useToast } from "../../hooks/use-toast";
 import { NavUser } from "./nav-user";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
+import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[];
@@ -31,10 +30,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
-  const params = useParams();
-  const currentDocumentId = params.documentId as string;
   const utils = api.useUtils();
-  const { toast } = useToast();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
 
@@ -74,52 +70,29 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const { data: userProfile, isLoading: userLoading } = useUserProfile();
   const { data: userEmail } = api.user.getCurrentUser.useQuery();
 
-  const createDocument = api.document.createDocument.useMutation({
-    onSuccess: async (data) => {
-      const doc = data.createdDocument[0] as Document;
-      if (doc?.id) {
-        // Invalidate both the document list and the new document
-        await Promise.all([
-          utils.document.getDocumentIdsForAuthenticatedUser.invalidate(),
-          utils.document.getDocumentById.prefetch(doc.id),
-        ]);
-        router.push(`/documents/${doc.id}`);
-      } else {
-        toast({
-          title: "Failed to create document",
-          description: "The document was created but returned an invalid ID.",
-        });
-      }
-    },
-    onError: (error) => {
-      console.error(error);
-      toast({
-        variant: "destructive",
-        title: "Failed to create document",
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-      });
-    },
-  });
+  // Instant document creation with optimistic sidebar update
+  const handleCreateDocument = React.useCallback(() => {
+    const newId = crypto.randomUUID();
 
-  // Setup document data prefetching
-  React.useEffect(() => {
-    documents?.documents?.forEach((doc) => {
-      // Always prefetch the document data
-      void utils.document.getDocumentById.prefetch(doc.id);
+    // Mark as new for the document page
+    markDocumentAsNew(newId);
 
-      // If this is the current document, set up periodic revalidation
-      if (doc.id === currentDocumentId) {
-        const interval = setInterval(() => {
-          void utils.document.getDocumentById.invalidate(doc.id);
-        }, 30000); // Revalidate every 30 seconds
+    // Optimistically add to sidebar list
+    utils.document.getDocumentIdsForAuthenticatedUser.setData(
+      undefined,
+      (old) => {
+        if (!old?.documents) return old;
+        // Add new doc at the beginning of the list
+        return {
+          ...old,
+          documents: [{ id: newId, name: "Untitled" }, ...old.documents],
+        };
+      },
+    );
 
-        return () => clearInterval(interval);
-      }
-    });
-  }, [documents?.documents, utils, currentDocumentId]);
+    // Navigate to the new document
+    router.push(`/documents/${newId}`);
+  }, [router, utils]);
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -160,8 +133,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => createDocument.mutate()}
-                disabled={createDocument.status === "pending"}
+                onClick={handleCreateDocument}
               >
                 <Plus className="size-4" />
               </Button>
@@ -211,9 +183,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                               href={`/documents/${doc.id}`}
                               prefetch={true}
                               onClick={() => {
-                                void utils.document.getDocumentById.invalidate(
-                                  doc.id,
-                                );
                                 if (isMobile) {
                                   setOpenMobile(false);
                                 }

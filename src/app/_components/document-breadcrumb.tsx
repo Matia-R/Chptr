@@ -2,43 +2,36 @@
 
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
-import {
-  BreadcrumbItem,
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "./breadcrumb";
+import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
 import * as React from "react";
 import { cn } from "~/lib/utils";
 import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
+import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 
 export function DocumentBreadcrumb() {
   const params = useParams();
   const documentId = params.documentId as string;
+  const { isNew, clearFlag } = useNewDocumentFlag();
   const utils = api.useUtils();
   const { toast } = useToast();
 
-  // Todo: create a query to just get the name so we're not fetching the whole document
+  // Don't fetch document data for new documents - show "Untitled" optimistically
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId,
+      enabled: !!documentId && !isNew,
     },
   );
 
+  // Track the previous name for reverting on error
+  const previousNameRef = React.useRef<string>("Untitled");
+
   const updateName = api.document.updateDocumentName.useMutation({
     onError: (err) => {
-      // Always revert to the current document name
-      if (document?.document?.name) {
-        setEditingName(document.document.name);
-      }
-
-      // Revert both caches on error
-      if (document?.document) {
-        utils.document.getDocumentById.setData(documentId, document);
-      }
+      // Revert to the previous name
+      setEditingName(previousNameRef.current);
 
       toast({
         variant: "destructive",
@@ -49,95 +42,97 @@ export function DocumentBreadcrumb() {
     },
     onSettled: () => {
       void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
+      void utils.document.getDocumentById.invalidate(documentId);
     },
   });
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editingName, setEditingName] = useState("");
+  const [editingName, setEditingName] = useState("Untitled");
 
-  // Update editing state when document name changes or when starting to edit
+  // Sync editingName with document data or reset for new documents
   React.useEffect(() => {
     if (document?.document?.name) {
+      // Existing document loaded - use its name
       setEditingName(document.document.name);
+    } else if (isNew) {
+      // New document - use "Untitled"
+      setEditingName("Untitled");
+    } else {
+      // Existing document loading - reset to empty (skeleton will show)
+      setEditingName("");
     }
-  }, [document?.document?.name]);
+  }, [documentId, document?.document?.name, isNew]);
 
   const handleSave = () => {
     const trimmedName = editingName.trim();
+    const currentName = document?.document?.name ?? "Untitled";
 
     // If no valid name or no change, just cancel
-    if (
-      !trimmedName ||
-      !document?.document?.name ||
-      trimmedName === document.document.name
-    ) {
+    if (!trimmedName || trimmedName === currentName) {
       handleCancel();
       return;
     }
 
-    // Snapshot the previous values
-    const prevDocs =
-      utils.document.getDocumentIdsForAuthenticatedUser.getData();
-    const prevDoc = utils.document.getDocumentById.getData(documentId);
+    // Store the previous name for potential revert
+    previousNameRef.current = currentName;
 
-    // Optimistically update the documents list
+    // Clear the "new" flag when user changes the name
+    if (isNew) {
+      clearFlag();
+    }
+
+    // Optimistically update the input immediately
+    setEditingName(trimmedName);
+
+    // Optimistically update the documents list (add if new, update if exists)
     utils.document.getDocumentIdsForAuthenticatedUser.setData(
       undefined,
       (old) => {
-        if (!old?.documents) return old;
-        return {
-          ...old,
-          documents: old.documents.map((doc) =>
-            doc.id === documentId ? { ...doc, name: trimmedName } : doc,
-          ),
-        };
+        if (!old?.documents) {
+          // No documents yet - create the list with this one
+          return {
+            success: true,
+            documents: [{ id: documentId, name: trimmedName }],
+          };
+        }
+
+        const exists = old.documents.some((doc) => doc.id === documentId);
+        if (exists) {
+          // Update existing
+          return {
+            ...old,
+            documents: old.documents.map((doc) =>
+              doc.id === documentId ? { ...doc, name: trimmedName } : doc,
+            ),
+          };
+        } else {
+          // Add new document to list
+          return {
+            ...old,
+            documents: [
+              { id: documentId, name: trimmedName },
+              ...old.documents,
+            ],
+          };
+        }
       },
     );
 
-    // Optimistically update the document data
-    if (document?.document) {
-      utils.document.getDocumentById.setData(documentId, {
-        ...document,
-        document: {
-          ...document.document,
-          name: trimmedName,
-        },
-      });
-    }
-
-    updateName.mutate(
-      { id: documentId, name: trimmedName },
-      {
-        onError: () => {
-          // Revert both caches on error
-          if (prevDocs) {
-            utils.document.getDocumentIdsForAuthenticatedUser.setData(
-              undefined,
-              prevDocs,
-            );
-          }
-          if (prevDoc) {
-            utils.document.getDocumentById.setData(documentId, prevDoc);
-          }
-        },
-      },
-    );
+    updateName.mutate({ id: documentId, name: trimmedName });
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    // Always revert to the current document name
-    if (document?.document?.name) {
-      setEditingName(document.document.name);
-    }
+    // Revert to the current document name (or "Untitled" for new docs)
+    setEditingName(document?.document?.name ?? "Untitled");
     setIsEditing(false);
   };
 
   const sharedStyles =
     "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
 
-  // Don't render anything until we have the document data
-  if (isLoading || !document?.document?.name) {
+  // Show loading skeleton only for existing documents that are loading
+  if (isLoading && !isNew) {
     return (
       <Breadcrumb>
         <BreadcrumbList>
@@ -149,13 +144,13 @@ export function DocumentBreadcrumb() {
     );
   }
 
+  // Use editingName for display - it's kept in sync with document name
+  // and updated optimistically when user saves
+  const displayName = editingName || "Untitled";
+
   return (
     <Breadcrumb>
       <BreadcrumbList>
-        {/* <BreadcrumbItem className="md:block">
-          <div>placeholder</div>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator /> */}
         <BreadcrumbItem className="md:block">
           <div className="group relative">
             {isEditing ? (
@@ -201,9 +196,9 @@ export function DocumentBreadcrumb() {
                     sharedStyles,
                     "truncate pr-8 text-left hover:bg-accent hover:text-accent-foreground",
                   )}
-                  title={document.document.name}
+                  title={displayName}
                 >
-                  {document.document.name}
+                  {displayName}
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}

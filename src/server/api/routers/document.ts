@@ -2,7 +2,19 @@ import { type Block } from "@blocknote/core";
 import { z } from "zod"
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { createDocument, saveDocument, getDocumentById, getLastUpdatedTimestamp, getDocumentIdsForUser as getDocumentsIdsForUser, updateDocumentName, persistDocumentSnapshot, getLatestDocumentSnapshot } from '~/server/db'
+import { 
+  createDocument, 
+  saveDocument, 
+  getDocumentById, 
+  getLastUpdatedTimestamp, 
+  getDocumentIdsForUser as getDocumentsIdsForUser, 
+  updateDocumentName, 
+  persistDocumentSnapshot, 
+  getLatestDocumentSnapshot,
+  saveDocumentChange,
+  saveDocumentChanges,
+  getDocumentChanges,
+} from '~/server/db'
 
 export interface Document {
     id: string,
@@ -71,5 +83,56 @@ export const documentRouter = createTRPCRouter({
         .input(z.string())
         .query(async ({ input }) => {
             return getLatestDocumentSnapshot(input);
+        }),
+
+    // =============================================================================
+    // CRDT-based document changes (new approach)
+    // =============================================================================
+
+    /**
+     * Save a single Yjs update to the changes table.
+     * Duplicates are ignored via unique constraint.
+     */
+    saveDocumentChange: publicProcedure
+        .input(z.object({
+            documentId: z.string(),
+            clientId: z.string(),
+            clock: z.number(),
+            updateData: z.string(), // base64 encoded Yjs update
+        }))
+        .mutation(async ({ input }) => {
+            return saveDocumentChange(
+                input.documentId,
+                input.clientId,
+                input.clock,
+                input.updateData
+            );
+        }),
+
+    /**
+     * Batch save multiple Yjs updates at once.
+     * More efficient for saving multiple changes.
+     */
+    saveDocumentChanges: publicProcedure
+        .input(z.object({
+            documentId: z.string(),
+            changes: z.array(z.object({
+                clientId: z.string(),
+                clock: z.number(),
+                updateData: z.string(),
+            })),
+        }))
+        .mutation(async ({ input }) => {
+            return saveDocumentChanges(input.documentId, input.changes);
+        }),
+
+    /**
+     * Get all changes for a document to rebuild CRDT state.
+     * Returns changes in order so they can be applied sequentially.
+     */
+    getDocumentChanges: publicProcedure
+        .input(z.string())
+        .query(async ({ input }) => {
+            return getDocumentChanges(input);
         }),
 });
