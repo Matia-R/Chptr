@@ -7,7 +7,6 @@ type DocumentSchema = {
     id: string;
     creator_id: string;
     name: string;
-    content?: Document['content'];
     last_updated?: Date;
 }
 
@@ -38,7 +37,6 @@ export async function createDocument() {
             id: newDocumentId,
             creator_id: currentUserId,
             name: 'Untitled',
-            content: []
         })
         .select()
 
@@ -55,7 +53,6 @@ export async function saveDocument(doc: Omit<Document, 'name'>) {
         .from('documents')
         .upsert({
             id: doc.id,
-            content: doc.content,
             last_updated: doc.lastUpdated
         })
 
@@ -68,7 +65,7 @@ export async function getDocumentById(documentId: string) {
 
     const { data, error } = await supabase
         .from('documents')
-        .select('*')
+        .select('id, creator_id, name, last_updated')
         .eq('id', documentId)
         .single() as { data: DocumentSchema | null, error: Error | null }
 
@@ -147,7 +144,6 @@ export async function updateDocumentName(documentId: string, name: string) {
                 id: documentId,
                 creator_id: user.id,
                 name,
-                content: [],
                 last_updated: new Date()
             });
 
@@ -371,7 +367,6 @@ export async function saveDocumentChange(
         id: documentId,
         creator_id: user.id,
         name: 'Untitled',
-        content: []
       });
 
     if (createError && createError.code !== '23505') {
@@ -458,7 +453,6 @@ export async function saveDocumentChanges(
         id: documentId,
         creator_id: user.id,
         name: 'Untitled',
-        content: []
       });
 
     if (createError && createError.code !== '23505') {

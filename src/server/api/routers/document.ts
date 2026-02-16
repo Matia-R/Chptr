@@ -1,4 +1,3 @@
-import { type Block } from "@blocknote/core";
 import { z } from "zod"
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
@@ -17,14 +16,12 @@ import {
 export interface Document {
     id: string,
     name: string,
-    content: Block[],
     lastUpdated: Date,
 }
 
 const documentSchema = z.object({
     id: z.string(),
     name: z.string(),
-    content: z.array(z.any()), // Block[] type from BlockNote
     lastUpdated: z.date()
 }) satisfies z.ZodType<Document>;
 
