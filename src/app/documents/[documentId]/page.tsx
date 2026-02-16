@@ -5,13 +5,40 @@ import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { DocumentError } from "~/app/_components/document-error";
+import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { useCollaborativeDocCrdt } from "~/hooks/use-collaborative-doc-crdt";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
 
-// Helper to extract error code (hook wraps TRPC error in Error.cause)
+const DOCUMENT_ERROR = {
+  NOT_FOUND: {
+    title: "Document Not Found",
+    message: "This document doesn't exist or the link may be incorrect.",
+  },
+  BAD_REQUEST: {
+    title: "Invalid Link",
+    message: "The document link is invalid. Please check the URL.",
+  },
+  FORBIDDEN: {
+    title: "Access Denied",
+    message: "You don't have permission to view this document.",
+  },
+  UNAUTHORIZED: {
+    title: "Access Denied",
+    message: "You don't have permission to view this document.",
+  },
+  INTERNAL_SERVER_ERROR: {
+    title: "Unable to Load Document",
+    message: "Something went wrong on our end. Please try again.",
+  },
+  DEFAULT: {
+    title: "Unable to Load Document",
+    message: "Something unexpected happened. Please try refreshing.",
+  },
+} as const;
+
 function getErrorCode(error: unknown): string | undefined {
   if (error instanceof TRPCClientError) {
     return (error.data as { code?: string } | undefined)?.code;
@@ -20,6 +47,18 @@ function getErrorCode(error: unknown): string | undefined {
     return (error.cause.data as { code?: string } | undefined)?.code;
   }
   return undefined;
+}
+
+function getDocumentErrorContent(error: unknown): {
+  title: string;
+  message: string;
+} {
+  const code = getErrorCode(error);
+  const key: keyof typeof DOCUMENT_ERROR =
+    code && code in DOCUMENT_ERROR
+      ? (code as keyof typeof DOCUMENT_ERROR)
+      : "DEFAULT";
+  return DOCUMENT_ERROR[key];
 }
 
 export default function DocumentPage() {
@@ -50,30 +89,7 @@ export default function DocumentPage() {
 
   // 1. Handle errors — show alert and stop; don't proceed to loading or editor
   if (error) {
-    const errorCode = getErrorCode(error);
-    const isForbidden =
-      errorCode === "FORBIDDEN" || errorCode === "UNAUTHORIZED";
-    const isNotFound = errorCode === "NOT_FOUND";
-    const isBadRequest = errorCode === "BAD_REQUEST";
-
-    const message = isNotFound
-      ? "This document doesn't exist or the link may be incorrect."
-      : isBadRequest
-        ? "The document link is invalid. Please check the URL."
-        : isForbidden
-          ? "You don't have permission to view this document."
-          : errorCode === "INTERNAL_SERVER_ERROR"
-            ? "Something went wrong on our end. Please try again."
-            : "Something unexpected happened. Please try refreshing.";
-
-    const title = isNotFound
-      ? "Document Not Found"
-      : isBadRequest
-        ? "Invalid Link"
-        : isForbidden
-          ? "Access Denied"
-          : "Unable to Load Document";
-
+    const { title, message } = getDocumentErrorContent(error);
     return (
       <MotionFade>
         <DocumentError title={title} message={message} />
@@ -81,44 +97,23 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Show loading skeleton
-  //    - Skip for optimistic creates (isNew = true)
-  //    - Show while CRDT changes are loading or provider isn't ready
+  // 2. Show loading skeleton (CRDT loading or provider not ready)
   if (
     !isNew &&
     (isLoading || !isReady || !ydoc || !provider || isProfileLoading)
   ) {
     return (
       <MotionFade>
-        <div className="animate-pulse space-y-4">
-          <div className="h-9 w-2/3 rounded-lg bg-muted" />
-          <div className="space-y-3">
-            <div className="h-4 rounded bg-muted" />
-            <div className="h-4 w-[95%] rounded bg-muted" />
-            <div className="h-4 w-[90%] rounded bg-muted" />
-          </div>
-          <div className="space-y-3 pt-4">
-            <div className="h-4 w-[85%] rounded bg-muted" />
-            <div className="h-4 w-[88%] rounded bg-muted" />
-            <div className="h-4 w-[92%] rounded bg-muted" />
-          </div>
-        </div>
+        <DocumentLoadingSkeleton />
       </MotionFade>
     );
   }
 
-  // 3. Still waiting for ydoc/provider (optimistic case)
+  // 3. Still waiting for ydoc/provider (e.g. optimistic new-doc case)
   if (!isReady || !ydoc || !provider || isProfileLoading) {
     return (
       <MotionFade>
-        <div className="animate-pulse space-y-4">
-          <div className="h-9 w-2/3 rounded-lg bg-muted" />
-          <div className="space-y-3">
-            <div className="h-4 rounded bg-muted" />
-            <div className="h-4 w-[95%] rounded bg-muted" />
-            <div className="h-4 w-[90%] rounded bg-muted" />
-          </div>
-        </div>
+        <DocumentLoadingSkeleton />
       </MotionFade>
     );
   }
