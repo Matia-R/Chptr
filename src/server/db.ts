@@ -99,16 +99,8 @@ export const getDocumentIdsForUser = async () => {
 
 export async function updateDocumentName(documentId: string, name: string) {
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const user = await getAuthenticatedUser(supabase);
 
-    if (userError || !user) {
-        throw new TRPCError({
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-        });
-    }
-
-    // Check if document exists
     const { data: existingDoc, error: docError } = await supabase
         .from('documents')
         .select('id')
@@ -120,37 +112,10 @@ export async function updateDocumentName(documentId: string, name: string) {
     }
 
     if (!existingDoc) {
-        // Document doesn't exist - create it with the given name
-        const { error: createError } = await supabase
-            .from('documents')
-            .insert({
-                id: documentId,
-                creator_id: user.id,
-                name,
-                last_updated: new Date()
-            });
-
-        if (createError && createError.code !== '23505') {
-            throw new Error(`Failed to create document: ${createError.message}`);
-        }
-
-        // Create permission for the creator
-        const { error: permError } = await supabase
-            .from('document_permissions')
-            .insert({
-                user_id: user.id,
-                document_id: documentId,
-                permission: 'owner'
-            });
-
-        if (permError && permError.code !== '23505') {
-            throw new Error(`Failed to create document permission: ${permError.message}`);
-        }
-
+        await createDocumentWithPermission(supabase, documentId, user.id, name);
         return { success: true, created: true };
     }
 
-    // Document exists - check permission
     const { data: permission, error: permCheckError } = await supabase
         .from('document_permissions')
         .select('id')
@@ -183,6 +148,91 @@ export async function updateDocumentName(documentId: string, name: string) {
     }
 
     return { success: true, created: false };
+}
+
+/**
+ * Returns the current authenticated user. Throws UNAUTHORIZED if not logged in.
+ */
+async function getAuthenticatedUser(supabase: Awaited<ReturnType<typeof createClient>>) {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+        throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Not authenticated',
+        });
+    }
+    return user;
+}
+
+/**
+ * Creates a document and an owner permission for the user.
+ * Idempotent: ignores 23505 (unique violation) for document or permission.
+ */
+async function createDocumentWithPermission(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    documentId: string,
+    userId: string,
+    name = 'Untitled'
+) {
+    const { error: createError } = await supabase
+        .from('documents')
+        .insert({
+            id: documentId,
+            creator_id: userId,
+            name,
+            ...(name !== 'Untitled' ? { last_updated: new Date() } : {}),
+        });
+
+    if (createError && createError.code !== '23505') {
+        throw new Error(`Failed to create document: ${createError.message}`);
+    }
+
+    const { error: permError } = await supabase
+        .from('document_permissions')
+        .insert({
+            user_id: userId,
+            document_id: documentId,
+            permission: 'owner',
+        });
+
+    if (permError && permError.code !== '23505') {
+        throw new Error(`Failed to create document permission: ${permError.message}`);
+    }
+}
+
+/**
+ * Ensures the user has permission to mutate the document (e.g. save changes).
+ * If the document does not exist, creates it and an owner permission for the user.
+ * If the document exists but the user has no permission, throws FORBIDDEN.
+ */
+async function ensureCanMutateDocument(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    documentId: string,
+    userId: string
+) {
+    const { data: permission } = await supabase
+        .from('document_permissions')
+        .select('id')
+        .eq('document_id', documentId)
+        .eq('user_id', userId)
+        .single();
+
+    if (permission) return;
+
+    const { data: existingDoc } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .single();
+
+    if (existingDoc) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to access this document',
+        });
+    }
+
+    await createDocumentWithPermission(supabase, documentId, userId, 'Untitled');
 }
 
 export async function getCurrentUser(): Promise<string | undefined> {
@@ -310,65 +360,8 @@ export async function saveDocumentChange(
   updateData: string
 ) {
   const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'Not authenticated',
-    });
-  }
-
-  // Check permission or create document if new
-  const { data: permission } = await supabase
-    .from('document_permissions')
-    .select('id')
-    .eq('document_id', documentId)
-    .eq('user_id', user.id)
-    .single();
-
-  if (!permission) {
-    // Check if document exists
-    const { data: existingDoc } = await supabase
-      .from('documents')
-      .select('id')
-      .eq('id', documentId)
-      .single();
-
-    if (existingDoc) {
-      // Document exists but user has no permission
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'You do not have permission to access this document',
-      });
-    }
-
-    // Create new document (this is a new document)
-    const { error: createError } = await supabase
-      .from('documents')
-      .insert({
-        id: documentId,
-        creator_id: user.id,
-        name: 'Untitled',
-      });
-
-    if (createError && createError.code !== '23505') {
-      throw new Error(`Failed to create document: ${createError.message}`);
-    }
-
-    // Create permission for the creator (required by RLS)
-    const { error: permError } = await supabase
-      .from('document_permissions')
-      .insert({
-        user_id: user.id,
-        document_id: documentId,
-        permission: 'owner'
-      });
-
-    if (permError && permError.code !== '23505') {
-      throw new Error(`Failed to create document permission: ${permError.message}`);
-    }
-  }
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
 
   // Insert the change (unique constraint handles duplicates)
   const { error } = await supabase
@@ -397,64 +390,8 @@ export async function saveDocumentChanges(
   changes: Array<{ clientId: string; clock: number; updateData: string }>
 ) {
   const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'Not authenticated',
-    });
-  }
-
-  // Check permission or create document if new
-  const { data: permission } = await supabase
-    .from('document_permissions')
-    .select('id')
-    .eq('document_id', documentId)
-    .eq('user_id', user.id)
-    .single();
-
-  if (!permission) {
-    // Check if document exists
-    const { data: existingDoc } = await supabase
-      .from('documents')
-      .select('id')
-      .eq('id', documentId)
-      .single();
-
-    if (existingDoc) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'You do not have permission to access this document',
-      });
-    }
-
-    // Create new document
-    const { error: createError } = await supabase
-      .from('documents')
-      .insert({
-        id: documentId,
-        creator_id: user.id,
-        name: 'Untitled',
-      });
-
-    if (createError && createError.code !== '23505') {
-      throw new Error(`Failed to create document: ${createError.message}`);
-    }
-
-    // Create permission for the creator (required by RLS)
-    const { error: permError } = await supabase
-      .from('document_permissions')
-      .insert({
-        user_id: user.id,
-        document_id: documentId,
-        permission: 'owner'
-      });
-
-    if (permError && permError.code !== '23505') {
-      throw new Error(`Failed to create document permission: ${permError.message}`);
-    }
-  }
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
 
   // Batch insert (upsert to handle duplicates gracefully)
   const rows = changes.map(c => ({
@@ -484,16 +421,8 @@ export async function saveDocumentChanges(
  */
 export async function getDocumentChanges(documentId: string) {
   const supabase = await createClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
 
-  if (userError || !user) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'Not authenticated',
-    });
-  }
-
-  // Check if document exists
   const { data: doc, error: docError } = await supabase
     .from('documents')
     .select('id')
@@ -501,11 +430,9 @@ export async function getDocumentChanges(documentId: string) {
     .single();
 
   if (docError?.code === 'PGRST116' || !doc) {
-    // Document doesn't exist - return empty (new document)
     return { success: true, changes: [] };
   }
 
-  // Check permission
   const { data: permission } = await supabase
     .from('document_permissions')
     .select('id')
