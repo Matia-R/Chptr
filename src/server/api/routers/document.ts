@@ -3,7 +3,6 @@ import { z } from "zod"
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { 
   createDocument, 
-  saveDocument, 
   getDocumentById, 
   getLastUpdatedTimestamp, 
   getDocumentIdsForUser as getDocumentsIdsForUser, 
@@ -19,21 +18,10 @@ export interface Document {
     lastUpdated: Date,
 }
 
-const documentSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    lastUpdated: z.date()
-}) satisfies z.ZodType<Document>;
-
 export const documentRouter = createTRPCRouter({
     createDocument: publicProcedure
         .mutation(async () => {
             return createDocument();
-        }),
-    saveDocument: publicProcedure
-        .input(documentSchema.omit({ name: true }))
-        .mutation(async ({ input }) => {
-            return saveDocument(input);
         }),
     updateDocumentName: publicProcedure
         .input(z.object({

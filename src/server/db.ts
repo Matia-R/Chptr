@@ -1,7 +1,6 @@
 import { createClient } from '~/utils/supabase/server'
 import { randomUUID } from 'crypto'
 import { TRPCError } from '@trpc/server'
-import { type Document } from '~/server/api/routers/document'
 
 type DocumentSchema = {
     id: string;
@@ -42,22 +41,6 @@ export async function createDocument() {
 
     if (error) throw new Error(`Failed to create document: ${error.message}`)
     return { success: true, createdDocument: data }
-}
-
-export async function saveDocument(doc: Omit<Document, 'name'>) {
-    const supabase = await createClient()
-
-    console.log("Doc save time: ", doc.lastUpdated)
-
-    const { error } = await supabase
-        .from('documents')
-        .upsert({
-            id: doc.id,
-            last_updated: doc.lastUpdated
-        })
-
-    if (error) throw new Error(`Failed to save document: ${error.message}`)
-    return { success: true }
 }
 
 export async function getDocumentById(documentId: string) {
