@@ -9,8 +9,6 @@ import {
   getLastUpdatedTimestamp, 
   getDocumentIdsForUser as getDocumentsIdsForUser, 
   updateDocumentName, 
-  persistDocumentSnapshot, 
-  getLatestDocumentSnapshot,
   saveDocumentChange,
   saveDocumentChanges,
   getDocumentChanges,
@@ -66,23 +64,6 @@ export const documentRouter = createTRPCRouter({
     getDocumentIdsForAuthenticatedUser: publicProcedure
         .query(async () => {
             return getDocumentsIdsForUser();
-        }),
-        persistDocumentSnapshot: publicProcedure
-        .input(z.object({
-          documentId: z.string(),
-          snapshotData: z.string(), // base64 string
-        }))
-        .mutation(async ({ input }) => {
-          // 🚫 DO NOT decode
-          return persistDocumentSnapshot(
-            input.documentId,
-            input.snapshotData
-          );
-        }),
-    getLatestDocumentSnapshot: publicProcedure
-        .input(z.string())
-        .query(async ({ input }) => {
-            return getLatestDocumentSnapshot(input);
         }),
 
     // =============================================================================
