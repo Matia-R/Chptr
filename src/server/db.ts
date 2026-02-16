@@ -24,6 +24,23 @@ type UserProfile = {
     default_avatar_background_color: string,
 };
 
+/** Map Supabase/PostgREST document-query errors to TRPC errors (NOT_FOUND, BAD_REQUEST, INTERNAL). */
+function throwOnDocumentQueryError(
+    error: { code?: string; message?: string },
+    context: string
+): never {
+    if (error.code === 'PGRST116' || (error.message?.includes('Cannot coerce') ?? false)) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
+    }
+    if (error.message?.includes('invalid input syntax for type uuid')) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid document ID format' });
+    }
+    throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `${context}: ${error.message ?? 'Unknown error'}`,
+    });
+}
+
 export async function createDocument() {
     const supabase = await createClient()
     const currentUserId = (await supabase.auth.getUser()).data.user?.id
@@ -50,9 +67,11 @@ export async function getDocumentById(documentId: string) {
         .from('documents')
         .select('id, creator_id, name, last_updated')
         .eq('id', documentId)
-        .single() as { data: DocumentSchema | null, error: Error | null }
+        .single() as { data: DocumentSchema | null, error: { code?: string; message?: string } | null }
 
-    if (error) throw new Error(`Failed to fetch document: ${error.message}`)
+    if (error) {
+        throwOnDocumentQueryError(error, 'Failed to fetch document');
+    }
     return { success: true, document: data }
 }
 
@@ -447,8 +466,12 @@ export async function getDocumentChanges(documentId: string) {
     .eq('id', documentId)
     .single();
 
-  if (docError?.code === 'PGRST116' || !doc) {
-    return { success: true, changes: [] };
+  if (docError) {
+    throwOnDocumentQueryError(docError, 'Failed to check document');
+  }
+
+  if (!doc) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
   }
 
   const { data: permission } = await supabase

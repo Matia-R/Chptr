@@ -11,10 +11,13 @@ import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
 
-// Helper to extract error code from TRPC error
+// Helper to extract error code (hook wraps TRPC error in Error.cause)
 function getErrorCode(error: unknown): string | undefined {
   if (error instanceof TRPCClientError) {
     return (error.data as { code?: string } | undefined)?.code;
+  }
+  if (error instanceof Error && error.cause instanceof TRPCClientError) {
+    return (error.cause.data as { code?: string } | undefined)?.code;
   }
   return undefined;
 }
@@ -45,35 +48,37 @@ export default function DocumentPage() {
 
   // === RENDERING LOGIC ===
 
-  // 1. Handle errors
+  // 1. Handle errors — show alert and stop; don't proceed to loading or editor
   if (error) {
     const errorCode = getErrorCode(error);
     const isForbidden =
       errorCode === "FORBIDDEN" || errorCode === "UNAUTHORIZED";
+    const isNotFound = errorCode === "NOT_FOUND";
+    const isBadRequest = errorCode === "BAD_REQUEST";
 
-    // NOT_FOUND is valid for collaborative apps (room not saved yet)
-    if (errorCode === "NOT_FOUND") {
-      // Continue to render - WebRTC will sync from peers
-    } else {
-      const getErrorMessage = () => {
-        if (isForbidden) {
-          return "You don't have permission to view this document.";
-        }
-        if (errorCode === "INTERNAL_SERVER_ERROR") {
-          return "Something went wrong on our end. Please try again.";
-        }
-        return "Something unexpected happened. Please try refreshing.";
-      };
+    const message = isNotFound
+      ? "This document doesn't exist or the link may be incorrect."
+      : isBadRequest
+        ? "The document link is invalid. Please check the URL."
+        : isForbidden
+          ? "You don't have permission to view this document."
+          : errorCode === "INTERNAL_SERVER_ERROR"
+            ? "Something went wrong on our end. Please try again."
+            : "Something unexpected happened. Please try refreshing.";
 
-      return (
-        <MotionFade>
-          <DocumentError
-            title={isForbidden ? "Access Denied" : "Unable to Load Document"}
-            message={getErrorMessage()}
-          />
-        </MotionFade>
-      );
-    }
+    const title = isNotFound
+      ? "Document Not Found"
+      : isBadRequest
+        ? "Invalid Link"
+        : isForbidden
+          ? "Access Denied"
+          : "Unable to Load Document";
+
+    return (
+      <MotionFade>
+        <DocumentError title={title} message={message} />
+      </MotionFade>
+    );
   }
 
   // 2. Show loading skeleton
