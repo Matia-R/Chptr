@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { TRPCClientError } from "@trpc/client";
-import { DocumentError } from "~/app/_components/document-error";
+import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { useCollaborativeDocCrdt } from "~/hooks/use-collaborative-doc-crdt";
@@ -92,7 +92,10 @@ export default function DocumentPage() {
     const { title, message } = getDocumentErrorContent(error);
     return (
       <MotionFade>
-        <DocumentError title={title} message={message} />
+        <Alert variant="destructive">
+          <AlertTitle>{title}</AlertTitle>
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
       </MotionFade>
     );
   }
