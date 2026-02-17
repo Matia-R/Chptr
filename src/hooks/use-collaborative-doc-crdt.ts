@@ -104,32 +104,51 @@ export function useCollaborativeDocCrdt({
   } = api.document.getDocumentChanges.useQuery(documentId, {
     enabled: !!documentId && !isNew,
     refetchOnWindowFocus: false,
-    staleTime: 0, // Always refetch when navigating
+    retry: false, // Don't retry on error; show error and stop
+    staleTime: 0,
   });
 
   // Track if we've initialized for a specific documentId + dataUpdatedAt combination
   const initializedForRef = useRef<string | null>(null);
+  // Once we have an error for a document, don't run setup() until documentId changes (sticky error)
+  const errorDocumentIdRef = useRef<string | null>(null);
+
+  // Clear error when navigating to a different document so the new document gets a clean slate
+  const prevDocumentIdRef = useRef<string>(documentId);
+  useEffect(() => {
+    if (prevDocumentIdRef.current !== documentId) {
+      prevDocumentIdRef.current = documentId;
+      errorDocumentIdRef.current = null;
+      setError(null);
+    }
+  }, [documentId]);
 
   // Main setup effect
   useEffect(() => {
     let cancelled = false;
 
-    // For new documents, initialize immediately
-    // For existing documents, wait for query to complete
+    // For existing documents: if the query failed, set error and stop. Never run setup() for this document.
+    if (!isNew && changesError) {
+      const wrapped = new Error(changesError.message) as Error & { cause?: unknown };
+      wrapped.cause = changesError;
+      setError(wrapped);
+      errorDocumentIdRef.current = documentId;
+      return;
+    }
+
+    // If we previously set an error for this documentId, don't run setup (e.g. after refetch)
+    if (errorDocumentIdRef.current === documentId) {
+      return;
+    }
+
+    // For new documents, initialize immediately. For existing, wait for query success.
     if (!isNew && !changesSuccess) {
       return;
     }
 
-    // Create a unique key for this documentId + data version
     const initKey = isNew ? `new-${documentId}` : `${documentId}-${dataUpdatedAt}`;
 
-    // Skip if already initialized for this exact data
     if (initializedForRef.current === initKey) {
-      return;
-    }
-
-    if (changesError) {
-      setError(new Error(changesError.message));
       return;
     }
 

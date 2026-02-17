@@ -4,19 +4,64 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { TRPCClientError } from "@trpc/client";
-import { DocumentError } from "~/app/_components/document-error";
+import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
+import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { useCollaborativeDocCrdt } from "~/hooks/use-collaborative-doc-crdt";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
 
-// Helper to extract error code from TRPC error
+const DOCUMENT_ERROR = {
+  NOT_FOUND: {
+    title: "Doc not found",
+    message:
+      "This doc doesn’t exist. It may have been moved, deleted, or the link might be incorrect.",
+  },
+  BAD_REQUEST: {
+    title: "Bad URL",
+    message:
+      "The URL provided is incomplete or malformed. Please check the link and try again.",
+  },
+  FORBIDDEN: {
+    title: "Restricted access",
+    message: "Looks like you don't have access to this doc.",
+  },
+  UNAUTHORIZED: {
+    title: "Login required",
+    message: "Please sign in to your account to access this doc.",
+  },
+  INTERNAL_SERVER_ERROR: {
+    title: "Unable to load doc",
+    message:
+      "A technical issue occurred on our end. We’re working to resolve it.",
+  },
+  DEFAULT: {
+    title: "Something went wrong",
+    message: "An unexpected error occurred. Please try again in a moment.",
+  },
+} as const;
+
 function getErrorCode(error: unknown): string | undefined {
   if (error instanceof TRPCClientError) {
     return (error.data as { code?: string } | undefined)?.code;
   }
+  if (error instanceof Error && error.cause instanceof TRPCClientError) {
+    return (error.cause.data as { code?: string } | undefined)?.code;
+  }
   return undefined;
+}
+
+function getDocumentErrorContent(error: unknown): {
+  title: string;
+  message: string;
+} {
+  const code = getErrorCode(error);
+  const key: keyof typeof DOCUMENT_ERROR =
+    code && code in DOCUMENT_ERROR
+      ? (code as keyof typeof DOCUMENT_ERROR)
+      : "DEFAULT";
+  return DOCUMENT_ERROR[key];
 }
 
 export default function DocumentPage() {
@@ -45,75 +90,36 @@ export default function DocumentPage() {
 
   // === RENDERING LOGIC ===
 
-  // 1. Handle errors
+  // 1. Handle errors — show alert and stop; don't proceed to loading or editor
   if (error) {
-    const errorCode = getErrorCode(error);
-    const isForbidden =
-      errorCode === "FORBIDDEN" || errorCode === "UNAUTHORIZED";
-
-    // NOT_FOUND is valid for collaborative apps (room not saved yet)
-    if (errorCode === "NOT_FOUND") {
-      // Continue to render - WebRTC will sync from peers
-    } else {
-      const getErrorMessage = () => {
-        if (isForbidden) {
-          return "You don't have permission to view this document.";
-        }
-        if (errorCode === "INTERNAL_SERVER_ERROR") {
-          return "Something went wrong on our end. Please try again.";
-        }
-        return "Something unexpected happened. Please try refreshing.";
-      };
-
-      return (
-        <MotionFade>
-          <DocumentError
-            title={isForbidden ? "Access Denied" : "Unable to Load Document"}
-            message={getErrorMessage()}
-          />
-        </MotionFade>
-      );
-    }
+    const { title, message } = getDocumentErrorContent(error);
+    return (
+      <MotionFade>
+        <Alert variant="destructive">
+          <AlertTitle>{title}</AlertTitle>
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      </MotionFade>
+    );
   }
 
-  // 2. Show loading skeleton
-  //    - Skip for optimistic creates (isNew = true)
-  //    - Show while CRDT changes are loading or provider isn't ready
+  // 2. Show loading skeleton (CRDT loading or provider not ready)
   if (
     !isNew &&
     (isLoading || !isReady || !ydoc || !provider || isProfileLoading)
   ) {
     return (
       <MotionFade>
-        <div className="animate-pulse space-y-4">
-          <div className="h-9 w-2/3 rounded-lg bg-muted" />
-          <div className="space-y-3">
-            <div className="h-4 rounded bg-muted" />
-            <div className="h-4 w-[95%] rounded bg-muted" />
-            <div className="h-4 w-[90%] rounded bg-muted" />
-          </div>
-          <div className="space-y-3 pt-4">
-            <div className="h-4 w-[85%] rounded bg-muted" />
-            <div className="h-4 w-[88%] rounded bg-muted" />
-            <div className="h-4 w-[92%] rounded bg-muted" />
-          </div>
-        </div>
+        <DocumentLoadingSkeleton />
       </MotionFade>
     );
   }
 
-  // 3. Still waiting for ydoc/provider (optimistic case)
+  // 3. Still waiting for ydoc/provider (e.g. optimistic new-doc case)
   if (!isReady || !ydoc || !provider || isProfileLoading) {
     return (
       <MotionFade>
-        <div className="animate-pulse space-y-4">
-          <div className="h-9 w-2/3 rounded-lg bg-muted" />
-          <div className="space-y-3">
-            <div className="h-4 rounded bg-muted" />
-            <div className="h-4 w-[95%] rounded bg-muted" />
-            <div className="h-4 w-[90%] rounded bg-muted" />
-          </div>
-        </div>
+        <DocumentLoadingSkeleton />
       </MotionFade>
     );
   }
