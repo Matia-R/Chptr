@@ -14,28 +14,31 @@ import { getAvatarColorHex } from "~/lib/avatar-colors";
 
 const DOCUMENT_ERROR = {
   NOT_FOUND: {
-    title: "Document Not Found",
-    message: "This document doesn't exist or the link may be incorrect.",
+    title: "Doc not found",
+    message:
+      "This doc doesn’t exist. It may have been moved, deleted, or the link might be incorrect.",
   },
   BAD_REQUEST: {
-    title: "Invalid Link",
-    message: "The document link is invalid. Please check the URL.",
+    title: "Bad URL",
+    message:
+      "The URL provided is incomplete or malformed. Please check the link and try again.",
   },
   FORBIDDEN: {
-    title: "Access Denied",
-    message: "You don't have permission to view this document.",
+    title: "Restricted access",
+    message: "Looks like you don't have access to this doc.",
   },
   UNAUTHORIZED: {
-    title: "Access Denied",
-    message: "You don't have permission to view this document.",
+    title: "Login required",
+    message: "Please sign in to your account to access this doc.",
   },
   INTERNAL_SERVER_ERROR: {
-    title: "Unable to Load Document",
-    message: "Something went wrong on our end. Please try again.",
+    title: "Unable to load doc",
+    message:
+      "A technical issue occurred on our end. We’re working to resolve it.",
   },
   DEFAULT: {
-    title: "Unable to Load Document",
-    message: "Something unexpected happened. Please try refreshing.",
+    title: "Something went wrong",
+    message: "An unexpected error occurred. Please try again in a moment.",
   },
 } as const;
 
