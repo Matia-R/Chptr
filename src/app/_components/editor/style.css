@@ -2212,3 +2212,40 @@
 .dark .bn-container .bn-toolbar.bn-formatting-toolbar :is(.hover\:bn-bg-muted:hover) {
   background-color: hsl(var(--accent)) !important;
 }
+
+/* AiPromptInput textarea only: restore border (bn-shadcn * resets border-width to 0) */
+.bn-container [data-content-type="aiPromptInput"] [data-ai-prompt-input-field] {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* AiPromptInput: remove selection/focus ring (no blue outline when block is selected or textarea focused) */
+.bn-container [data-content-type="aiPromptInput"],
+.bn-container [data-content-type="aiPromptInput"] *,
+.bn-container .ProseMirror-selectednode [data-content-type="aiPromptInput"],
+.bn-container .ProseMirror-selectednode .bn-block-content [data-content-type="aiPromptInput"] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* AiPromptInput history: animate new text rising up into the history area */
+@keyframes ai-prompt-input-history-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bn-container [data-content-type="aiPromptInput"] .ai-prompt-input-history-entry {
+  animation: ai-prompt-input-history-enter 0.25s ease-out;
+  padding: 0.375rem 0 0.375rem 0; /* py-1.5 - a bit of padding, not too much */
+}
+
+.bn-container [data-content-type="aiPromptInput"] .ai-prompt-input-history-entry:first-child {
+  padding-top: 0;
+}
