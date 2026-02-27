@@ -2,19 +2,26 @@
 
 import { createReactBlockSpec } from "@blocknote/react";
 import { ArrowUp, CornerDownRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { api } from "~/trpc/react";
 import { Button } from "~/app/_components/ui/button";
+import { useAiPromptSession } from "~/hooks/use-ai-prompt-session";
 
-// Minimal editor interface so we can pass paragraph to replaceBlocks (full schema has paragraph)
+// Minimal editor interface: matches the subset of BlockNote editor APIs we actually use here.
 interface EditorWithSchema {
   updateBlock(
-    block: { id: string },
-    update: { props: { value?: string; historyJson?: string } },
+    block: { id: string } | string,
+    update: { props?: { value?: string; historyJson?: string }; content?: string },
   ): void;
   replaceBlocks(
     blocksToRemove: string[],
-    blocksToInsert: Array<{ type: string }>,
+    blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: string }>,
   ): { insertedBlocks: { id: string }[] };
+  insertBlocks(
+    blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: string }>,
+    referenceBlock: { id: string } | string,
+    placement: "before" | "after",
+  ): { id: string }[];
   setTextCursorPosition(
     block: { id: string },
     placement: "start" | "end",
@@ -23,7 +30,7 @@ interface EditorWithSchema {
 }
 
 /**
- * Auto-resize textarea: set height to auto then to scrollHeight so it grows with content (ai-integration-v4 pattern).
+ * Auto-resize textarea: set height to auto then to scrollHeight so it grows with content.
  */
 function adjustTextareaHeight(textarea: HTMLTextAreaElement | null) {
   if (!textarea) return;
@@ -44,7 +51,7 @@ function parseHistory(historyJson: string | undefined): string[] {
 }
 
 /**
- * Inner component: multi-line auto-expanding textarea like ai-integration-v4 AIGenerateInput.
+ * Inner component: multi-line auto-expanding textarea with prompt history and streamed response.
  */
 function AiPromptInputContent(props: {
   block: { id: string; props: { value: string; historyJson?: string } };
@@ -53,6 +60,10 @@ function AiPromptInputContent(props: {
   const { block, editor } = props;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const history = parseHistory(block.props.historyJson);
+  const generateForPrompt = api.aiPrompt.generateForPrompt.useMutation();
+
+  const { lastResponse, isStreaming, setPrompts, startStreaming, appendResponse, finishStreaming, reset } =
+    useAiPromptSession();
 
   const setTextareaRef = (element: HTMLTextAreaElement | null) => {
     if (element && !element.dataset.focused) {
@@ -65,9 +76,68 @@ function AiPromptInputContent(props: {
     }
   };
 
+  const runGeneration = useCallback(
+    async (prompt: string, previousResponse: string | null, followUp: string | null) => {
+      startStreaming();
+      try {
+        const result = followUp
+          ? await generateForPrompt.mutateAsync({
+              prompt,
+              previousResponse: previousResponse ?? "",
+              followUp,
+            })
+          : await generateForPrompt.mutateAsync({ prompt });
+
+        let full = "";
+        // Track the block ids we insert for the streamed response so we can replace them as the markdown grows
+        let generatedBlockIds: string[] = [];
+        // We need access to the full BlockNote editor API for markdown → blocks
+        const bnEditor = editor as unknown as {
+          insertBlocks: (
+            blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>,
+            referenceBlock: { id: string } | string,
+            placement: "before" | "after",
+          ) => { id: string }[];
+          replaceBlocks: (
+            blocksToRemove: Array<{ id: string } | string>,
+            blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>,
+          ) => { insertedBlocks: { id: string }[] };
+          tryParseMarkdownToBlocks: (
+            markdown: string,
+          ) => Promise<Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>>;
+        };
+
+        for await (const token of result) {
+          full += token;
+          appendResponse(token);
+
+          // Convert the current markdown to BlockNote blocks and render them after the AiPromptInput
+          const blocksToAdd = await bnEditor.tryParseMarkdownToBlocks(full);
+
+          if (generatedBlockIds.length === 0) {
+            // First chunk: insert the blocks once after this AiPromptInput
+            const inserted = bnEditor.insertBlocks(blocksToAdd, block.id, "after");
+            generatedBlockIds = inserted.map((b) => b.id);
+          } else {
+            // Subsequent chunks: replace previously inserted blocks with the new parsed blocks
+            const { insertedBlocks } = bnEditor.replaceBlocks(generatedBlockIds, blocksToAdd);
+            generatedBlockIds = insertedBlocks.map((b) => b.id);
+          }
+        }
+      } catch (err) {
+        console.error("[generateForPrompt]", err);
+        reset();
+      } finally {
+        finishStreaming();
+      }
+    },
+    [appendResponse, block.id, editor, finishStreaming, generateForPrompt, reset, startStreaming],
+  );
+
   const submitCurrent = () => {
     const text = block.props.value?.trim() ?? "";
-    if (!text) return;
+    if (!text || isStreaming) return;
+
     const nextHistory = [...history, text];
     editor.updateBlock(block, {
       props: {
@@ -75,8 +145,18 @@ function AiPromptInputContent(props: {
         historyJson: JSON.stringify(nextHistory),
       },
     });
+    setPrompts(nextHistory);
+
     textareaRef.current?.focus();
     setTimeout(() => adjustTextareaHeight(textareaRef.current), 0);
+
+    const isFollowUp = nextHistory.length > 1;
+    if (isFollowUp) {
+      const initialPrompt = nextHistory[0]!;
+      void runGeneration(initialPrompt, lastResponse || null, text);
+    } else {
+      void runGeneration(text, null, null);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -154,7 +234,8 @@ function AiPromptInputContent(props: {
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           rows={1}
-          className="min-h-[2rem] w-full resize-none overflow-hidden bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+          disabled={isStreaming}
+          className="min-h-[2rem] w-full resize-none overflow-hidden bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ resize: "none" }}
         />
         <div className="flex justify-end">
@@ -164,6 +245,7 @@ function AiPromptInputContent(props: {
             size="icon"
             aria-label="Move up"
             onClick={submitCurrent}
+            disabled={isStreaming}
           >
             <ArrowUp className="h-4 w-4" />
           </Button>

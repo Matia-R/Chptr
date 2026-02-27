@@ -2213,6 +2213,11 @@
   background-color: hsl(var(--accent)) !important;
 }
 
+/* AiPromptInput: hide only the add-block button (the + circle), keep the drag handle so the block can still be reordered */
+.bn-container .bn-side-menu[data-block-type="aiPromptInput"] > *:first-child {
+  display: none !important;
+}
+
 /* AiPromptInput textarea only: restore border (bn-shadcn * resets border-width to 0) */
 .bn-container [data-content-type="aiPromptInput"] [data-ai-prompt-input-field] {
   border-width: 1px !important;
