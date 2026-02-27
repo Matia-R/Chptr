@@ -488,19 +488,31 @@ export async function getDocumentChanges(documentId: string) {
     });
   }
 
-  // Fetch all changes ordered by creation time
-  const { data, error } = await supabase
-    .from('document_changes')
-    .select('client_id, clock, update_data, created_at')
-    .eq('document_id', documentId)
-    .order('created_at', { ascending: true });
+  // Fetch all changes ordered by creation time. PostgREST defaults to 1000 rows;
+  // paginate to retrieve every row so CRDT state rebuilds correctly.
+  const PAGE_SIZE = 1000;
+  const allRows: Array<{ client_id: string; clock: number; update_data: string; created_at: string }> = [];
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data: page, error } = await supabase
+      .from('document_changes')
+      .select('client_id, clock, update_data, created_at')
+      .eq('document_id', documentId)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  if (error) {
-    throw new Error(`Failed to fetch document changes: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to fetch document changes: ${error.message}`);
+    }
+    const rows = page ?? [];
+    allRows.push(...rows);
+    hasMore = rows.length === PAGE_SIZE;
+    offset += PAGE_SIZE;
   }
 
   // Normalize the update data (handle hex encoding if present)
-  const changes = (data ?? []).map((row: { 
+  const changes = allRows.map((row: { 
     client_id: string; 
     clock: number; 
     update_data: string; 
