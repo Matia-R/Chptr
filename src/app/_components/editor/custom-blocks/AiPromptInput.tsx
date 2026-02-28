@@ -1,7 +1,7 @@
 "use client";
 
 import { createReactBlockSpec } from "@blocknote/react";
-import { ArrowUp, CornerDownRight } from "lucide-react";
+import { ArrowUp, Check, CornerDownRight, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { api } from "~/trpc/react";
 import { Button } from "~/app/_components/ui/button";
@@ -11,8 +11,9 @@ import { useAiPromptSession } from "~/hooks/use-ai-prompt-session";
 interface EditorWithSchema {
   updateBlock(
     block: { id: string } | string,
-    update: { props?: { value?: string; historyJson?: string }; content?: string },
+    update: { props?: { value?: string; historyJson?: string; lastResponseMarkdown?: string; lastResponseBlockIds?: string }; content?: string },
   ): void;
+  removeBlocks(blocksToRemove: string[]): void;
   replaceBlocks(
     blocksToRemove: string[],
     blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: string }>,
@@ -53,8 +54,20 @@ function parseHistory(historyJson: string | undefined): string[] {
 /**
  * Inner component: multi-line auto-expanding textarea with prompt history and streamed response.
  */
+function parseBlockIds(blockIdsJson: string | undefined): string[] {
+  if (!blockIdsJson) return [];
+  try {
+    const parsed = JSON.parse(blockIdsJson) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function AiPromptInputContent(props: {
-  block: { id: string; props: { value: string; historyJson?: string } };
+  block: { id: string; props: { value: string; historyJson?: string; lastResponseMarkdown?: string; lastResponseBlockIds?: string } };
   editor: EditorWithSchema;
 }) {
   const { block, editor } = props;
@@ -65,6 +78,34 @@ function AiPromptInputContent(props: {
   const { lastResponse, isStreaming, setPrompts, startStreaming, appendResponse, finishStreaming, reset } =
     useAiPromptSession();
 
+  // When the block is removed (e.g. user deletes it via side menu / keyboard), treat as reject: remove generated blocks.
+  // Skip when user clicked Accept (keep response) or Reject (we already removed them).
+  const removalIntentRef = useRef<"accept" | "reject" | null>(null);
+  const blockAndEditorRef = useRef({ block, editor });
+  blockAndEditorRef.current = { block, editor };
+  useEffect(() => {
+    return () => {
+      if (removalIntentRef.current !== null) return;
+      const { block: b, editor: ed } = blockAndEditorRef.current;
+      const generatedIds = parseBlockIds(b.props.lastResponseBlockIds);
+      if (generatedIds.length > 0 && b.props.lastResponseMarkdown) {
+        ed.removeBlocks(generatedIds);
+      }
+    };
+  }, []);
+
+  const closeFormattingToolbar = useCallback(() => {
+    const bn = editor as unknown as { formattingToolbar?: { closeMenu: () => void } };
+    bn.formattingToolbar?.closeMenu?.();
+  }, [editor]);
+
+  /** Close toolbar now and on next tick/rAF so we run after BlockNote opens it */
+  const closeFormattingToolbarDeferred = useCallback(() => {
+    closeFormattingToolbar();
+    setTimeout(closeFormattingToolbar, 0);
+    requestAnimationFrame(closeFormattingToolbar);
+  }, [closeFormattingToolbar]);
+
   const setTextareaRef = (element: HTMLTextAreaElement | null) => {
     if (element && !element.dataset.focused) {
       element.dataset.focused = "true";
@@ -72,21 +113,36 @@ function AiPromptInputContent(props: {
       setTimeout(() => {
         element.focus();
         adjustTextareaHeight(element);
+        closeFormattingToolbar();
       }, 0);
     }
   };
 
   const runGeneration = useCallback(
-    async (prompt: string, previousResponse: string | null, followUp: string | null) => {
+    async (
+      prompt: string,
+      previousResponse: string | null,
+      followUp: string | null,
+      documentContext: string,
+    ) => {
       startStreaming();
       try {
+        // On follow-up, remove the previously generated blocks before streaming the new response
+        if (followUp != null) {
+          const previousBlockIds = parseBlockIds(block.props.lastResponseBlockIds);
+          if (previousBlockIds.length > 0) {
+            editor.removeBlocks(previousBlockIds);
+          }
+        }
+
         const result = followUp
           ? await generateForPrompt.mutateAsync({
               prompt,
+              documentContext,
               previousResponse: previousResponse ?? "",
               followUp,
             })
-          : await generateForPrompt.mutateAsync({ prompt });
+          : await generateForPrompt.mutateAsync({ prompt, documentContext });
 
         let full = "";
         // Track the block ids we insert for the streamed response so we can replace them as the markdown grows
@@ -124,6 +180,16 @@ function AiPromptInputContent(props: {
             generatedBlockIds = insertedBlocks.map((b) => b.id);
           }
         }
+
+        // Persist the final response and its block ids so follow-ups work after refresh and we can remove them on next follow-up
+        if (full) {
+          editor.updateBlock(block.id, {
+            props: {
+              lastResponseMarkdown: full,
+              lastResponseBlockIds: JSON.stringify(generatedBlockIds),
+            },
+          });
+        }
       } catch (err) {
         console.error("[generateForPrompt]", err);
         reset();
@@ -131,10 +197,10 @@ function AiPromptInputContent(props: {
         finishStreaming();
       }
     },
-    [appendResponse, block.id, editor, finishStreaming, generateForPrompt, reset, startStreaming],
+    [appendResponse, block.id, block.props.lastResponseBlockIds, editor, finishStreaming, generateForPrompt, reset, startStreaming],
   );
 
-  const submitCurrent = () => {
+  const submitCurrent = async () => {
     const text = block.props.value?.trim() ?? "";
     if (!text || isStreaming) return;
 
@@ -150,12 +216,21 @@ function AiPromptInputContent(props: {
     textareaRef.current?.focus();
     setTimeout(() => adjustTextareaHeight(textareaRef.current), 0);
 
+    const bnEditor = editor as unknown as {
+      document: Array<{ id: string }>;
+      blocksToMarkdownLossy: (blocks?: Array<{ id: string }>) => Promise<string>;
+    };
+    const blocksExcludingInput = bnEditor.document.filter((b) => b.id !== block.id);
+    const documentContext = await bnEditor.blocksToMarkdownLossy(blocksExcludingInput);
+
     const isFollowUp = nextHistory.length > 1;
+    const previousResponse =
+      (block.props.lastResponseMarkdown ?? lastResponse) || null;
     if (isFollowUp) {
       const initialPrompt = nextHistory[0]!;
-      void runGeneration(initialPrompt, lastResponse || null, text);
+      void runGeneration(initialPrompt, previousResponse, text, documentContext);
     } else {
-      void runGeneration(text, null, null);
+      void runGeneration(text, null, null, documentContext);
     }
   };
 
@@ -163,6 +238,7 @@ function AiPromptInputContent(props: {
     editor.updateBlock(block, {
       props: { value: e.target.value },
     });
+    closeFormattingToolbarDeferred();
   };
 
   const handleInput = () => {
@@ -175,13 +251,14 @@ function AiPromptInputContent(props: {
   }, [block.props.value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    closeFormattingToolbarDeferred();
     if ((e.metaKey || e.ctrlKey) && e.key === "/") {
       e.stopPropagation();
       return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      submitCurrent();
+      void submitCurrent();
       return;
     }
     if (e.key === "Backspace" && !block.props.value) {
@@ -200,6 +277,19 @@ function AiPromptInputContent(props: {
 
   const placeholder = history.length > 0 ? "Follow up" : "Type something…";
 
+  const showAcceptReject = !isStreaming && history.length > 0 && block.props.lastResponseMarkdown;
+
+  const handleAccept = useCallback(() => {
+    removalIntentRef.current = "accept";
+    editor.removeBlocks([block.id]);
+  }, [block.id, editor]);
+
+  const handleReject = useCallback(() => {
+    removalIntentRef.current = "reject";
+    const generatedIds = parseBlockIds(block.props.lastResponseBlockIds);
+    editor.removeBlocks([block.id, ...generatedIds]);
+  }, [block.id, block.props.lastResponseBlockIds, editor]);
+
   return (
     <div
       contentEditable={false}
@@ -213,17 +303,47 @@ function AiPromptInputContent(props: {
       >
         {history.length > 0 && (
           <div className="flex max-h-32 flex-col overflow-y-auto border-b border-border pb-2">
-            {history.map((entry, i) => (
-              <div
-                key={`${i}-${entry.slice(0, 20)}`}
-                className="ai-prompt-input-history-entry flex items-start gap-2 text-sm text-muted-foreground"
-              >
-                {i > 0 && (
-                  <CornerDownRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-                <span>{entry}</span>
-              </div>
-            ))}
+            {history.map((entry, i) => {
+              const isLast = i === history.length - 1;
+              const showActions = isLast && showAcceptReject;
+              return (
+                <div
+                  key={`${i}-${entry.slice(0, 20)}`}
+                  className="ai-prompt-input-history-entry flex items-center justify-between gap-2 text-sm text-muted-foreground"
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    {i > 0 && (
+                      <CornerDownRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{entry}</span>
+                  </div>
+                  {showActions && (
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Accept response"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={handleAccept}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Reject response"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={handleReject}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         <textarea
@@ -232,6 +352,7 @@ function AiPromptInputContent(props: {
           value={block.props.value}
           onChange={handleChange}
           onInput={handleInput}
+          onFocus={closeFormattingToolbarDeferred}
           onKeyDown={handleKeyDown}
           rows={1}
           disabled={isStreaming}
@@ -244,7 +365,7 @@ function AiPromptInputContent(props: {
             variant="ghost"
             size="icon"
             aria-label="Move up"
-            onClick={submitCurrent}
+            onClick={() => void submitCurrent()}
             disabled={isStreaming}
           >
             <ArrowUp className="h-4 w-4" />
@@ -268,6 +389,12 @@ export const AiPromptInput = createReactBlockSpec(
         default: "",
       },
       historyJson: {
+        default: "[]",
+      },
+      lastResponseMarkdown: {
+        default: "",
+      },
+      lastResponseBlockIds: {
         default: "[]",
       },
     },
