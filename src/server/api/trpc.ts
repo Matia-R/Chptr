@@ -6,9 +6,10 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { createClient } from "~/utils/supabase/server";
 
 /**
  * 1. CONTEXT
@@ -23,10 +24,17 @@ import { ZodError } from "zod";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return {
     ...opts,
-  }
-}
+    user: user ?? null,
+  };
+};
+
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 /**
  * 2. INITIALIZATION
@@ -35,7 +43,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
  * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
  * errors on the backend.
  */
-const t = initTRPC.context<typeof createTRPCContext>().create({
+const t = initTRPC.context<Context>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -101,3 +109,58 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Auth middleware: requires a logged-in user. Use for protected routes.
+ */
+const authMiddleware = t.middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Not authenticated",
+    });
+  }
+  return next({
+    ctx: { ...ctx, user: ctx.user },
+  });
+});
+
+/**
+ * Protected (authenticated) procedure. Fails with UNAUTHORIZED if the user is not logged in.
+ */
+export const protectedProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(authMiddleware);
+
+/**
+ * In-memory per-user rate limit. Key: userId, value: { count, resetAt }.
+ * Not shared across server instances; suitable for single-instance or best-effort limiting.
+ */
+const rateLimitStore = new Map<
+  string,
+  { count: number; resetAt: number }
+>();
+
+/**
+ * Returns middleware that rate-limits by ctx.user.id. Use only after authMiddleware (e.g. with protectedProcedure).
+ * Requests over maxRequests within windowMs are rejected with TOO_MANY_REQUESTS.
+ */
+export function rateLimitMiddleware(maxRequests: number, windowMs: number) {
+  return t.middleware(({ ctx, next }) => {
+    const userId = (ctx as { user: { id: string } }).user.id;
+    const now = Date.now();
+    let entry = rateLimitStore.get(userId);
+    if (!entry || now >= entry.resetAt) {
+      entry = { count: 0, resetAt: now + windowMs };
+      rateLimitStore.set(userId, entry);
+    }
+    entry.count += 1;
+    if (entry.count > maxRequests) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Rate limit exceeded. Try again later.",
+      });
+    }
+    return next({ ctx });
+  });
+}

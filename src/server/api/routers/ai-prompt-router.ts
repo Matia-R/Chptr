@@ -1,4 +1,5 @@
-import { createTRPCRouter, publicProcedure } from "../trpc";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- tRPC procedure chain types are correct but not inferred through middleware */
+import { createTRPCRouter, protectedProcedure, rateLimitMiddleware } from "../trpc";
 import { z } from "zod";
 import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
@@ -6,17 +7,43 @@ import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
 
 const DEFAULT_MODEL = 'gemma-3-1b-it';
 
+const quickGenerateInputSchema = z.object({
+    action: z.nativeEnum(AtAction),
+    content: z.string()
+});
+
+const generateForPromptInputSchema = z
+    .object({
+        prompt: z.string(),
+        documentContext: z.string().optional(),
+        previousResponse: z.string().optional(),
+        followUp: z.string().optional(),
+    })
+    .refine(
+        (data) => {
+            const hasFollowUp = data.followUp != null && data.followUp !== "";
+            const hasPrevious = data.previousResponse != null && data.previousResponse !== "";
+            return hasFollowUp === hasPrevious;
+        },
+        { message: "previousResponse and followUp must both be provided for a follow-up" }
+    );
+
+type QuickGenerateInput = z.infer<typeof quickGenerateInputSchema>;
+type GenerateForPromptInput = z.infer<typeof generateForPromptInputSchema>;
+
+// Rate limit: 30 requests per minute per user. Chain is correctly typed; eslint no-unsafe-* flags tRPC middleware chain.
+const aiRateLimit = rateLimitMiddleware(30, 60_000);
+
 export const aiPromptRouter = createTRPCRouter({
-    quickGenerateAction: publicProcedure
-        .input(z.object({
-            action: z.nativeEnum(AtAction),
-            content: z.string()
-        }))
-        .mutation(async function* ({ input }) {
+    quickGenerateAction: protectedProcedure
+        .use(aiRateLimit)
+        .input(quickGenerateInputSchema)
+        .mutation(async function* ({ input }: { input: QuickGenerateInput }) {
+            const config = atActionsConfig[input.action];
             const { textStream } = streamText({
                 model: google(DEFAULT_MODEL),
                 system: buildSystemPrompt(undefined),
-                prompt: `${atActionsConfig[input.action].prompt} ${input.content}`,
+                prompt: `${config.prompt} ${input.content}`,
                 experimental_transform: smoothStream({
                     delayInMs: 20,
                     chunking: "word"
@@ -28,25 +55,10 @@ export const aiPromptRouter = createTRPCRouter({
             }
         }),
 
-    generateForPrompt: publicProcedure
-        .input(
-            z
-                .object({
-                    prompt: z.string(),
-                    documentContext: z.string().optional(),
-                    previousResponse: z.string().optional(),
-                    followUp: z.string().optional(),
-                })
-                .refine(
-                    (data) => {
-                        const hasFollowUp = data.followUp != null && data.followUp !== "";
-                        const hasPrevious = data.previousResponse != null && data.previousResponse !== "";
-                        return hasFollowUp === hasPrevious;
-                    },
-                    { message: "previousResponse and followUp must both be provided for a follow-up" }
-                )
-        )
-        .mutation(async function* ({ input }) {
+    generateForPrompt: protectedProcedure
+        .use(aiRateLimit)
+        .input(generateForPromptInputSchema)
+        .mutation(async function* ({ input }: { input: GenerateForPromptInput }) {
             const isFollowUp =
                 input.followUp != null &&
                 input.followUp !== "" &&
@@ -56,7 +68,7 @@ export const aiPromptRouter = createTRPCRouter({
             const systemPromptWithContext = buildSystemPrompt(input.documentContext);
 
             const { textStream } = streamText({
-                model: google(DEFAULT_MODEL),
+                model: google("gemini-flash-latest"),
                 system: systemPromptWithContext,
                 ...(isFollowUp
                     ? {

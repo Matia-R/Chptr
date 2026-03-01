@@ -3,23 +3,42 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { ArrowUp, Check, CornerDownRight, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
-import { api } from "~/trpc/react";
+import { api, type RouterInputs } from "~/trpc/react";
 import { Button } from "~/app/_components/ui/button";
+import { Spinner } from "~/app/_components/spinner";
 import { useAiPromptSession } from "~/hooks/use-ai-prompt-session";
+
+type GenerateForPromptInput = RouterInputs["aiPrompt"]["generateForPrompt"];
 
 // Minimal editor interface: matches the subset of BlockNote editor APIs we actually use here.
 interface EditorWithSchema {
   updateBlock(
     block: { id: string } | string,
-    update: { props?: { value?: string; historyJson?: string; lastResponseMarkdown?: string; lastResponseBlockIds?: string }; content?: string },
+    update: {
+      props?: {
+        value?: string;
+        historyJson?: string;
+        lastResponseMarkdown?: string;
+        lastResponseBlockIds?: string;
+      };
+      content?: string;
+    },
   ): void;
   removeBlocks(blocksToRemove: string[]): void;
   replaceBlocks(
     blocksToRemove: string[],
-    blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: string }>,
+    blocksToInsert: Array<{
+      type: string;
+      props?: Record<string, unknown>;
+      content?: string;
+    }>,
   ): { insertedBlocks: { id: string }[] };
   insertBlocks(
-    blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: string }>,
+    blocksToInsert: Array<{
+      type: string;
+      props?: Record<string, unknown>;
+      content?: string;
+    }>,
     referenceBlock: { id: string } | string,
     placement: "before" | "after",
   ): { id: string }[];
@@ -67,16 +86,39 @@ function parseBlockIds(blockIdsJson: string | undefined): string[] {
 }
 
 function AiPromptInputContent(props: {
-  block: { id: string; props: { value: string; historyJson?: string; lastResponseMarkdown?: string; lastResponseBlockIds?: string } };
+  block: {
+    id: string;
+    props: {
+      value: string;
+      historyJson?: string;
+      lastResponseMarkdown?: string;
+      lastResponseBlockIds?: string;
+    };
+  };
   editor: EditorWithSchema;
 }) {
   const { block, editor } = props;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const history = parseHistory(block.props.historyJson);
-  const generateForPrompt = api.aiPrompt.generateForPrompt.useMutation();
+  const generateForPrompt = (
+    api.aiPrompt.generateForPrompt as {
+      useMutation: () => {
+        mutateAsync: (
+          input: GenerateForPromptInput,
+        ) => Promise<AsyncIterable<string>>;
+      };
+    }
+  ).useMutation();
 
-  const { lastResponse, isStreaming, setPrompts, startStreaming, appendResponse, finishStreaming, reset } =
-    useAiPromptSession();
+  const {
+    lastResponse,
+    isStreaming,
+    setPrompts,
+    startStreaming,
+    appendResponse,
+    finishStreaming,
+    reset,
+  } = useAiPromptSession();
 
   // When the block is removed (e.g. user deletes it via side menu / keyboard), treat as reject: remove generated blocks.
   // Skip when user clicked Accept (keep response) or Reject (we already removed them).
@@ -95,7 +137,9 @@ function AiPromptInputContent(props: {
   }, []);
 
   const closeFormattingToolbar = useCallback(() => {
-    const bn = editor as unknown as { formattingToolbar?: { closeMenu: () => void } };
+    const bn = editor as unknown as {
+      formattingToolbar?: { closeMenu: () => void };
+    };
     bn.formattingToolbar?.closeMenu?.();
   }, [editor]);
 
@@ -126,62 +170,79 @@ function AiPromptInputContent(props: {
       documentContext: string,
     ) => {
       startStreaming();
-      try {
-        // On follow-up, remove the previously generated blocks before streaming the new response
-        if (followUp != null) {
-          const previousBlockIds = parseBlockIds(block.props.lastResponseBlockIds);
-          if (previousBlockIds.length > 0) {
-            editor.removeBlocks(previousBlockIds);
-          }
+      // On follow-up, remove previously generated blocks before streaming the new response
+      if (followUp != null) {
+        const previousBlockIds = parseBlockIds(
+          block.props.lastResponseBlockIds,
+        );
+        if (previousBlockIds.length > 0) {
+          editor.removeBlocks(previousBlockIds);
         }
+      }
 
-        const result = followUp
-          ? await generateForPrompt.mutateAsync({
+      let generatedBlockIds: string[] = [];
+      try {
+        const input: GenerateForPromptInput = followUp
+          ? {
               prompt,
               documentContext,
               previousResponse: previousResponse ?? "",
               followUp,
-            })
-          : await generateForPrompt.mutateAsync({ prompt, documentContext });
+            }
+          : { prompt, documentContext };
+        const result: AsyncIterable<string> =
+          await generateForPrompt.mutateAsync(input);
 
         let full = "";
-        // Track the block ids we insert for the streamed response so we can replace them as the markdown grows
-        let generatedBlockIds: string[] = [];
-        // We need access to the full BlockNote editor API for markdown → blocks
         const bnEditor = editor as unknown as {
           insertBlocks: (
-            blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>,
+            blocksToInsert: Array<{
+              type: string;
+              props?: Record<string, unknown>;
+              content?: unknown;
+            }>,
             referenceBlock: { id: string } | string,
             placement: "before" | "after",
           ) => { id: string }[];
           replaceBlocks: (
             blocksToRemove: Array<{ id: string } | string>,
-            blocksToInsert: Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>,
+            blocksToInsert: Array<{
+              type: string;
+              props?: Record<string, unknown>;
+              content?: unknown;
+            }>,
           ) => { insertedBlocks: { id: string }[] };
-          tryParseMarkdownToBlocks: (
-            markdown: string,
-          ) => Promise<Array<{ type: string; props?: Record<string, unknown>; content?: unknown }>>;
+          tryParseMarkdownToBlocks: (markdown: string) => Promise<
+            Array<{
+              type: string;
+              props?: Record<string, unknown>;
+              content?: unknown;
+            }>
+          >;
         };
 
         for await (const token of result) {
           full += token;
           appendResponse(token);
 
-          // Convert the current markdown to BlockNote blocks and render them after the AiPromptInput
           const blocksToAdd = await bnEditor.tryParseMarkdownToBlocks(full);
 
           if (generatedBlockIds.length === 0) {
-            // First chunk: insert the blocks once after this AiPromptInput
-            const inserted = bnEditor.insertBlocks(blocksToAdd, block.id, "after");
+            const inserted = bnEditor.insertBlocks(
+              blocksToAdd,
+              block.id,
+              "after",
+            );
             generatedBlockIds = inserted.map((b) => b.id);
           } else {
-            // Subsequent chunks: replace previously inserted blocks with the new parsed blocks
-            const { insertedBlocks } = bnEditor.replaceBlocks(generatedBlockIds, blocksToAdd);
+            const { insertedBlocks } = bnEditor.replaceBlocks(
+              generatedBlockIds,
+              blocksToAdd,
+            );
             generatedBlockIds = insertedBlocks.map((b) => b.id);
           }
         }
 
-        // Persist the final response and its block ids so follow-ups work after refresh and we can remove them on next follow-up
         if (full) {
           editor.updateBlock(block.id, {
             props: {
@@ -192,12 +253,24 @@ function AiPromptInputContent(props: {
         }
       } catch (err) {
         console.error("[generateForPrompt]", err);
+        if (generatedBlockIds.length > 0) {
+          editor.removeBlocks(generatedBlockIds);
+        }
         reset();
       } finally {
         finishStreaming();
       }
     },
-    [appendResponse, block.id, block.props.lastResponseBlockIds, editor, finishStreaming, generateForPrompt, reset, startStreaming],
+    [
+      appendResponse,
+      block.id,
+      block.props.lastResponseBlockIds,
+      editor,
+      finishStreaming,
+      generateForPrompt,
+      reset,
+      startStreaming,
+    ],
   );
 
   const submitCurrent = async () => {
@@ -218,17 +291,27 @@ function AiPromptInputContent(props: {
 
     const bnEditor = editor as unknown as {
       document: Array<{ id: string }>;
-      blocksToMarkdownLossy: (blocks?: Array<{ id: string }>) => Promise<string>;
+      blocksToMarkdownLossy: (
+        blocks?: Array<{ id: string }>,
+      ) => Promise<string>;
     };
-    const blocksExcludingInput = bnEditor.document.filter((b) => b.id !== block.id);
-    const documentContext = await bnEditor.blocksToMarkdownLossy(blocksExcludingInput);
+    const blocksExcludingInput = bnEditor.document.filter(
+      (b) => b.id !== block.id,
+    );
+    const documentContext =
+      await bnEditor.blocksToMarkdownLossy(blocksExcludingInput);
 
     const isFollowUp = nextHistory.length > 1;
     const previousResponse =
       (block.props.lastResponseMarkdown ?? lastResponse) || null;
     if (isFollowUp) {
       const initialPrompt = nextHistory[0]!;
-      void runGeneration(initialPrompt, previousResponse, text, documentContext);
+      void runGeneration(
+        initialPrompt,
+        previousResponse,
+        text,
+        documentContext,
+      );
     } else {
       void runGeneration(text, null, null, documentContext);
     }
@@ -277,7 +360,8 @@ function AiPromptInputContent(props: {
 
   const placeholder = history.length > 0 ? "Follow up" : "Type something…";
 
-  const showAcceptReject = !isStreaming && history.length > 0 && block.props.lastResponseMarkdown;
+  const showAcceptReject =
+    !isStreaming && history.length > 0 && block.props.lastResponseMarkdown;
 
   const handleAccept = useCallback(() => {
     removalIntentRef.current = "accept";
@@ -302,7 +386,7 @@ function AiPromptInputContent(props: {
         data-ai-prompt-input-field
       >
         {history.length > 0 && (
-          <div className="flex max-h-32 flex-col overflow-y-auto border-b border-border pb-2">
+          <div className="flex max-h-32 flex-col overflow-y-auto border-b border-border pb-2 [scrollbar-gutter:stable]">
             {history.map((entry, i) => {
               const isLast = i === history.length - 1;
               const showActions = isLast && showAcceptReject;
@@ -317,30 +401,39 @@ function AiPromptInputContent(props: {
                     )}
                     <span className="min-w-0 flex-1 truncate">{entry}</span>
                   </div>
-                  {showActions && (
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Accept response"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={handleAccept}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Reject response"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={handleReject}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                  {(isStreaming && isLast) || showActions ? (
+                    <div className="flex min-w-9 shrink-0 items-center justify-end gap-0.5">
+                      {isStreaming && isLast ? (
+                        <Spinner
+                          className="m-2 h-4 w-4 text-muted-foreground"
+                          aria-label="Generating"
+                        />
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Accept response"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={handleAccept}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Reject response"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={handleReject}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
@@ -356,10 +449,10 @@ function AiPromptInputContent(props: {
           onKeyDown={handleKeyDown}
           rows={1}
           disabled={isStreaming}
-          className="min-h-[2rem] w-full resize-none overflow-hidden bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-[2rem] w-full resize-none overflow-hidden bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ resize: "none" }}
         />
-        <div className="flex justify-end">
+        <div className="flex min-w-9 justify-end">
           <Button
             type="button"
             variant="ghost"

@@ -6,6 +6,7 @@ import "./style.css";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
+import { en } from "@blocknote/core/locales";
 import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
 
 import { Alert } from "./custom-blocks/Alert";
@@ -52,6 +53,13 @@ export default function Editor({
   const editor = useCreateBlockNote(
     {
       schema,
+      dictionary: {
+        ...en,
+        placeholders: {
+          ...en.placeholders,
+          default: "Type '/' for commands or ⌘ + '/' to generate something",
+        },
+      },
       collaboration: {
         provider: provider,
         fragment: ydoc.getXmlFragment("document-store"),
@@ -97,6 +105,13 @@ export default function Editor({
         const container = editorContainerRef.current;
         if (!container?.contains(document.activeElement)) return;
         e.preventDefault();
+
+        // Only one AI prompt input block at a time: if one exists, do nothing
+        const hasAiPromptInput = editor.document.some(
+          (b) => (b as { type?: string }).type === "aiPromptInput",
+        );
+        if (hasAiPromptInput) return;
+
         const currentBlock = editor.getTextCursorPosition().block;
         const isEmptyParagraph =
           currentBlock.type === "paragraph" &&
