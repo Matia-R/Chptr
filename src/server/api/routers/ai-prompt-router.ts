@@ -5,7 +5,7 @@ import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
 import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
 
-const DEFAULT_MODEL = 'gemma-3-1b-it';
+const DEFAULT_MODEL = 'gemini-flash-latest';
 
 const quickGenerateInputSchema = z.object({
     action: z.nativeEnum(AtAction),
@@ -68,7 +68,7 @@ export const aiPromptRouter = createTRPCRouter({
             const systemPromptWithContext = buildSystemPrompt(input.documentContext);
 
             const { textStream } = streamText({
-                model: google("gemini-flash-latest"),
+                model: google(DEFAULT_MODEL),
                 system: systemPromptWithContext,
                 ...(isFollowUp
                     ? {

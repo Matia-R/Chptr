@@ -358,7 +358,7 @@ function AiPromptInputContent(props: {
     }
   };
 
-  const placeholder = history.length > 0 ? "Follow up" : "Type something…";
+  const placeholder = history.length > 0 ? "Follow up" : "Generate something…";
 
   const showAcceptReject =
     !isStreaming && history.length > 0 && block.props.lastResponseMarkdown;
