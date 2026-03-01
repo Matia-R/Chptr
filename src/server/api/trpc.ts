@@ -149,6 +149,9 @@ export function rateLimitMiddleware(maxRequests: number, windowMs: number) {
   return t.middleware(({ ctx, next }) => {
     const userId = (ctx as { user: { id: string } }).user.id;
     const now = Date.now();
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetAt <= now) rateLimitStore.delete(key);
+    }
     let entry = rateLimitStore.get(userId);
     if (!entry || now >= entry.resetAt) {
       entry = { count: 0, resetAt: now + windowMs };
