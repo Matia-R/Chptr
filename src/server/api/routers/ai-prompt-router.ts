@@ -3,7 +3,8 @@ import { createTRPCRouter, protectedProcedure, rateLimitMiddleware } from "../tr
 import { z } from "zod";
 import { streamText, smoothStream } from "ai"
 import { google } from "@ai-sdk/google"
-import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions"
+import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions";
+import { MAX_PROMPT_LENGTH } from "~/app/ai/prompt/constants";
 
 const DEFAULT_MODEL = 'gemini-flash-latest';
 
@@ -14,10 +15,10 @@ const quickGenerateInputSchema = z.object({
 
 const generateForPromptInputSchema = z
     .object({
-        prompt: z.string(),
+        prompt: z.string().max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" }),
         documentContext: z.string().optional(),
         previousResponse: z.string().optional(),
-        followUp: z.string().optional(),
+        followUp: z.string().max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" }).optional(),
     })
     .refine(
         (data) => {

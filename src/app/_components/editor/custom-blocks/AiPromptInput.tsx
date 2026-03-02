@@ -7,6 +7,7 @@ import { api, type RouterInputs } from "~/trpc/react";
 import { Button } from "~/app/_components/ui/button";
 import { Spinner } from "~/app/_components/spinner";
 import { useAiPromptSession } from "~/hooks/use-ai-prompt-session";
+import { MAX_PROMPT_LENGTH } from "~/app/ai/prompt/constants";
 
 type GenerateForPromptInput = RouterInputs["aiPrompt"]["generateForPrompt"];
 
@@ -275,7 +276,7 @@ function AiPromptInputContent(props: {
 
   const submitCurrent = async () => {
     const text = block.props.value?.trim() ?? "";
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || text.length > MAX_PROMPT_LENGTH) return;
 
     const nextHistory = [...history, text];
     editor.updateBlock(block, {
@@ -341,7 +342,8 @@ function AiPromptInputContent(props: {
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void submitCurrent();
+      const currentLength = (block.props.value?.trim() ?? "").length;
+      if (currentLength <= MAX_PROMPT_LENGTH) void submitCurrent();
       return;
     }
     if (e.key === "Backspace" && !block.props.value) {
@@ -359,6 +361,9 @@ function AiPromptInputContent(props: {
   };
 
   const placeholder = history.length > 0 ? "Follow up" : "Generate something…";
+
+  const promptLength = (block.props.value?.trim() ?? "").length;
+  const isOverLimit = promptLength > MAX_PROMPT_LENGTH;
 
   const showAcceptReject =
     !isStreaming && history.length > 0 && block.props.lastResponseMarkdown;
@@ -452,14 +457,21 @@ function AiPromptInputContent(props: {
           className="min-h-[2rem] w-full resize-none overflow-hidden bg-transparent py-3 text-sm text-popover-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ resize: "none" }}
         />
-        <div className="flex min-w-9 justify-end">
+        <div className="flex min-w-9 items-center justify-between gap-2">
+          {isOverLimit ? (
+            <span className="text-sm text-destructive">
+              Please shorten your prompt
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1" />
+          )}
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Move up"
+            aria-label="Submit prompt"
             onClick={() => void submitCurrent()}
-            disabled={isStreaming}
+            disabled={isStreaming || isOverLimit}
           >
             <ArrowUp className="h-4 w-4" />
           </Button>
