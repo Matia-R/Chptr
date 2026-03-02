@@ -11,8 +11,15 @@ import { MAX_PROMPT_LENGTH } from "~/app/ai/prompt/constants";
 
 type GenerateForPromptInput = RouterInputs["aiPrompt"]["generateForPrompt"];
 
+// Block with optional children (generated content lives as children of the prompt block).
+interface BlockWithChildren {
+  id: string;
+  children: Array<{ id: string; type: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] }>;
+}
+
 // Minimal editor interface: matches the subset of BlockNote editor APIs we actually use here.
 interface EditorWithSchema {
+  getBlock(block: { id: string } | string): BlockWithChildren | undefined;
   updateBlock(
     block: { id: string } | string,
     update: {
@@ -20,9 +27,13 @@ interface EditorWithSchema {
         value?: string;
         historyJson?: string;
         lastResponseMarkdown?: string;
-        lastResponseBlockIds?: string;
       };
       content?: string;
+      children?: Array<{
+        type: string;
+        props?: Record<string, unknown>;
+        content?: unknown;
+      }>;
     },
   ): void;
   removeBlocks(blocksToRemove: string[]): void;
@@ -31,14 +42,15 @@ interface EditorWithSchema {
     blocksToInsert: Array<{
       type: string;
       props?: Record<string, unknown>;
-      content?: string;
+      content?: unknown;
     }>,
   ): { insertedBlocks: { id: string }[] };
   insertBlocks(
     blocksToInsert: Array<{
       type: string;
       props?: Record<string, unknown>;
-      content?: string;
+      content?: unknown;
+      id?: string;
     }>,
     referenceBlock: { id: string } | string,
     placement: "before" | "after",
@@ -71,21 +83,6 @@ function parseHistory(historyJson: string | undefined): string[] {
   }
 }
 
-/**
- * Inner component: multi-line auto-expanding textarea with prompt history and streamed response.
- */
-function parseBlockIds(blockIdsJson: string | undefined): string[] {
-  if (!blockIdsJson) return [];
-  try {
-    const parsed = JSON.parse(blockIdsJson) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter((x): x is string => typeof x === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 function AiPromptInputContent(props: {
   block: {
     id: string;
@@ -93,7 +90,6 @@ function AiPromptInputContent(props: {
       value: string;
       historyJson?: string;
       lastResponseMarkdown?: string;
-      lastResponseBlockIds?: string;
     };
   };
   editor: EditorWithSchema;
@@ -121,21 +117,9 @@ function AiPromptInputContent(props: {
     reset,
   } = useAiPromptSession();
 
-  // When the block is removed (e.g. user deletes it via side menu / keyboard), treat as reject: remove generated blocks.
-  // Skip when user clicked Accept (keep response) or Reject (we already removed them).
+  // When the block is removed (e.g. user deletes it via side menu / keyboard), generated blocks are
+  // children of this block so they are removed with it. No cleanup needed.
   const removalIntentRef = useRef<"accept" | "reject" | null>(null);
-  const blockAndEditorRef = useRef({ block, editor });
-  blockAndEditorRef.current = { block, editor };
-  useEffect(() => {
-    return () => {
-      if (removalIntentRef.current !== null) return;
-      const { block: b, editor: ed } = blockAndEditorRef.current;
-      const generatedIds = parseBlockIds(b.props.lastResponseBlockIds);
-      if (generatedIds.length > 0 && b.props.lastResponseMarkdown) {
-        ed.removeBlocks(generatedIds);
-      }
-    };
-  }, []);
 
   const closeFormattingToolbar = useCallback(() => {
     const bn = editor as unknown as {
@@ -171,17 +155,15 @@ function AiPromptInputContent(props: {
       documentContext: string,
     ) => {
       startStreaming();
-      // On follow-up, remove previously generated blocks before streaming the new response
+      // On follow-up, clear previous generated content (children) before streaming the new response
       if (followUp != null) {
-        const previousBlockIds = parseBlockIds(
-          block.props.lastResponseBlockIds,
-        );
-        if (previousBlockIds.length > 0) {
-          editor.removeBlocks(previousBlockIds);
+        const promptBlock = editor.getBlock(block.id);
+        const childIds = promptBlock?.children?.map((c) => c.id) ?? [];
+        if (childIds.length > 0) {
+          editor.removeBlocks(childIds);
         }
       }
 
-      let generatedBlockIds: string[] = [];
       try {
         const input: GenerateForPromptInput = followUp
           ? {
@@ -196,23 +178,6 @@ function AiPromptInputContent(props: {
 
         let full = "";
         const bnEditor = editor as unknown as {
-          insertBlocks: (
-            blocksToInsert: Array<{
-              type: string;
-              props?: Record<string, unknown>;
-              content?: unknown;
-            }>,
-            referenceBlock: { id: string } | string,
-            placement: "before" | "after",
-          ) => { id: string }[];
-          replaceBlocks: (
-            blocksToRemove: Array<{ id: string } | string>,
-            blocksToInsert: Array<{
-              type: string;
-              props?: Record<string, unknown>;
-              content?: unknown;
-            }>,
-          ) => { insertedBlocks: { id: string }[] };
           tryParseMarkdownToBlocks: (markdown: string) => Promise<
             Array<{
               type: string;
@@ -227,35 +192,20 @@ function AiPromptInputContent(props: {
           appendResponse(token);
 
           const blocksToAdd = await bnEditor.tryParseMarkdownToBlocks(full);
-
-          if (generatedBlockIds.length === 0) {
-            const inserted = bnEditor.insertBlocks(
-              blocksToAdd,
-              block.id,
-              "after",
-            );
-            generatedBlockIds = inserted.map((b) => b.id);
-          } else {
-            const { insertedBlocks } = bnEditor.replaceBlocks(
-              generatedBlockIds,
-              blocksToAdd,
-            );
-            generatedBlockIds = insertedBlocks.map((b) => b.id);
-          }
+          editor.updateBlock(block.id, { children: blocksToAdd });
         }
 
         if (full) {
           editor.updateBlock(block.id, {
-            props: {
-              lastResponseMarkdown: full,
-              lastResponseBlockIds: JSON.stringify(generatedBlockIds),
-            },
+            props: { lastResponseMarkdown: full },
           });
         }
       } catch (err) {
         console.error("[generateForPrompt]", err);
-        if (generatedBlockIds.length > 0) {
-          editor.removeBlocks(generatedBlockIds);
+        const promptBlock = editor.getBlock(block.id);
+        const childIds = promptBlock?.children?.map((c) => c.id) ?? [];
+        if (childIds.length > 0) {
+          editor.removeBlocks(childIds);
         }
         reset();
       } finally {
@@ -265,7 +215,6 @@ function AiPromptInputContent(props: {
     [
       appendResponse,
       block.id,
-      block.props.lastResponseBlockIds,
       editor,
       finishStreaming,
       generateForPrompt,
@@ -348,10 +297,9 @@ function AiPromptInputContent(props: {
     }
     if (e.key === "Backspace" && !block.props.value) {
       e.preventDefault();
-      const { insertedBlocks } = editor.replaceBlocks(
-        [block.id],
-        [{ type: "paragraph" }],
-      );
+      const { insertedBlocks } = editor.replaceBlocks([block.id], [
+        { type: "paragraph" },
+      ]);
       const newBlock = insertedBlocks[0];
       if (newBlock) {
         editor.setTextCursorPosition(newBlock, "start");
@@ -370,14 +318,22 @@ function AiPromptInputContent(props: {
 
   const handleAccept = useCallback(() => {
     removalIntentRef.current = "accept";
+    const promptBlock = editor.getBlock(block.id);
+    const children = promptBlock?.children ?? [];
+    if (children.length > 0) {
+      editor.insertBlocks(
+        children.map((c) => ({ type: c.type, props: c.props, content: c.content })),
+        block.id,
+        "after",
+      );
+    }
     editor.removeBlocks([block.id]);
   }, [block.id, editor]);
 
   const handleReject = useCallback(() => {
     removalIntentRef.current = "reject";
-    const generatedIds = parseBlockIds(block.props.lastResponseBlockIds);
-    editor.removeBlocks([block.id, ...generatedIds]);
-  }, [block.id, block.props.lastResponseBlockIds, editor]);
+    editor.removeBlocks([block.id]);
+  }, [block.id, editor]);
 
   return (
     <div
@@ -498,9 +454,6 @@ export const AiPromptInput = createReactBlockSpec(
       },
       lastResponseMarkdown: {
         default: "",
-      },
-      lastResponseBlockIds: {
-        default: "[]",
       },
     },
   },
