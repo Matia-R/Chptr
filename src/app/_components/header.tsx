@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { SidebarTrigger } from "./sidebar";
+import { RightSidebarTrigger, SidebarTrigger } from "./sidebar";
 import { Separator } from "./separator";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
@@ -25,7 +25,12 @@ export function Header() {
       </div>
       <div className="ml-auto flex min-w-[110px] flex-shrink-0 items-center gap-2 px-3">
         <CommandMenuButton />
-        {isDocumentPage && <DocumentActions />}
+        {isDocumentPage && (
+          <>
+            <RightSidebarTrigger />
+            <DocumentActions />
+          </>
+        )}
       </div>
     </header>
   );

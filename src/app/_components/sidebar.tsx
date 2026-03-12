@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { type VariantProps, cva } from "class-variance-authority";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, PencilLine } from "lucide-react";
 
 import { useIsMobile } from "~/hooks/use-mobile";
 import { cn } from "~/lib/utils";
@@ -303,6 +303,147 @@ const SidebarTrigger = React.forwardRef<
   );
 });
 SidebarTrigger.displayName = "SidebarTrigger";
+
+const RIGHT_SIDEBAR_COOKIE_NAME = "right_sidebar_state";
+const RIGHT_SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const RIGHT_SIDEBAR_WIDTH = "18rem";
+
+type RightSidebarContextProps = {
+  state: "expanded" | "collapsed";
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+};
+
+const RightSidebarContext =
+  React.createContext<RightSidebarContextProps | null>(null);
+
+function useRightSidebar() {
+  const context = React.useContext(RightSidebarContext);
+  if (!context) {
+    throw new Error(
+      "useRightSidebar must be used within a RightSidebarProvider.",
+    );
+  }
+  return context;
+}
+
+const RightSidebarProvider = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, style, children, ...props }, ref) => {
+  // Always start collapsed so server and client match (avoids hydration error).
+  // Restore from cookie after mount.
+  const [_open, _setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const cookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${RIGHT_SIDEBAR_COOKIE_NAME}=`));
+    const value = cookie?.endsWith("true") ?? false;
+    _setOpen(value);
+  }, []);
+
+  const setOpen = React.useCallback((value: boolean) => {
+    _setOpen(value);
+    document.cookie = `${RIGHT_SIDEBAR_COOKIE_NAME}=${value}; path=/; max-age=${RIGHT_SIDEBAR_COOKIE_MAX_AGE}`;
+  }, []);
+
+  const toggleSidebar = React.useCallback(() => {
+    _setOpen((prev) => {
+      const next = !prev;
+      document.cookie = `${RIGHT_SIDEBAR_COOKIE_NAME}=${next}; path=/; max-age=${RIGHT_SIDEBAR_COOKIE_MAX_AGE}`;
+      return next;
+    });
+  }, []);
+
+  const state = _open ? "expanded" : "collapsed";
+  const contextValue = React.useMemo<RightSidebarContextProps>(
+    () => ({ state, open: _open, setOpen, toggleSidebar }),
+    [state, _open, setOpen, toggleSidebar],
+  );
+
+  return (
+    <RightSidebarContext.Provider value={contextValue}>
+      <div
+        ref={ref}
+        className={cn("flex min-h-0 flex-1", className)}
+        style={
+          {
+            "--right-sidebar-width": RIGHT_SIDEBAR_WIDTH,
+            ...style,
+          } as React.CSSProperties
+        }
+        {...props}
+      >
+        {children}
+      </div>
+    </RightSidebarContext.Provider>
+  );
+});
+RightSidebarProvider.displayName = "RightSidebarProvider";
+
+const RightSidebar = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & { inline?: boolean }
+>(({ inline = false, className, children, ...props }, ref) => {
+  const { state } = useRightSidebar();
+
+  if (inline) {
+    return (
+      <div
+        ref={ref}
+        data-state={state}
+        className={cn(
+          "flex h-full w-[var(--right-sidebar-width)] flex-shrink-0 flex-col border-l border-border bg-muted/30 transition-[width] duration-200 ease-in-out",
+          state === "collapsed" && "w-0 overflow-hidden border-0 p-0",
+          className,
+        )}
+        {...props}
+      >
+        {state === "expanded" && children}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      data-state={state}
+      className={cn(
+        "fixed inset-y-0 right-0 z-20 flex w-[var(--right-sidebar-width)] flex-col border-l border-border bg-muted/30 shadow-lg transition-transform duration-200 ease-in-out",
+        state === "collapsed" && "translate-x-full",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
+RightSidebar.displayName = "RightSidebar";
+
+const RightSidebarTrigger = React.forwardRef<
+  React.ElementRef<typeof Button>,
+  React.ComponentProps<typeof Button>
+>(({ className, ...props }, ref) => {
+  const { toggleSidebar } = useRightSidebar();
+
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="icon"
+      className={cn("h-7 w-7", className)}
+      onClick={toggleSidebar}
+      {...props}
+    >
+      <PencilLine />
+      <span className="sr-only">Toggle right sidebar</span>
+    </Button>
+  );
+});
+RightSidebarTrigger.displayName = "RightSidebarTrigger";
 
 const SidebarRail = React.forwardRef<
   HTMLButtonElement,
@@ -755,6 +896,9 @@ const SidebarMenuSubButton = React.forwardRef<
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
 
 export {
+  RightSidebar,
+  RightSidebarProvider,
+  RightSidebarTrigger,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -778,5 +922,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  useRightSidebar,
   useSidebar,
 };

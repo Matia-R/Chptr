@@ -527,3 +527,154 @@ export async function getDocumentChanges(documentId: string) {
   return { success: true, changes };
 }
 
+/**
+ * Upsert AI review feedback for a block. Keyed by (document_id, content_hash).
+ * Used so all clients see the same feedback via Realtime; only one row per content.
+ */
+export async function upsertDocumentReviewFeedback(
+  documentId: string,
+  contentHash: string,
+  suggestions: unknown[]
+) {
+  const supabase = await createClient();
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
+
+  const { error } = await supabase
+    .from('document_review_feedback')
+    .upsert(
+      {
+        document_id: documentId,
+        content_hash: contentHash,
+        suggestions,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'document_id,content_hash' }
+    );
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to save review feedback: ${error.message}`,
+      cause: error,
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get the current reviewing criteria for a document, or an empty string if none is set.
+ */
+export async function getDocumentReviewCriteria(
+  documentId: string
+): Promise<string> {
+  const supabase = await createClient();
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
+
+  const { data, error } = await supabase
+    .from('document_review_criteria')
+    .select('criteria')
+    .eq('document_id', documentId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to fetch review criteria: ${error.message}`,
+      cause: error,
+    });
+  }
+
+  if (!data || typeof (data as { criteria?: unknown }).criteria !== 'string') {
+    return '';
+  }
+  return (data as { criteria: string }).criteria;
+}
+
+/**
+ * Upsert reviewing criteria for a document.
+ */
+export async function upsertDocumentReviewCriteria(
+  documentId: string,
+  criteria: string
+): Promise<{ success: true }> {
+  const supabase = await createClient();
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
+
+  const { error } = await supabase
+    .from('document_review_criteria')
+    .upsert({
+      document_id: documentId,
+      criteria,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to save review criteria: ${error.message}`,
+      cause: error,
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * Content hashes that already have feedback for this document. Used to avoid re-reviewing.
+ */
+export async function getDocumentReviewFeedbackHashes(
+  documentId: string
+): Promise<Set<string>> {
+  const supabase = await createClient();
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
+
+  const { data, error } = await supabase
+    .from('document_review_feedback')
+    .select('content_hash')
+    .eq('document_id', documentId);
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to fetch review feedback hashes: ${error.message}`,
+      cause: error,
+    });
+  }
+
+  const hashes = new Set<string>();
+  for (const row of data ?? []) {
+    if (typeof (row as { content_hash: string }).content_hash === 'string') {
+      hashes.add((row as { content_hash: string }).content_hash);
+    }
+  }
+  return hashes;
+}
+
+/**
+ * Atomically claim a review run for this document (one run per cooldown). Returns true if claimed.
+ */
+export async function tryClaimDocumentReviewRun(
+  documentId: string,
+  cooldownMinutes = 2
+): Promise<boolean> {
+  const supabase = await createClient();
+  await getAuthenticatedUser(supabase);
+  const result = await supabase.rpc('try_claim_document_review_run', {
+    p_document_id: documentId,
+    p_cooldown_interval: `${cooldownMinutes} minutes`,
+  });
+
+  if (result.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to claim review run: ${result.error.message}`,
+      cause: result.error,
+    });
+  }
+  return result.data === true;
+}

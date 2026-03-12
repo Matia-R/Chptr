@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
+import { useBlockPositions } from "~/app/_components/block-positions-context";
 
 type Theme = "light" | "dark" | "system";
 
@@ -147,6 +148,67 @@ export default function Editor({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  // --- Report all blocks to sidebar (for review feedback and cursor linking) ---
+  const { setPositions, registerCursorMoveHandler } = useBlockPositions();
+  useEffect(() => {
+    const bnEditor = editor as unknown as {
+      document: Array<{ id: string }>;
+      getBlock: (id: string) => { id: string } | undefined;
+      blocksToMarkdownLossy: (blocks: Array<{ id: string }>) => Promise<string>;
+    };
+
+    const update = () => {
+      try {
+        const doc = bnEditor.document;
+        const entries: { index: number; blockId: string }[] = [];
+        for (let i = 0; i < doc.length; i++) {
+          const block = doc[i];
+          if (block) entries.push({ index: i, blockId: block.id });
+        }
+        setPositions(entries);
+
+        void (async () => {
+          const withMarkdown = await Promise.all(
+            entries.map(async (e) => {
+              const block = bnEditor.getBlock(e.blockId);
+              if (!block) return { ...e };
+              try {
+                const markdown = await bnEditor.blocksToMarkdownLossy([block]);
+                return { ...e, markdown };
+              } catch {
+                return { ...e };
+              }
+            }),
+          );
+          setPositions(withMarkdown);
+        })();
+      } catch {
+        setPositions([]);
+      }
+    };
+    update();
+    const unsub = editor.onChange?.(update);
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, [editor, setPositions]);
+
+  // --- Register cursor-move handler so sidebar can move cursor to a position ---
+  useEffect(() => {
+    const handler = (blockId: string) => {
+      try {
+        editor.setTextCursorPosition(blockId, "start");
+        editor.focus();
+      } catch {
+        // Block may have been removed
+      }
+    };
+    // registerCursorMoveHandler(handler) returns () => void (unregister)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- from BlockPositionsContext, typed as (handler) => () => void
+    const unregister = registerCursorMoveHandler(handler) as () => void;
+    return unregister;
+  }, [editor, registerCursorMoveHandler]);
 
   // --- Custom shadcn components for BlockNote ---
   const shadCNComponents = {
