@@ -168,16 +168,26 @@ export function useCollaborativeDocCrdt({
 
       const ydoc = new Y.Doc();
 
-      // Apply all changes from DB
-      const changes = changesData?.changes ?? [];
-      if (!isNew && changes.length > 0) {
-        console.log(`[CRDT] Applying ${changes.length} changes from database`);
-        for (const change of changes) {
+      // Apply snapshot (if any) then tail changes from DB
+      if (!isNew) {
+        const snapshot = changesData?.snapshot;
+        const changes = changesData?.changes ?? [];
+        if (snapshot) {
           try {
-            const update = base64ToUint8Array(change.updateData);
-            Y.applyUpdate(ydoc, update);
+            Y.applyUpdate(ydoc, base64ToUint8Array(snapshot));
           } catch (err) {
-            console.error("[CRDT] Failed to apply change:", err);
+            console.error("[CRDT] Failed to apply snapshot:", err);
+          }
+        }
+        if (changes.length > 0) {
+          console.log(`[CRDT] Applying ${changes.length} changes from database`);
+          for (const change of changes) {
+            try {
+              const update = base64ToUint8Array(change.updateData);
+              Y.applyUpdate(ydoc, update);
+            } catch (err) {
+              console.error("[CRDT] Failed to apply change:", err);
+            }
           }
         }
       }

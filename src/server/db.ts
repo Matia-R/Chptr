@@ -1,6 +1,7 @@
 import { createClient } from '~/utils/supabase/server'
 import { randomUUID } from 'crypto'
 import { TRPCError } from '@trpc/server'
+import * as Y from 'yjs'
 
 type DocumentSchema = {
     id: string;
@@ -22,6 +23,11 @@ type UserProfile = {
     first_name: string,
     last_name: string,
     default_avatar_background_color: string,
+};
+
+type DocumentSnapshotRow = {
+    snapshot_data: string;
+    snapshot_cutoff_created_at: string;
 };
 
 /** Map Supabase/PostgREST document-query errors to TRPC errors (NOT_FOUND, BAD_REQUEST, INTERNAL). */
@@ -95,6 +101,10 @@ export const getDocumentIdsForUser = async () => {
         data: { user },
     } = await supabase.auth.getUser()
 
+    if (!user?.id) {
+        return { success: true, documents: [] }
+    }
+
     const { data, error } = await supabase
         .from('document_permissions')
         .select(`
@@ -104,7 +114,7 @@ export const getDocumentIdsForUser = async () => {
                 last_updated
             )
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('documents(last_updated)', { ascending: false }) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name' | 'last_updated'> })[] | null, error: Error | null }
 
     const documents = data?.map((permission) => ({
@@ -385,6 +395,8 @@ export async function getCurrentUserProfile(): Promise<UserProfile | undefined> 
 // CRDT-based document changes (new approach)
 // =============================================================================
 
+import { COMPACTION_CAP } from '~/server/document-compaction';
+
 /**
  * Save a single Yjs update to the document_changes table.
  * Uses unique constraint (document_id, client_id, clock) to prevent duplicates.
@@ -453,34 +465,41 @@ export async function saveDocumentChanges(
 }
 
 /**
- * Get all changes for a document to rebuild the CRDT state.
- * Returns changes ordered by creation time so they can be applied in order.
+ * Get snapshot + tail for a document. Returns latest snapshot (if any) and only
+ * changes after the snapshot cutoff so the client can apply snapshot then tail.
  */
+/** Single round-trip page size for tail fetch (avoids pagination waterfall). */
+const GET_CHANGES_TAIL_PAGE_SIZE = 5000;
+
 export async function getDocumentChanges(documentId: string) {
   const supabase = await createClient();
   const user = await getAuthenticatedUser(supabase);
 
-  const { data: doc, error: docError } = await supabase
-    .from('documents')
-    .select('id')
-    .eq('id', documentId)
-    .single();
+  // Run doc check, permission check, and snapshot fetch in parallel to avoid waterfall.
+  const [docResult, permissionResult, snapshotResult] = await Promise.all([
+    supabase.from('documents').select('id').eq('id', documentId).single(),
+    supabase
+      .from('document_permissions')
+      .select('id')
+      .eq('document_id', documentId)
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('document_snapshots')
+      .select('snapshot_data, snapshot_cutoff_created_at')
+      .eq('document_id', documentId)
+      .single(),
+  ]);
 
+  const { data: doc, error: docError } = docResult;
   if (docError) {
     throwOnDocumentQueryError(docError, 'Failed to check document');
   }
-
   if (!doc) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
   }
 
-  const { data: permission } = await supabase
-    .from('document_permissions')
-    .select('id')
-    .eq('document_id', documentId)
-    .eq('user_id', user.id)
-    .single();
-
+  const { data: permission } = permissionResult;
   if (!permission) {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -488,20 +507,29 @@ export async function getDocumentChanges(documentId: string) {
     });
   }
 
-  // Fetch all changes ordered by creation time. PostgREST defaults to 1000 rows;
-  // paginate to retrieve every row so CRDT state rebuilds correctly.
-  const PAGE_SIZE = 1000;
+  const snapshotRow = snapshotResult.data as DocumentSnapshotRow | null;
+  const snapshot: string | null = snapshotRow?.snapshot_data
+    ? normalizeToBase64(snapshotRow.snapshot_data)
+    : null;
+  const snapshotCutoffCreatedAt: string | null =
+    snapshotRow?.snapshot_cutoff_created_at ?? null;
+
+  // Fetch tail only: changes after snapshot cutoff (or all if no snapshot). One large page to avoid loop.
+  const PAGE_SIZE = GET_CHANGES_TAIL_PAGE_SIZE;
   const allRows: Array<{ client_id: string; clock: number; update_data: string; created_at: string }> = [];
   let offset = 0;
   let hasMore = true;
   while (hasMore) {
-    const { data: page, error } = await supabase
+    let tailQuery = supabase
       .from('document_changes')
       .select('client_id, clock, update_data, created_at')
       .eq('document_id', documentId)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
-
+    if (snapshotCutoffCreatedAt) {
+      tailQuery = tailQuery.gt('created_at', snapshotCutoffCreatedAt);
+    }
+    const { data: page, error } = await tailQuery;
     if (error) {
       throw new Error(`Failed to fetch document changes: ${error.message}`);
     }
@@ -511,11 +539,10 @@ export async function getDocumentChanges(documentId: string) {
     offset += PAGE_SIZE;
   }
 
-  // Normalize the update data (handle hex encoding if present)
-  const changes = allRows.map((row: { 
-    client_id: string; 
-    clock: number; 
-    update_data: string; 
+  const changes = allRows.map((row: {
+    client_id: string;
+    clock: number;
+    update_data: string;
     created_at: string;
   }) => ({
     clientId: row.client_id,
@@ -524,6 +551,157 @@ export async function getDocumentChanges(documentId: string) {
     createdAt: row.created_at,
   }));
 
-  return { success: true, changes };
+  return {
+    success: true,
+    snapshot,
+    snapshotCutoffCreatedAt,
+    changes,
+  };
+}
+
+/**
+ * Count tail rows (changes after current snapshot). Used to decide whether to compact.
+ */
+export async function getDocumentTailCount(documentId: string): Promise<number> {
+  const supabase = await createClient();
+  await getAuthenticatedUser(supabase);
+
+  const { data: snapshotRow } = await supabase
+    .from('document_snapshots')
+    .select('snapshot_cutoff_created_at')
+    .eq('document_id', documentId)
+    .single();
+
+  let query = supabase
+    .from('document_changes')
+    .select('id', { count: 'exact', head: true })
+    .eq('document_id', documentId);
+  if (snapshotRow?.snapshot_cutoff_created_at) {
+    query = query.gt('created_at', snapshotRow.snapshot_cutoff_created_at);
+  }
+  const { count, error } = await query;
+  if (error) {
+    throw new Error(`Failed to count document tail: ${error.message}`);
+  }
+  return count ?? 0;
+}
+
+/**
+ * Base64-encode a Uint8Array (Node).
+ */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64');
+}
+
+/**
+ * Build Yjs state from snapshot + tail and return base64-encoded state update.
+ */
+function buildSnapshotFromSnapshotAndTail(
+  snapshotBase64: string | null,
+  tailRows: Array<{ update_data: string; created_at: string }>
+): { snapshotData: string; cutoffCreatedAt: string } {
+  const ydoc = new Y.Doc();
+  if (snapshotBase64) {
+    const snapshotBytes = base64ToUint8Array(snapshotBase64);
+    Y.applyUpdate(ydoc, snapshotBytes);
+  }
+  for (const row of tailRows) {
+    const updateBytes = base64ToUint8Array(normalizeToBase64(row.update_data));
+    Y.applyUpdate(ydoc, updateBytes);
+  }
+  const stateUpdate = Y.encodeStateAsUpdate(ydoc);
+  const cutoff =
+    tailRows.length > 0
+      ? tailRows[tailRows.length - 1]!.created_at
+      : (snapshotBase64 ? new Date().toISOString() : '');
+  return {
+    snapshotData: uint8ArrayToBase64(stateUpdate),
+    cutoffCreatedAt: cutoff,
+  };
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = Buffer.from(base64.trim(), 'base64');
+  return new Uint8Array(binary);
+}
+
+/**
+ * Compact document: merge snapshot + tail into a new snapshot and delete the tail.
+ * Processes at most COMPACTION_CAP tail rows per run for timeout safety.
+ */
+export async function compactDocument(documentId: string): Promise<void> {
+  const supabase = await createClient();
+  const user = await getAuthenticatedUser(supabase);
+  await ensureCanMutateDocument(supabase, documentId, user.id);
+
+  const { data: rawSnapshotRow } = await supabase
+    .from('document_snapshots')
+    .select('snapshot_data, snapshot_cutoff_created_at')
+    .eq('document_id', documentId)
+    .single();
+
+  const snapshotRow = rawSnapshotRow as DocumentSnapshotRow | null;
+  const snapshotBase64 = snapshotRow?.snapshot_data
+    ? normalizeToBase64(snapshotRow.snapshot_data)
+    : null;
+  const cutoffAfter = snapshotRow?.snapshot_cutoff_created_at ?? null;
+
+  // Load tail (cap for timeout safety). Use large page to minimize round-trips.
+  const PAGE_SIZE = 5000;
+  const tailRows: Array<{ update_data: string; created_at: string }> = [];
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore && tailRows.length < COMPACTION_CAP) {
+    const limit = Math.min(PAGE_SIZE, COMPACTION_CAP - tailRows.length);
+    let tailQuery = supabase
+      .from('document_changes')
+      .select('update_data, created_at')
+      .eq('document_id', documentId)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + limit - 1);
+    if (cutoffAfter) {
+      tailQuery = tailQuery.gt('created_at', cutoffAfter);
+    }
+    const { data: page, error } = await tailQuery;
+    if (error) {
+      throw new Error(`Failed to fetch tail for compaction: ${error.message}`);
+    }
+    const rows = (page ?? []) as Array<{ update_data: string; created_at: string }>;
+    tailRows.push(...rows);
+    hasMore = rows.length === limit;
+    offset += limit;
+  }
+
+  if (tailRows.length === 0) {
+    return;
+  }
+
+  const { snapshotData, cutoffCreatedAt } = buildSnapshotFromSnapshotAndTail(
+    snapshotBase64,
+    tailRows
+  );
+
+  const { error: upsertError } = await supabase
+    .from('document_snapshots')
+    .upsert(
+      {
+        document_id: documentId,
+        snapshot_data: snapshotData,
+        snapshot_cutoff_created_at: cutoffCreatedAt,
+      },
+      { onConflict: 'document_id' }
+    );
+  if (upsertError) {
+    throw new Error(`Failed to upsert snapshot: ${upsertError.message}`);
+  }
+
+  const { error: deleteError } = await supabase
+    .from('document_changes')
+    .delete()
+    .eq('document_id', documentId)
+    .lte('created_at', cutoffCreatedAt);
+  if (deleteError) {
+    throw new Error(`Failed to delete compacted changes: ${deleteError.message}`);
+  }
 }
 

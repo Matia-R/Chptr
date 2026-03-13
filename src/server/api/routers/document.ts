@@ -1,16 +1,19 @@
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { 
-  createDocument, 
-  getDocumentById, 
-  getLastUpdatedTimestamp, 
-  getDocumentIdsForUser as getDocumentsIdsForUser, 
-  updateDocumentName, 
+import { COMPACTION_TAIL_THRESHOLD } from "~/server/document-compaction";
+import {
+  createDocument,
+  getDocumentById,
+  getLastUpdatedTimestamp,
+  getDocumentIdsForUser as getDocumentsIdsForUser,
+  updateDocumentName,
   saveDocumentChange,
   saveDocumentChanges,
   getDocumentChanges,
-} from '~/server/db'
+  getDocumentTailCount,
+  compactDocument,
+} from "~/server/db";
 
 export interface Document {
     id: string,
@@ -89,7 +92,12 @@ export const documentRouter = createTRPCRouter({
             })),
         }))
         .mutation(async ({ input }) => {
-            return saveDocumentChanges(input.documentId, input.changes);
+            const result = await saveDocumentChanges(input.documentId, input.changes);
+            const tailCount = await getDocumentTailCount(input.documentId);
+            if (tailCount >= COMPACTION_TAIL_THRESHOLD) {
+                await compactDocument(input.documentId);
+            }
+            return result;
         }),
 
     /**
