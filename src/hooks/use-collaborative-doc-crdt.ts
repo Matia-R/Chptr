@@ -168,26 +168,23 @@ export function useCollaborativeDocCrdt({
 
       const ydoc = new Y.Doc();
 
-      // Apply snapshot (if any) then tail changes from DB
+      // Merge snapshot + tail into one update and apply once (avoids N applyUpdate round-trips).
       if (!isNew) {
         const snapshot = changesData?.snapshot;
         const changes = changesData?.changes ?? [];
+        const updates: Uint8Array[] = [];
         if (snapshot) {
-          try {
-            Y.applyUpdate(ydoc, base64ToUint8Array(snapshot));
-          } catch (err) {
-            console.error("[CRDT] Failed to apply snapshot:", err);
-          }
+          updates.push(base64ToUint8Array(snapshot));
         }
-        if (changes.length > 0) {
-          console.log(`[CRDT] Applying ${changes.length} changes from database`);
-          for (const change of changes) {
-            try {
-              const update = base64ToUint8Array(change.updateData);
-              Y.applyUpdate(ydoc, update);
-            } catch (err) {
-              console.error("[CRDT] Failed to apply change:", err);
-            }
+        for (const change of changes) {
+          updates.push(base64ToUint8Array(change.updateData));
+        }
+        if (updates.length > 0) {
+          try {
+            const merged = Y.mergeUpdates(updates);
+            Y.applyUpdate(ydoc, merged);
+          } catch (err) {
+            console.error("[CRDT] Failed to apply merged update:", err);
           }
         }
       }

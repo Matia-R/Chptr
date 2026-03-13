@@ -3,6 +3,12 @@ import { randomUUID } from 'crypto'
 import { TRPCError } from '@trpc/server'
 import * as Y from 'yjs'
 
+/** Passed from tRPC context to avoid redundant createClient() + getUser() per request. */
+export type AuthContext = {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+};
+
 type DocumentSchema = {
     id: string;
     creator_id: string;
@@ -47,9 +53,9 @@ function throwOnDocumentQueryError(
     });
 }
 
-export async function createDocument() {
-    const supabase = await createClient()
-    const currentUserId = (await supabase.auth.getUser()).data.user?.id
+export async function createDocument(auth?: AuthContext) {
+    const supabase = auth?.supabase ?? await createClient();
+    const currentUserId = auth?.userId ?? (await supabase.auth.getUser()).data.user?.id;
 
     const newDocumentId = randomUUID()
 
@@ -66,8 +72,11 @@ export async function createDocument() {
     return { success: true, createdDocument: data }
 }
 
-export async function getDocumentById(documentId: string) {
-    const supabase = await createClient()
+export async function getDocumentById(
+    documentId: string,
+    opts?: { supabase?: Awaited<ReturnType<typeof createClient>> }
+) {
+    const supabase = opts?.supabase ?? (await createClient());
 
     const { data, error } = await supabase
         .from('documents')
@@ -81,8 +90,11 @@ export async function getDocumentById(documentId: string) {
     return { success: true, document: data }
 }
 
-export async function getLastUpdatedTimestamp(documentId: string) {
-    const supabase = await createClient()
+export async function getLastUpdatedTimestamp(
+    documentId: string,
+    opts?: { supabase?: Awaited<ReturnType<typeof createClient>> }
+) {
+    const supabase = opts?.supabase ?? (await createClient());
 
     const { data, error } = await supabase
         .from('documents')
@@ -94,15 +106,19 @@ export async function getLastUpdatedTimestamp(documentId: string) {
     return { success: true, lastUpdated: data?.last_updated }
 }
 
-export const getDocumentIdsForUser = async () => {
-    const supabase = await createClient()
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user?.id) {
-        return { success: true, documents: [] }
+export const getDocumentIdsForUser = async (auth?: AuthContext) => {
+    let supabase: Awaited<ReturnType<typeof createClient>>;
+    let userId: string | undefined;
+    if (auth) {
+        supabase = auth.supabase;
+        userId = auth.userId;
+    } else {
+        supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+    }
+    if (!userId) {
+        return { success: true, documents: [] };
     }
 
     const { data, error } = await supabase
@@ -114,7 +130,7 @@ export const getDocumentIdsForUser = async () => {
                 last_updated
             )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('documents(last_updated)', { ascending: false }) as { data: (DocumentPermissionSchema & { documents: Pick<DocumentSchema, 'name' | 'last_updated'> })[] | null, error: Error | null }
 
     const documents = data?.map((permission) => ({
@@ -126,9 +142,13 @@ export const getDocumentIdsForUser = async () => {
     return { success: true, documents }
 }
 
-export async function updateDocumentName(documentId: string, name: string) {
-    const supabase = await createClient();
-    const user = await getAuthenticatedUser(supabase);
+export async function updateDocumentName(
+    documentId: string,
+    name: string,
+    auth?: AuthContext
+) {
+    const supabase = auth?.supabase ?? await createClient();
+    const user = auth ? { id: auth.userId } : await getAuthenticatedUser(supabase);
 
     const { data: existingDoc, error: docError } = await supabase
         .from('documents')
@@ -282,21 +302,21 @@ async function ensureCanMutateDocument(
     await createDocumentWithPermission(supabase, documentId, userId, 'Untitled');
 }
 
-export async function getCurrentUser(): Promise<string | undefined> {
-    const supabase = await createClient();
+export async function getCurrentUser(auth?: AuthContext): Promise<string | undefined> {
+    const supabase = auth?.supabase ?? await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('Not authenticated');
     return user.email;
 }
 
-export async function getCurrentUserProfile(): Promise<UserProfile | undefined> {
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('Not authenticated');
+export async function getCurrentUserProfile(auth?: AuthContext): Promise<UserProfile | undefined> {
+    const supabase = auth?.supabase ?? await createClient();
+    const userId = auth?.userId ?? (await supabase.auth.getUser()).data.user?.id;
+    if (!userId) throw new Error('Not authenticated');
     const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single<UserProfile>();
     if (error) throw new Error('Failed to fetch user profile');
     return data;
@@ -406,11 +426,12 @@ export async function saveDocumentChange(
   documentId: string,
   clientId: string,
   clock: number,
-  updateData: string
+  updateData: string,
+  auth?: AuthContext
 ) {
-  const supabase = await createClient();
-  const user = await getAuthenticatedUser(supabase);
-  await ensureCanMutateDocument(supabase, documentId, user.id);
+  const supabase = auth?.supabase ?? await createClient();
+  const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
+  await ensureCanMutateDocument(supabase, documentId, userId);
 
   // Insert the change (unique constraint handles duplicates)
   const { error } = await supabase
@@ -436,11 +457,12 @@ export async function saveDocumentChange(
  */
 export async function saveDocumentChanges(
   documentId: string,
-  changes: Array<{ clientId: string; clock: number; updateData: string }>
+  changes: Array<{ clientId: string; clock: number; updateData: string }>,
+  auth?: AuthContext
 ) {
-  const supabase = await createClient();
-  const user = await getAuthenticatedUser(supabase);
-  await ensureCanMutateDocument(supabase, documentId, user.id);
+  const supabase = auth?.supabase ?? await createClient();
+  const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
+  await ensureCanMutateDocument(supabase, documentId, userId);
 
   // Batch insert (upsert to handle duplicates gracefully)
   const rows = changes.map(c => ({
@@ -467,22 +489,24 @@ export async function saveDocumentChanges(
 /**
  * Get snapshot + tail for a document. Returns latest snapshot (if any) and only
  * changes after the snapshot cutoff so the client can apply snapshot then tail.
+ * Tail uses index (document_id, created_at). For one DB round trip, consider a
+ * Postgres RPC that returns snapshot row + tail rows in a single call.
  */
 /** Single round-trip page size for tail fetch (avoids pagination waterfall). */
 const GET_CHANGES_TAIL_PAGE_SIZE = 5000;
 
-export async function getDocumentChanges(documentId: string) {
-  const supabase = await createClient();
-  const user = await getAuthenticatedUser(supabase);
+export async function getDocumentChanges(documentId: string, auth?: AuthContext) {
+  const supabase = auth?.supabase ?? await createClient();
+  const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
 
-  // Run doc check, permission check, and snapshot fetch in parallel to avoid waterfall.
+  // Doc check, permission check, and snapshot fetch in parallel (no waterfall).
   const [docResult, permissionResult, snapshotResult] = await Promise.all([
     supabase.from('documents').select('id').eq('id', documentId).single(),
     supabase
       .from('document_permissions')
       .select('id')
       .eq('document_id', documentId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single(),
     supabase
       .from('document_snapshots')
@@ -514,15 +538,15 @@ export async function getDocumentChanges(documentId: string) {
   const snapshotCutoffCreatedAt: string | null =
     snapshotRow?.snapshot_cutoff_created_at ?? null;
 
-  // Fetch tail only: changes after snapshot cutoff (or all if no snapshot). One large page to avoid loop.
+  // Fetch tail only: changes after snapshot cutoff. Select minimal columns; index (document_id, created_at) used for range.
   const PAGE_SIZE = GET_CHANGES_TAIL_PAGE_SIZE;
-  const allRows: Array<{ client_id: string; clock: number; update_data: string; created_at: string }> = [];
+  const allRows: Array<{ update_data: string; created_at: string }> = [];
   let offset = 0;
   let hasMore = true;
   while (hasMore) {
     let tailQuery = supabase
       .from('document_changes')
-      .select('client_id, clock, update_data, created_at')
+      .select('update_data, created_at')
       .eq('document_id', documentId)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -539,16 +563,8 @@ export async function getDocumentChanges(documentId: string) {
     offset += PAGE_SIZE;
   }
 
-  const changes = allRows.map((row: {
-    client_id: string;
-    clock: number;
-    update_data: string;
-    created_at: string;
-  }) => ({
-    clientId: row.client_id,
-    clock: row.clock,
+  const changes = allRows.map((row: { update_data: string; created_at: string }) => ({
     updateData: normalizeToBase64(row.update_data),
-    createdAt: row.created_at,
   }));
 
   return {
@@ -562,9 +578,12 @@ export async function getDocumentChanges(documentId: string) {
 /**
  * Count tail rows (changes after current snapshot). Used to decide whether to compact.
  */
-export async function getDocumentTailCount(documentId: string): Promise<number> {
-  const supabase = await createClient();
-  await getAuthenticatedUser(supabase);
+export async function getDocumentTailCount(
+  documentId: string,
+  auth?: AuthContext
+): Promise<number> {
+  const supabase = auth?.supabase ?? await createClient();
+  if (!auth) await getAuthenticatedUser(supabase);
 
   const { data: snapshotRow } = await supabase
     .from('document_snapshots')
@@ -629,10 +648,13 @@ function base64ToUint8Array(base64: string): Uint8Array {
  * Compact document: merge snapshot + tail into a new snapshot and delete the tail.
  * Processes at most COMPACTION_CAP tail rows per run for timeout safety.
  */
-export async function compactDocument(documentId: string): Promise<void> {
-  const supabase = await createClient();
-  const user = await getAuthenticatedUser(supabase);
-  await ensureCanMutateDocument(supabase, documentId, user.id);
+export async function compactDocument(
+  documentId: string,
+  auth?: AuthContext
+): Promise<void> {
+  const supabase = auth?.supabase ?? await createClient();
+  const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
+  await ensureCanMutateDocument(supabase, documentId, userId);
 
   const { data: rawSnapshotRow } = await supabase
     .from('document_snapshots')
