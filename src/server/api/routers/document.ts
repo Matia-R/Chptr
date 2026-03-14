@@ -1,16 +1,24 @@
 import { z } from "zod";
 
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { 
-  createDocument, 
-  getDocumentById, 
-  getLastUpdatedTimestamp, 
-  getDocumentIdsForUser as getDocumentsIdsForUser, 
-  updateDocumentName, 
+import type { AuthContext } from "~/server/db";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
+import { COMPACTION_TAIL_THRESHOLD } from "~/server/document-compaction";
+import {
+  createDocument,
+  getDocumentById,
+  getLastUpdatedTimestamp,
+  getDocumentIdsForUser as getDocumentsIdsForUser,
+  updateDocumentName,
   saveDocumentChange,
   saveDocumentChanges,
   getDocumentChanges,
-} from '~/server/db'
+  getDocumentTailCount,
+  compactDocument,
+} from "~/server/db";
+
+function authFromCtx(ctx: { user: { id: string }; supabase: AuthContext["supabase"] }): AuthContext {
+  return { supabase: ctx.supabase, userId: ctx.user.id };
+}
 
 export interface Document {
     id: string,
@@ -19,36 +27,41 @@ export interface Document {
 }
 
 export const documentRouter = createTRPCRouter({
-    createDocument: publicProcedure
-        .mutation(async () => {
-            return createDocument();
+    createDocument: protectedProcedure
+        .mutation(async ({ ctx }) => {
+            return createDocument(authFromCtx(ctx));
         }),
-    updateDocumentName: publicProcedure
+    updateDocumentName: protectedProcedure
         .input(z.object({
             id: z.string(),
             name: z.string(),
         }))
-        .mutation(async ({ input }) => {
-            return updateDocumentName(input.id, input.name);
+        .mutation(async ({ input, ctx }) => {
+            return updateDocumentName(input.id, input.name, authFromCtx(ctx));
         }),
     getDocumentById: publicProcedure
         .input(z.string())
-        .query(async ({ input }) => {
-            return getDocumentById(input);
+        .query(async ({ input, ctx }) => {
+            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+            return getDocumentById(input, supabase != null ? { supabase } : undefined);
         }),
     getDocumentLastUpdated: publicProcedure
         .input(z.string())
-        .query(async ({ input }) => {
-            return getLastUpdatedTimestamp(input)
+        .query(async ({ input, ctx }) => {
+            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+            return getLastUpdatedTimestamp(input, supabase != null ? { supabase } : undefined);
         }),
     getLastUpdatedTimestamp: publicProcedure
         .input(z.string())
-        .query(async ({ input }) => {
-            return getLastUpdatedTimestamp(input);
+        .query(async ({ input, ctx }) => {
+            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+            return getLastUpdatedTimestamp(input, supabase != null ? { supabase } : undefined);
         }),
     getDocumentIdsForAuthenticatedUser: publicProcedure
-        .query(async () => {
-            return getDocumentsIdsForUser();
+        .query(async ({ ctx }) => {
+            return getDocumentsIdsForUser(
+                ctx.user && ctx.supabase ? authFromCtx(ctx as { user: { id: string }; supabase: AuthContext["supabase"] }) : undefined
+            );
         }),
 
     // =============================================================================
@@ -59,19 +72,20 @@ export const documentRouter = createTRPCRouter({
      * Save a single Yjs update to the changes table.
      * Duplicates are ignored via unique constraint.
      */
-    saveDocumentChange: publicProcedure
+    saveDocumentChange: protectedProcedure
         .input(z.object({
             documentId: z.string(),
             clientId: z.string(),
             clock: z.number(),
             updateData: z.string(), // base64 encoded Yjs update
         }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input, ctx }) => {
             return saveDocumentChange(
                 input.documentId,
                 input.clientId,
                 input.clock,
-                input.updateData
+                input.updateData,
+                authFromCtx(ctx)
             );
         }),
 
@@ -79,7 +93,7 @@ export const documentRouter = createTRPCRouter({
      * Batch save multiple Yjs updates at once.
      * More efficient for saving multiple changes.
      */
-    saveDocumentChanges: publicProcedure
+    saveDocumentChanges: protectedProcedure
         .input(z.object({
             documentId: z.string(),
             changes: z.array(z.object({
@@ -88,17 +102,23 @@ export const documentRouter = createTRPCRouter({
                 updateData: z.string(),
             })),
         }))
-        .mutation(async ({ input }) => {
-            return saveDocumentChanges(input.documentId, input.changes);
+        .mutation(async ({ input, ctx }) => {
+            const auth = authFromCtx(ctx);
+            const result = await saveDocumentChanges(input.documentId, input.changes, auth);
+            const tailCount = await getDocumentTailCount(input.documentId, auth);
+            if (tailCount >= COMPACTION_TAIL_THRESHOLD) {
+                await compactDocument(input.documentId, auth);
+            }
+            return result;
         }),
 
     /**
      * Get all changes for a document to rebuild CRDT state.
      * Returns changes in order so they can be applied sequentially.
      */
-    getDocumentChanges: publicProcedure
+    getDocumentChanges: protectedProcedure
         .input(z.string())
-        .query(async ({ input }) => {
-            return getDocumentChanges(input);
+        .query(async ({ input, ctx }) => {
+            return getDocumentChanges(input, authFromCtx(ctx));
         }),
 });
