@@ -322,98 +322,30 @@ export async function getCurrentUserProfile(auth?: AuthContext): Promise<UserPro
     return data;
 }
 
-/**
-   * Converts hex-encoded string to ASCII string.
-   * Used when hex is encoding a text string (like a base64 string).
-   */
-  function hexToAscii(hex: string): string {
-    let cleanHex = hex;
-    
-    // Remove \x or 0x prefix if present
-    if (hex.startsWith('\\x')) {
-      cleanHex = hex.slice(2);
-    } else if (hex.startsWith('0x') || hex.startsWith('0X')) {
-      cleanHex = hex.slice(2);
-    }
-    
-    // Remove whitespace
-    cleanHex = cleanHex.replace(/\s/g, '');
-    
-    // Validate hex string
-    if (cleanHex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(cleanHex)) {
-      throw new Error('Invalid hex string');
-    }
-    
-    // Convert hex to ASCII string
-    let ascii = '';
-    for (let i = 0; i < cleanHex.length; i += 2) {
-      const byte = parseInt(cleanHex.substring(i, i + 2), 16);
-      ascii += String.fromCharCode(byte);
-    }
-    
-    return ascii;
-  }
-
-  /**
-   * Normalizes snapshot data to base64 format.
-   * If the data is hex-encoded, it's likely encoding a base64 string.
-   * We decode hex to ASCII, and if that's base64, we use it directly.
-   * If it's already base64, returns as-is.
-   */
-  function normalizeToBase64(data: string): string {
-    const trimmed = data.trim();
-    
-    // Check if it's hex-encoded (starts with \x, 0x, or is pure hex)
-    const hasHexPrefix = trimmed.startsWith('\\x') || 
-                         trimmed.startsWith('0x') || 
-                         trimmed.startsWith('0X');
-    const isPureHex = /^[0-9a-fA-F]+$/.test(trimmed);
-    const isHex = hasHexPrefix || isPureHex;
-    
-    // Check if it's base64
-    const isBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(trimmed);
-    
-    if (isHex && !isBase64) {
-      // It's hex, decode it to see what we get
-      try {
-        const decoded = hexToAscii(trimmed);
-        
-        // Check if the decoded string is base64
-        const decodedIsBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(decoded);
-        
-        if (decodedIsBase64) {
-          // Hex was encoding a base64 string, return it directly
-          return decoded;
-        } else {
-          // Hex was encoding raw binary, convert to base64
-          // This is unlikely but handle it for completeness
-          const bytes = new Uint8Array(decoded.length);
-          for (let i = 0; i < decoded.length; i++) {
-            bytes[i] = decoded.charCodeAt(i);
-          }
-          
-          let binary = '';
-          for (const byte of bytes) {
-            binary += String.fromCharCode(byte);
-          }
-          
-          return btoa(binary);
-        }
-      } catch (err) {
-        throw new Error(`Failed to convert hex to base64: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    } else if (isBase64) {
-      // Already base64, return as-is
-      return trimmed;
-    } else {
-      // Unknown format
-      throw new Error(`Snapshot data is neither valid base64 nor valid hex. Preview: ${trimmed.substring(0, 50)}`);
-    }
-  }
-
 // =============================================================================
 // CRDT-based document changes (new approach)
 // =============================================================================
+// Supabase/PostgREST can return bytea as base64 or hex in JSON. Normalize to base64 for the API.
+
+/** Convert bytea response (base64 or hex from PostgREST) to base64 so the client can always use atob(). */
+function byteaResponseToBase64(raw: string | null | undefined): string {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('\\x') || trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
+    const hex = trimmed.replace(/^\\x|^0x|^0X/i, '').replace(/\s/g, '');
+    return Buffer.from(hex, 'hex').toString('base64');
+  }
+  if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
+    return Buffer.from(trimmed, 'hex').toString('base64');
+  }
+  return trimmed;
+}
+
+/** Convert base64 (from API) to Postgres bytea input format (hex with \\x prefix) for INSERT/UPDATE. */
+function base64ToByteaHex(base64: string): string {
+  const buf = Buffer.from(base64, 'base64');
+  return '\\x' + buf.toString('hex');
+}
 
 import { COMPACTION_CAP } from '~/server/document-compaction';
 
@@ -433,14 +365,14 @@ export async function saveDocumentChange(
   const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
   await ensureCanMutateDocument(supabase, documentId, userId);
 
-  // Insert the change (unique constraint handles duplicates)
+  // Insert the change (unique constraint handles duplicates). bytea column expects hex.
   const { error } = await supabase
     .from('document_changes')
     .insert({
       document_id: documentId,
       client_id: clientId,
       clock,
-      update_data: updateData,
+      update_data: base64ToByteaHex(updateData),
     });
 
   // Ignore duplicate key errors (23505) - this is expected with CRDT
@@ -464,12 +396,12 @@ export async function saveDocumentChanges(
   const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
   await ensureCanMutateDocument(supabase, documentId, userId);
 
-  // Batch insert (upsert to handle duplicates gracefully)
+  // Batch insert (upsert to handle duplicates gracefully). bytea column expects hex.
   const rows = changes.map(c => ({
     document_id: documentId,
     client_id: c.clientId,
     clock: c.clock,
-    update_data: c.updateData,
+    update_data: base64ToByteaHex(c.updateData),
   }));
 
   const { error } = await supabase
@@ -522,7 +454,7 @@ export async function getDocumentChanges(documentId: string, auth?: AuthContext)
 
   const snapshotRow = snapshotResult.data as DocumentSnapshotRow | null;
   const snapshot: string | null = snapshotRow?.snapshot_data
-    ? normalizeToBase64(snapshotRow.snapshot_data)
+    ? byteaResponseToBase64(snapshotRow.snapshot_data)
     : null;
   const snapshotCutoffCreatedAt: string | null =
     snapshotRow?.snapshot_cutoff_created_at ?? null;
@@ -547,7 +479,7 @@ export async function getDocumentChanges(documentId: string, auth?: AuthContext)
     (changesRows as Array<{ update_data: string; created_at: string }> | null) ?? [];
 
   const changes = tailRows.map((row) => ({
-    updateData: normalizeToBase64(row.update_data),
+    updateData: byteaResponseToBase64(row.update_data),
   }));
 
   return {
@@ -608,7 +540,7 @@ function buildSnapshotFromSnapshotAndTail(
     Y.applyUpdate(ydoc, snapshotBytes);
   }
   for (const row of tailRows) {
-    const updateBytes = base64ToUint8Array(normalizeToBase64(row.update_data));
+    const updateBytes = base64ToUint8Array(byteaResponseToBase64(row.update_data));
     Y.applyUpdate(ydoc, updateBytes);
   }
   const stateUpdate = Y.encodeStateAsUpdate(ydoc);
@@ -647,7 +579,7 @@ export async function compactDocument(
 
   const snapshotRow = rawSnapshotRow as DocumentSnapshotRow | null;
   const snapshotBase64 = snapshotRow?.snapshot_data
-    ? normalizeToBase64(snapshotRow.snapshot_data)
+    ? byteaResponseToBase64(snapshotRow.snapshot_data)
     : null;
   const cutoffAfter = snapshotRow?.snapshot_cutoff_created_at ?? null;
 
@@ -691,7 +623,7 @@ export async function compactDocument(
     .upsert(
       {
         document_id: documentId,
-        snapshot_data: snapshotData,
+        snapshot_data: base64ToByteaHex(snapshotData),
         snapshot_cutoff_created_at: cutoffCreatedAt,
       },
       { onConflict: 'document_id' }
