@@ -492,44 +492,33 @@ export async function saveDocumentChanges(
  * Tail uses index (document_id, created_at). For one DB round trip, consider a
  * Postgres RPC that returns snapshot row + tail rows in a single call.
  */
-/** Single round-trip page size for tail fetch (avoids pagination waterfall). */
-const GET_CHANGES_TAIL_PAGE_SIZE = 5000;
-
 export async function getDocumentChanges(documentId: string, auth?: AuthContext) {
   const supabase = auth?.supabase ?? await createClient();
-  const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
+  if (!auth) {
+    // Ensure the caller is authenticated; row-level security will handle per-row permissions.
+    await getAuthenticatedUser(supabase);
+  }
 
-  // Doc check, permission check, and snapshot fetch in parallel (no waterfall).
-  const [docResult, permissionResult, snapshotResult] = await Promise.all([
-    supabase.from('documents').select('id').eq('id', documentId).single(),
-    supabase
-      .from('document_permissions')
-      .select('id')
-      .eq('document_id', documentId)
-      .eq('user_id', userId)
-      .single(),
-    supabase
-      .from('document_snapshots')
-      .select('snapshot_data, snapshot_cutoff_created_at')
-      .eq('document_id', documentId)
-      .single(),
-  ]);
+  // 1) Check document existence (RLS on documents still applies).
+  const { data: doc, error: docError } = await supabase
+    .from('documents')
+    .select('id')
+    .eq('id', documentId)
+    .single();
 
-  const { data: doc, error: docError } = docResult;
   if (docError) {
-    throwOnDocumentQueryError(docError, 'Failed to check document');
+    throwOnDocumentQueryError(docError as { code?: string; message?: string }, 'Failed to fetch document');
   }
   if (!doc) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
   }
 
-  const { data: permission } = permissionResult;
-  if (!permission) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'You do not have permission to access this document',
-    });
-  }
+  // 2) Fetch snapshot row (if any).
+  const snapshotResult = await supabase
+    .from('document_snapshots')
+    .select('snapshot_data, snapshot_cutoff_created_at')
+    .eq('document_id', documentId)
+    .single();
 
   const snapshotRow = snapshotResult.data as DocumentSnapshotRow | null;
   const snapshot: string | null = snapshotRow?.snapshot_data
@@ -538,32 +527,26 @@ export async function getDocumentChanges(documentId: string, auth?: AuthContext)
   const snapshotCutoffCreatedAt: string | null =
     snapshotRow?.snapshot_cutoff_created_at ?? null;
 
-  // Fetch tail only: changes after snapshot cutoff. Select minimal columns; index (document_id, created_at) used for range.
-  const PAGE_SIZE = GET_CHANGES_TAIL_PAGE_SIZE;
-  const allRows: Array<{ update_data: string; created_at: string }> = [];
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    let tailQuery = supabase
-      .from('document_changes')
-      .select('update_data, created_at')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (snapshotCutoffCreatedAt) {
-      tailQuery = tailQuery.gt('created_at', snapshotCutoffCreatedAt);
-    }
-    const { data: page, error } = await tailQuery;
-    if (error) {
-      throw new Error(`Failed to fetch document changes: ${error.message}`);
-    }
-    const rows = page ?? [];
-    allRows.push(...rows);
-    hasMore = rows.length === PAGE_SIZE;
-    offset += PAGE_SIZE;
+  // 3) Fetch tail: all changes after snapshot cutoff (or all if no cutoff) in a single query.
+  let changesQuery = supabase
+    .from('document_changes')
+    .select('update_data, created_at')
+    .eq('document_id', documentId)
+    .order('created_at', { ascending: true });
+
+  if (snapshotCutoffCreatedAt) {
+    changesQuery = changesQuery.gt('created_at', snapshotCutoffCreatedAt);
   }
 
-  const changes = allRows.map((row: { update_data: string; created_at: string }) => ({
+  const { data: changesRows, error: changesError } = await changesQuery;
+  if (changesError) {
+    throw new Error(`Failed to fetch document changes: ${changesError.message}`);
+  }
+
+  const tailRows =
+    (changesRows as Array<{ update_data: string; created_at: string }> | null) ?? [];
+
+  const changes = tailRows.map((row) => ({
     updateData: normalizeToBase64(row.update_data),
   }));
 
