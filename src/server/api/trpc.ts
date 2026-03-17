@@ -31,6 +31,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   return {
     ...opts,
     user: user ?? null,
+    supabase,
   };
 };
 

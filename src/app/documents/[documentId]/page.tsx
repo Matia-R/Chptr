@@ -77,8 +77,8 @@ export default function DocumentPage() {
     [],
   );
 
-  // Fetch user profile
-  const { data: userProfile, isLoading: isProfileLoading } = useUserProfile();
+  // Fetch user profile (non-blocking: editor shows with placeholder until loaded)
+  const { data: userProfile } = useUserProfile();
 
   // CRDT-based collaborative doc - handles fetching and saving internally
   const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocCrdt(
@@ -103,11 +103,8 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Show loading skeleton (CRDT loading or provider not ready)
-  if (
-    !isNew &&
-    (isLoading || !isReady || !ydoc || !provider || isProfileLoading)
-  ) {
+  // 2. Show loading skeleton (CRDT loading or provider not ready). Do not block on profile.
+  if (!isNew && (isLoading || !isReady || !ydoc || !provider)) {
     return (
       <MotionFade>
         <DocumentLoadingSkeleton />
@@ -116,7 +113,7 @@ export default function DocumentPage() {
   }
 
   // 3. Still waiting for ydoc/provider (e.g. optimistic new-doc case)
-  if (!isReady || !ydoc || !provider || isProfileLoading) {
+  if (!isReady || !ydoc || !provider) {
     return (
       <MotionFade>
         <DocumentLoadingSkeleton />
