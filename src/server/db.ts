@@ -437,6 +437,9 @@ export async function getDocumentChanges(documentId: string, auth?: AuthContext)
     .eq('document_id', documentId)
     .single();
 
+  if (snapshotResult.error && snapshotResult.error.code !== 'PGRST116') {
+    throw new Error(`Failed to fetch document snapshot: ${snapshotResult.error.message}`);
+  }
   const snapshotRow = snapshotResult.data as DocumentSnapshotRow | null;
   const snapshot: string | null = snapshotRow?.snapshot_data
     ? byteaResponseToBase64(snapshotRow.snapshot_data)
@@ -485,11 +488,15 @@ export async function getDocumentTailCount(
   const supabase = auth?.supabase ?? await createClient();
   if (!auth) await getAuthenticatedUser(supabase);
 
-  const { data: snapshotRow } = await supabase
+  const { data: snapshotRow, error: snapshotError } = await supabase
     .from('document_snapshots')
     .select('snapshot_cutoff_created_at')
     .eq('document_id', documentId)
     .single();
+
+  if (snapshotError && snapshotError.code !== 'PGRST116') {
+    throw new Error(`Failed to fetch document snapshot: ${snapshotError.message}`);
+  }
 
   let query = supabase
     .from('document_changes')
@@ -556,12 +563,15 @@ export async function compactDocument(
   const userId = auth?.userId ?? (await getAuthenticatedUser(supabase)).id;
   await ensureCanMutateDocument(supabase, documentId, userId);
 
-  const { data: rawSnapshotRow } = await supabase
+  const { data: rawSnapshotRow, error: snapshotError } = await supabase
     .from('document_snapshots')
     .select('snapshot_data, snapshot_cutoff_created_at')
     .eq('document_id', documentId)
     .single();
 
+  if (snapshotError && snapshotError.code !== 'PGRST116') {
+    throw new Error(`Failed to fetch document snapshot: ${snapshotError.message}`);
+  }
   const snapshotRow = rawSnapshotRow as DocumentSnapshotRow | null;
   const snapshotBase64 = snapshotRow?.snapshot_data
     ? byteaResponseToBase64(snapshotRow.snapshot_data)

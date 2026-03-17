@@ -185,6 +185,9 @@ export function useCollaborativeDocCrdt({
             Y.applyUpdate(ydoc, merged);
           } catch (err) {
             console.error("[CRDT] Failed to apply merged update:", err);
+            setError(err instanceof Error ? err : new Error(String(err)));
+            ydoc.destroy();
+            return;
           }
         }
       }
