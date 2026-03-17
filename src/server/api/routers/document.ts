@@ -105,9 +105,13 @@ export const documentRouter = createTRPCRouter({
         .mutation(async ({ input, ctx }) => {
             const auth = authFromCtx(ctx);
             const result = await saveDocumentChanges(input.documentId, input.changes, auth);
-            const tailCount = await getDocumentTailCount(input.documentId, auth);
-            if (tailCount >= COMPACTION_TAIL_THRESHOLD) {
-                await compactDocument(input.documentId, auth);
+            try {
+                const tailCount = await getDocumentTailCount(input.documentId, auth);
+                if (tailCount >= COMPACTION_TAIL_THRESHOLD) {
+                    await compactDocument(input.documentId, auth);
+                }
+            } catch (err) {
+                console.error("[saveDocumentChanges] Compaction failed (best-effort):", err);
             }
             return result;
         }),
