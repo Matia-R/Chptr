@@ -215,37 +215,22 @@ async function getAuthenticatedUser(supabase: Awaited<ReturnType<typeof createCl
 
 /**
  * Creates a document and an owner permission for the user.
- * Idempotent: ignores 23505 (unique violation) for document or permission.
+ * Uses a DB RPC so creator_id = auth.uid() in the same request context (avoids app/session mismatch).
+ * Idempotent: RPC uses ON CONFLICT DO NOTHING; trigger adds owner permission.
  */
 async function createDocumentWithPermission(
     supabase: Awaited<ReturnType<typeof createClient>>,
     documentId: string,
-    userId: string,
+    _userId: string,
     name = 'Untitled'
 ) {
-    const { error: createError } = await supabase
-        .from('documents')
-        .insert({
-            id: documentId,
-            creator_id: userId,
-            name,
-            ...(name !== 'Untitled' ? { last_updated: new Date() } : {}),
-        });
+    const { error } = await supabase.rpc('create_document_with_owner', {
+        p_document_id: documentId,
+        p_name: name,
+    });
 
-    if (createError && createError.code !== '23505') {
-        throw new Error(`Failed to create document: ${createError.message}`);
-    }
-
-    const { error: permError } = await supabase
-        .from('document_permissions')
-        .insert({
-            user_id: userId,
-            document_id: documentId,
-            permission: 'owner',
-        });
-
-    if (permError && permError.code !== '23505') {
-        throw new Error(`Failed to create document permission: ${permError.message}`);
+    if (error) {
+        throw new Error(`Failed to create document: ${error.message}`);
     }
 }
 
