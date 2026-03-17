@@ -10,6 +10,7 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/avatar";
 import {
@@ -53,10 +54,13 @@ export function NavUser({
   const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    // Clear all cached server state so the next user doesn't see the previous user's data
+    queryClient.clear();
     router.push("/login");
   };
 
