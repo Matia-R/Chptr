@@ -585,14 +585,14 @@ export async function compactDocument(
 
   // Load tail (cap for timeout safety). Use large page to minimize round-trips.
   const PAGE_SIZE = 5000;
-  const tailRows: Array<{ update_data: string; created_at: string }> = [];
+  const tailRows: Array<{ id: string; update_data: string; created_at: string }> = [];
   let offset = 0;
   let hasMore = true;
   while (hasMore && tailRows.length < COMPACTION_CAP) {
     const limit = Math.min(PAGE_SIZE, COMPACTION_CAP - tailRows.length);
     let tailQuery = supabase
       .from('document_changes')
-      .select('update_data, created_at')
+      .select('id, update_data, created_at')
       .eq('document_id', documentId)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
@@ -603,7 +603,7 @@ export async function compactDocument(
     if (error) {
       throw new Error(`Failed to fetch tail for compaction: ${error.message}`);
     }
-    const rows = (page ?? []) as Array<{ update_data: string; created_at: string }>;
+    const rows = (page ?? []) as Array<{ id: string; update_data: string; created_at: string }>;
     tailRows.push(...rows);
     hasMore = rows.length === limit;
     offset += limit;
@@ -632,11 +632,11 @@ export async function compactDocument(
     throw new Error(`Failed to upsert snapshot: ${upsertError.message}`);
   }
 
+  const compactedIds = tailRows.map((r) => r.id);
   const { error: deleteError } = await supabase
     .from('document_changes')
     .delete()
-    .eq('document_id', documentId)
-    .lte('created_at', cutoffCreatedAt);
+    .in('id', compactedIds);
   if (deleteError) {
     throw new Error(`Failed to delete compacted changes: ${deleteError.message}`);
   }
