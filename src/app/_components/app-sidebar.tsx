@@ -66,9 +66,13 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     setShowBottomShadow(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
   }, [documents]);
 
-  // Fetch user profile and email (shared query, automatically deduplicated by React Query)
   const { data: userProfile, isLoading: userLoading } = useUserProfile();
-  const { data: userEmail } = api.user.getCurrentUser.useQuery();
+  const { data: userEmail, isLoading: emailLoading } =
+    api.user.getCurrentUser.useQuery();
+
+  const footerLoading =
+    userLoading ||
+    (!!userProfile && !userProfile.username && emailLoading);
 
   // Instant document creation with optimistic sidebar update
   const handleCreateDocument = React.useCallback(() => {
@@ -203,19 +207,22 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
         <div className="flex-none">
           <SidebarFooter>
-            {userProfile && userEmail ? (
+            {footerLoading ? (
+              <NavUser isLoading />
+            ) : userProfile ? (
               <NavUser
                 user={{
                   first_name: userProfile.first_name,
                   last_name: userProfile.last_name,
-                  email: userEmail,
+                  username: userProfile.username,
+                  email: userEmail ?? "",
                   avatar_url: userProfile.avatar_url,
                   default_avatar_background_color:
                     userProfile.default_avatar_background_color,
                 }}
               />
             ) : (
-              <NavUser isLoading={userLoading} />
+              <NavUser isLoading={false} />
             )}
           </SidebarFooter>
         </div>

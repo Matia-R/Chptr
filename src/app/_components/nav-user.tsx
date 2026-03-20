@@ -45,6 +45,8 @@ export function NavUser({
   user?: {
     first_name: string;
     last_name: string;
+    username: string | null;
+    /** Shown when `username` is unset (username is optional). */
     email: string;
     avatar_url: string | null;
     default_avatar_background_color: string;
@@ -113,6 +115,12 @@ export function NavUser({
     backgroundColor: fallbackAvatarBackgroundColor,
   };
 
+  const subtitle = user.username
+    ? `@${user.username}`
+    : user.email
+      ? user.email
+      : null;
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -139,7 +147,11 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                {subtitle ? (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {subtitle}
+                  </span>
+                ) : null}
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -169,7 +181,11 @@ export function NavUser({
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  {subtitle ? (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {subtitle}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </DropdownMenuLabel>

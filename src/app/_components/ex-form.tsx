@@ -17,9 +17,13 @@ import {
 import { Input } from "./input"
 
 const formSchema = z.object({
-    username: z.string().min(2, {
-        message: "Username must be at least 2 characters.",
-    }),
+    username: z
+        .string()
+        .trim()
+        .max(50, { message: "Username must be at most 50 characters." })
+        .refine((s) => s.length === 0 || s.length >= 2, {
+            message: "Username must be at least 2 characters when provided.",
+        }),
 })
 
 export function ProfileForm() {

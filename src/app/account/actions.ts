@@ -13,7 +13,7 @@ export async function updateProfile(formData: FormData) {
 
     const email = formData.get('email') as string
     const password = formData.get('password') as string
-    const username = formData.get('username') as string
+    const username = ((formData.get('username') as string) ?? '').trim()
 
     try {
         if (email !== user.email) {
@@ -30,7 +30,7 @@ export async function updateProfile(formData: FormData) {
             .from('profiles')
             .upsert({
                 id: user.id,
-                username,
+                username: username.length > 0 ? username : null,
                 updated_at: new Date().toISOString(),
             })
 

@@ -7,6 +7,7 @@ type UserProfile = {
   first_name: string
   last_name: string
   default_avatar_background_color: string
+  username: string | null
 }
 
 /**
