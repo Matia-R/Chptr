@@ -3,6 +3,7 @@
 import { signup } from "./actions";
 import { Button } from "../_components/button";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -43,6 +44,8 @@ const formSchema = z
   });
 
 export default function SignUpPage() {
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -56,17 +59,22 @@ export default function SignUpPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      const formData = new FormData();
-      formData.append("firstName", values.firstName);
-      formData.append("lastName", values.lastName);
-      formData.append("username", values.username);
-      formData.append("email", values.email);
-      formData.append("password", values.password);
+    setAuthError(null);
+    const formData = new FormData();
+    formData.append("firstName", values.firstName);
+    formData.append("lastName", values.lastName);
+    formData.append("username", values.username);
+    formData.append("email", values.email);
+    formData.append("password", values.password);
 
-      await signup(formData);
-    } catch (error) {
-      console.error("Signup failed:", error);
+    setIsLoading(true);
+    try {
+      const result = await signup(formData);
+      if (result?.error) {
+        setAuthError(result.error);
+      }
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -123,6 +131,10 @@ export default function SignUpPage() {
                     placeholder="Username"
                     autoComplete="username"
                     {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setAuthError(null);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
@@ -175,7 +187,15 @@ export default function SignUpPage() {
             )}
           />
 
-          <Button type="submit" className="w-full py-2 text-sm font-medium">
+          {authError ? (
+            <div className="text-sm text-red-600">{authError}</div>
+          ) : null}
+
+          <Button
+            type="submit"
+            className="w-full py-2 text-sm font-medium"
+            disabled={isLoading}
+          >
             Submit
           </Button>
 
