@@ -123,7 +123,10 @@ export default function DocumentPage() {
 
   // 4. Ready to render
   const userName = userProfile
-    ? `${userProfile.first_name} ${userProfile.last_name}`
+    ? [userProfile.first_name, userProfile.last_name]
+        .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+        .join(" ")
+        .trim() || "Anonymous User"
     : "Anonymous User";
   const userColor = getAvatarColorHex(
     userProfile?.default_avatar_background_color,
@@ -132,6 +135,7 @@ export default function DocumentPage() {
   return (
     <MotionFade>
       <Editor
+        documentId={documentId}
         userName={userName}
         userColor={userColor}
         ydoc={ydoc}
