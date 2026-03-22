@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { createClient } from "~/utils/supabase/server";
+import { sanitizePublishedHtml } from "~/lib/published-html";
 import { getPublicationByUsernameSlug } from "~/server/db/document-publications";
 
 export const revalidate = 3600;
@@ -50,6 +51,8 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
     notFound();
   }
 
+  const safeHtml = sanitizePublishedHtml(publication.body_html);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -74,7 +77,7 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
         </h1>
         <article
           className="bn-shadcn published-document-content text-[1.05rem] leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: publication.body_html }}
+          dangerouslySetInnerHTML={{ __html: safeHtml }}
         />
       </main>
     </div>
