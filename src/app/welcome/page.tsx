@@ -9,10 +9,10 @@ export default async function WelcomePage() {
     try {
         const userProfile = await caller.user.getCurrentUserProfile();
         const { first_name } = userProfile!;
+        const firstNameTrim = first_name?.trim() ?? "";
+        const welcomeName = firstNameTrim.length > 0 ? firstNameTrim : "there";
 
-        return (
-            <WelcomeClient userName={first_name} />
-        )
+        return <WelcomeClient userName={welcomeName} />;
     } catch (error) {
         // If user is not authenticated, redirect to login
         redirect('/login')

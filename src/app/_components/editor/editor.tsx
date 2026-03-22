@@ -23,10 +23,12 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
+import { DocumentPublishBar } from "./document-publish-bar";
 
 type Theme = "light" | "dark" | "system";
 
 interface EditorProps {
+  documentId: string;
   userName: string;
   userColor: string;
   ydoc: Y.Doc;
@@ -42,6 +44,7 @@ const schema = BlockNoteSchema.create({
 });
 
 export default function Editor({
+  documentId,
   userName,
   userColor,
   ydoc,
@@ -159,6 +162,7 @@ export default function Editor({
 
   return (
     <div ref={editorContainerRef} className="contents">
+      <DocumentPublishBar documentId={documentId} editor={editor} />
       <BlockNoteView
         editor={editor}
         theme={currentTheme as "light" | "dark"}

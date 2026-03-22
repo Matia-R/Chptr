@@ -14,3 +14,11 @@ export {
   getDocumentTailCount,
   compactDocument,
 } from './document-changes'
+export {
+  getPublicationByUsernameSlug,
+  getPublicationByDocumentId,
+  getPublicationOwnerPathSegmentForDocument,
+  publishDocument,
+  unpublishDocument,
+  type DocumentPublicationRow,
+} from './document-publications'

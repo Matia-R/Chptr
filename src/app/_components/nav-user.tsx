@@ -43,10 +43,9 @@ export function NavUser({
   isLoading,
 }: {
   user?: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
     username: string | null;
-    /** Shown when `username` is unset (username is optional). */
     email: string;
     avatar_url: string | null;
     default_avatar_background_color: string;
