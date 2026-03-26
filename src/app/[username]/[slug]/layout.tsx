@@ -2,6 +2,8 @@ import "@blocknote/core/style.css";
 
 import "~/app/_components/editor/style.css";
 
+import "./published-document.css";
+
 import { PublishedScrollRoot } from "./published-scroll-root";
 
 /** Runs before paint so wheel scrolling works before React hydrates (class pairs with globals.css). */

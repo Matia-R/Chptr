@@ -1,0 +1,10 @@
+/**
+ * Published article HTML is BlockNote export: empty blocks render as
+ * <p class="bn-inline-content"></p> (or headings) with no text, which collapse
+ * to 0 height in browsers. Match a normal line box (~26px at default scale).
+ */
+.published-document-content .bn-block-content
+  :is(p, h1, h2, h3, h4, h5, h6).bn-inline-content:empty {
+  display: block;
+  min-height: 1.625em;
+}
