@@ -8,3 +8,16 @@
   display: block;
   min-height: 1.625em;
 }
+
+/**
+ * Match the editor: `.bn-shadcn a` uses color/text-decoration inherit (Tailwind reset).
+ * Inside `.bn-editor`, links use `revert` for default link styling. Published HTML has no
+ * `.bn-editor` wrapper, so links looked like plain text — restore UA link appearance.
+ * (See editor/style.css `.bn-shadcn .bn-editor a`.)
+ */
+.published-document-content a[href] {
+  color: revert;
+  -webkit-text-decoration: revert;
+  text-decoration: revert;
+  cursor: pointer;
+}
