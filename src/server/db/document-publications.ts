@@ -1,5 +1,8 @@
 import { TRPCError } from '@trpc/server'
 import { revalidatePath } from 'next/cache'
+import { cache } from 'react'
+
+import { createClient } from '~/utils/supabase/server'
 
 import {
   isValidOwnerPathSegment,
@@ -22,6 +25,29 @@ export type DocumentPublicationRow = {
   blocks_json: unknown
   published_at: string
   updated_at: string
+}
+
+/** Fields needed for public published-page author row (from `profiles`). */
+export type PublishedAuthorProfileRow = {
+  username: string | null
+  first_name: string | null
+  last_name: string | null
+  avatar_url: string | null
+  default_avatar_background_color: string | null
+}
+
+export function authorDisplayLabel(
+  profile: PublishedAuthorProfileRow | null,
+  ownerUsername: string
+): string {
+  if (!profile) return ownerUsername
+  const parts = [profile.first_name, profile.last_name]
+    .map((s) => s?.trim())
+    .filter((s): s is string => Boolean(s && s.length > 0))
+  if (parts.length > 0) return parts.join(' ')
+  const u = profile.username?.trim()
+  if (u) return u
+  return ownerUsername
 }
 
 type DocRow = {
@@ -117,6 +143,49 @@ export async function getPublicationByUsernameSlug(
 
   return pubResult.data as DocumentPublicationRow | null
 }
+
+/**
+ * Publication row plus creator profile for public `/[username]/[slug]`.
+ * Wrapped in `cache()` so `generateMetadata` and the page share one DB round-trip per request.
+ * Uses only `(username, slug)` as the cache key (not the Supabase client instance).
+ */
+export const getPublicationWithAuthorByUsernameSlug = cache(
+  async (
+    ownerUsername: string,
+    slug: string
+  ): Promise<{
+    publication: DocumentPublicationRow
+    authorProfile: PublishedAuthorProfileRow | null
+  } | null> => {
+    const supabase = await createClient()
+    const publication = await getPublicationByUsernameSlug(
+      ownerUsername,
+      slug,
+      supabase
+    )
+    if (!publication) return null
+
+    const profileResult = await supabase
+      .from('profiles')
+      .select(
+        'username, first_name, last_name, avatar_url, default_avatar_background_color'
+      )
+      .eq('id', publication.creator_id)
+      .maybeSingle()
+
+    if (profileResult.error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: profileResult.error.message,
+      })
+    }
+
+    return {
+      publication,
+      authorProfile: profileResult.data as PublishedAuthorProfileRow | null,
+    }
+  }
+)
 
 export async function getPublicationByDocumentId(
   documentId: string,

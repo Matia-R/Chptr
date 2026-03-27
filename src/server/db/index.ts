@@ -15,10 +15,13 @@ export {
   compactDocument,
 } from './document-changes'
 export {
+  authorDisplayLabel,
   getPublicationByUsernameSlug,
+  getPublicationWithAuthorByUsernameSlug,
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,
   unpublishDocument,
   type DocumentPublicationRow,
+  type PublishedAuthorProfileRow,
 } from './document-publications'
