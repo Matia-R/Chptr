@@ -135,7 +135,6 @@ export default function DocumentPage() {
   return (
     <MotionFade>
       <Editor
-        documentId={documentId}
         userName={userName}
         userColor={userColor}
         ydoc={ydoc}

@@ -23,12 +23,11 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
-import { DocumentPublishBar } from "./document-publish-bar";
+import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
 
 interface EditorProps {
-  documentId: string;
   userName: string;
   userColor: string;
   ydoc: Y.Doc;
@@ -44,7 +43,6 @@ const schema = BlockNoteSchema.create({
 });
 
 export default function Editor({
-  documentId,
   userName,
   userColor,
   ydoc,
@@ -52,6 +50,8 @@ export default function Editor({
 }: EditorProps) {
   const { theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
+
+  const setDocumentEditor = useDocumentEditorStore((s) => s.setEditor);
 
   const editor = useCreateBlockNote(
     {
@@ -82,6 +82,13 @@ export default function Editor({
     },
     [userName, userColor, provider, ydoc],
   );
+
+  useEffect(() => {
+    setDocumentEditor(editor);
+    return () => {
+      setDocumentEditor(null);
+    };
+  }, [editor, setDocumentEditor]);
 
   // --- Theme handling ---
   useEffect(() => {
@@ -162,7 +169,6 @@ export default function Editor({
 
   return (
     <div ref={editorContainerRef} className="contents">
-      <DocumentPublishBar documentId={documentId} editor={editor} />
       <BlockNoteView
         editor={editor}
         theme={currentTheme as "light" | "dark"}

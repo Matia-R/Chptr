@@ -6,6 +6,7 @@ import { Separator } from "./separator";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
 import { CommandMenuButton } from "./command-menu-button";
+import { DocumentPublishButton } from "./editor/document-publish-button";
 
 export function Header() {
   const pathname = usePathname();
@@ -23,8 +24,9 @@ export function Header() {
           </>
         )}
       </div>
-      <div className="ml-auto flex min-w-[110px] flex-shrink-0 items-center gap-2 px-3">
-        <CommandMenuButton />
+      <div className="ml-auto flex flex-shrink-0 items-center gap-2">
+        {isDocumentPage && <DocumentPublishButton />}
+        {/* <CommandMenuButton /> */}
         {isDocumentPage && <DocumentActions />}
       </div>
     </header>
