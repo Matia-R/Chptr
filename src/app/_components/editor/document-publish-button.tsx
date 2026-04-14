@@ -7,22 +7,25 @@
  */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- tRPC React Query hooks */
 
-import { Copy, Globe, Loader2 } from "lucide-react";
+import { ExternalLink, Globe, Link as LinkIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "~/app/_components/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/app/_components/dialog";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/app/_components/popover";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+} from "~/app/_components/field";
 import { Input } from "~/app/_components/input";
-import { Label } from "~/app/_components/label";
+import { Switch } from "~/app/_components/switch";
 import { useToast } from "~/hooks/use-toast";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { slugifyTitle } from "~/lib/slug";
@@ -49,12 +52,14 @@ function formatUsernameSegmentForDisplay(username: string): string {
   return username.length <= MAX_USERNAME_DISPLAY_CHARS ? username : "...";
 }
 
-/**
- * Renders like `chptr.io/.../doc-slug` when the username is long; otherwise full username.
- */
-function formatLiveUrlForDisplay(username: string, slug: string): string {
-  const userPart = formatUsernameSegmentForDisplay(username);
-  return `${LIVE_HOST_DISPLAY}/${userPart}/${slug}`;
+/** Same pattern as `PublishedDocumentTitleSection` (short month, day, year). */
+function formatPublicationDate(iso: string): string {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
 }
 
 export function DocumentPublishButton() {
@@ -65,6 +70,7 @@ export function DocumentPublishButton() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [slugOverride, setSlugOverride] = useState("");
+  const [autoPublishChanges, setAutoPublishChanges] = useState(false);
 
   const { data: docMeta } = api.document.getDocumentById.useQuery(
     documentId ?? "",
@@ -150,6 +156,19 @@ export function DocumentPublishButton() {
   const urlPrefixTitle =
     ownerPreview != null ? `${LIVE_HOST_DISPLAY}/${ownerPreview}/` : undefined;
 
+  /** Slug segment for the public path preview (matches what will be live after publish/update). */
+  const previewSlugSegment = slugOverride.trim()
+    ? slugifyTitle(slugOverride)
+    : publication
+      ? publication.slug
+      : slugifyTitle(title);
+
+  /** When auto-publish is on, manual Update is only needed if the URL slug was edited. */
+  const updateDisabledForAutoPublishNoSlugEdit =
+    autoPublishChanges &&
+    !!publication &&
+    previewSlugSegment === publication.slug;
+
   const handlePublish = async () => {
     if (!editor || !documentId) {
       toast({
@@ -181,79 +200,132 @@ export function DocumentPublishButton() {
   const busy = publishMutation.isPending || unpublishMutation.isPending;
 
   return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="relative h-8 w-8 shrink-0"
-        disabled={!editor}
-        title={
-          !editor
-            ? "Loading editor…"
-            : publication
-              ? "Published — manage sharing"
-              : "Publish to web"
-        }
-        onClick={() => {
-          setSlugOverride("");
-          setOpen(true);
-        }}
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setSlugOverride("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="relative h-8 w-8 shrink-0"
+          disabled={!editor}
+          title={
+            !editor
+              ? "Loading editor…"
+              : publication
+                ? "Published — manage sharing"
+                : "Publish to web"
+          }
+        >
+          <span className="sr-only">
+            {publication
+              ? "Document is published. Open sharing options."
+              : "Publish to web."}
+          </span>
+          <Globe className="h-4 w-4" aria-hidden />
+          {publication && !!editor ? (
+            <span
+              className="motion-safe:duration-[650ms] pointer-events-none absolute right-[5px] top-[5px] size-1.5 rounded-full bg-emerald-500 ring-2 ring-background motion-safe:ease-out motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
+              aria-hidden
+            />
+          ) : null}
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        className={cn(
+          "relative w-[min(100vw-2rem,28rem)] max-w-md border border-sidebar-border bg-sidebar p-6 text-sidebar-foreground shadow-lg",
+          "grid gap-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        )}
       >
-        <span className="sr-only">
-          {publication
-            ? "Document is published. Open sharing options."
-            : "Publish to web."}
-        </span>
-        <Globe className="h-4 w-4" aria-hidden />
-        {publication && !!editor ? (
-          <span
-            className="motion-safe:duration-[650ms] pointer-events-none absolute right-[5px] top-[5px] size-1.5 rounded-full bg-emerald-500 ring-2 ring-background motion-safe:ease-out motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
-            aria-hidden
-          />
-        ) : null}
-      </Button>
+        <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
+            Publish to the web
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Share your article with the world.
+          </p>
+        </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Publish to the web</DialogTitle>
-            <DialogDescription>
-              Share your article with the world.
-            </DialogDescription>
-          </DialogHeader>
-
+        <div className="grid gap-4 py-2">
           {publication && (
-            <div className="text-sm">
-              <div className="mb-2 flex items-center gap-1.5">
+            <div className="flex w-full items-center justify-between gap-3 text-sm">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span
                   className="size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
                   aria-hidden
                 />
-                <p className="text-muted-foreground">Live at:</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/${publication.owner_username}/${publication.slug}`}
-                  className="min-w-0 break-words font-medium text-foreground underline underline-offset-2"
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`${LIVE_HOST_DISPLAY}/${publication.owner_username}/${publication.slug}`}
+                  className="inline-flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                 >
-                  {formatLiveUrlForDisplay(
-                    publication.owner_username,
-                    publication.slug,
-                  )}
+                  View article
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
                 </Link>
+              </div>
+              <p className="shrink-0 text-right text-xs text-muted-foreground">
+                Last published {formatPublicationDate(publication.updated_at)}
+              </p>
+            </div>
+          )}
+          <div className="grid gap-2">
+            {/* <Label htmlFor="publish-slug">Title in URL</Label> */}
+            <div
+              className={cn(
+                "flex min-h-9 w-full items-stretch overflow-hidden rounded-md border shadow-sm",
+                "border-input bg-transparent",
+                /* Dark: dialog is bg-sidebar — input/muted borders vanish; use darker inset + visible border */
+                "dark:border-sidebar-border dark:bg-background dark:shadow-[inset_0_1px_0_0_hsl(0_0%_100%_/_0.06)]",
+                "focus-within:ring-1 focus-within:ring-ring",
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center border-r px-2 py-1.5 text-xs sm:text-sm",
+                  "border-input bg-muted/40 text-muted-foreground",
+                  /* Lighter strip vs slug area so prefix vs editable reads clearly */
+                  "dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground/70",
+                )}
+                title={urlPrefixTitle}
+                aria-hidden
+              >
+                {urlPrefixDisplay}
+              </span>
+              <Input
+                id="publish-slug"
+                className={cn(
+                  "h-9 min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
+                  publication ? "rounded-none" : "rounded-r-md",
+                )}
+                placeholder={slugPlaceholder}
+                value={slugOverride}
+                onChange={(e) => {
+                  setSlugOverride(e.target.value.replace(/\s+/g, "-"));
+                }}
+                disabled={busy}
+              />
+              {publication ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Copy link"
+                  disabled={busy || !ownerPreview}
+                  title="Copy public link"
+                  className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input text-muted-foreground hover:text-foreground dark:border-sidebar-border"
                   onClick={async () => {
+                    if (!ownerPreview) return;
                     const url = new URL(
-                      `/${publication.owner_username}/${publication.slug}`,
+                      `/${ownerPreview}/${previewSlugSegment}`,
                       window.location.origin,
                     ).href;
                     try {
@@ -268,110 +340,93 @@ export function DocumentPublishButton() {
                     }
                   }}
                 >
-                  <Copy className="h-4 w-4" aria-hidden />
-                  <span className="sr-only">Copy link</span>
+                  <LinkIcon className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">Copy public link</span>
                 </Button>
-              </div>
+              ) : null}
             </div>
-          )}
-
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="publish-slug">Title in URL</Label>
-              <div
-                className={cn(
-                  "flex min-h-9 w-full items-stretch overflow-hidden rounded-md border shadow-sm",
-                  "border-input bg-transparent",
-                  /* Dark: dialog is bg-sidebar — input/muted borders vanish; use darker inset + visible border */
-                  "dark:border-sidebar-border dark:bg-background dark:shadow-[inset_0_1px_0_0_hsl(0_0%_100%_/_0.06)]",
-                  "focus-within:ring-1 focus-within:ring-ring",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-flex shrink-0 items-center border-r px-2 py-1.5 font-mono text-xs sm:text-sm",
-                    "border-input bg-muted/40 text-muted-foreground",
-                    /* Lighter strip vs slug area so prefix vs editable reads clearly */
-                    "dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground/70",
-                  )}
-                  title={urlPrefixTitle}
-                  aria-hidden
-                >
-                  {urlPrefixDisplay}
-                </span>
-                <Input
-                  id="publish-slug"
-                  className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0"
-                  placeholder={slugPlaceholder}
-                  value={slugOverride}
-                  onChange={(e) => {
-                    setSlugOverride(e.target.value.replace(/\s+/g, "-"));
-                  }}
-                  disabled={busy}
-                />
-              </div>
-              {!ownerPreview && (
-                <p className="text-xs text-muted-foreground">
-                  Add a username in Account to use your real URL path.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter
-            className={cn(
-              "flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:gap-3 sm:space-x-0",
-              publication ? "sm:justify-between" : "sm:justify-end",
+            {!ownerPreview && (
+              <p className="text-xs text-muted-foreground">
+                Add a username in Account to use your real URL path.
+              </p>
             )}
+          </div>
+          <Field
+            orientation="horizontal"
+            className="w-full max-w-sm items-start pt-1"
+            data-disabled={busy ? true : undefined}
           >
-            {publication ? (
-              <Button
-                type="button"
-                variant="ghostText"
-                disabled={busy || publicationLoading}
-                className="self-start text-destructive/75 hover:!text-destructive sm:self-center"
-                onClick={() => {
-                  if (documentId) {
-                    unpublishMutation.mutate(documentId);
-                  }
-                }}
-              >
-                {unpublishMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Unpublish"
-                )}
-              </Button>
-            ) : null}
-            <div className="flex w-full flex-row justify-end gap-2 sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                disabled={busy || !editor}
-                onClick={() => {
-                  void handlePublish();
-                }}
-              >
-                {publishMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : publication ? (
-                  "Update"
-                ) : (
-                  "Publish"
-                )}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            <FieldContent>
+              <FieldLabel htmlFor="auto-publish-changes">
+                Auto-publish changes
+              </FieldLabel>
+              <FieldDescription>
+                Your published article will update as you make changes.
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              id="auto-publish-changes"
+              checked={autoPublishChanges}
+              onCheckedChange={setAutoPublishChanges}
+              disabled={busy}
+            />
+          </Field>
+        </div>
+
+        {publication ? (
+          <div className="flex w-full gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || publicationLoading}
+              className="min-w-0 flex-1 !px-4"
+              onClick={() => {
+                if (documentId) {
+                  unpublishMutation.mutate(documentId);
+                }
+              }}
+            >
+              {unpublishMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Unpublish"
+              )}
+            </Button>
+            <Button
+              type="button"
+              className="min-w-0 flex-1"
+              disabled={
+                busy || !editor || updateDisabledForAutoPublishNoSlugEdit
+              }
+              onClick={() => {
+                void handlePublish();
+              }}
+            >
+              {publishMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Publish Changes"
+              )}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            className="w-full"
+            disabled={busy || !editor}
+            onClick={() => {
+              void handlePublish();
+            }}
+          >
+            {publishMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Publish"
+            )}
+          </Button>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
