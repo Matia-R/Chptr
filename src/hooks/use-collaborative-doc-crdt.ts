@@ -87,6 +87,7 @@ export function useCollaborativeDocCrdt({
     },
     onSuccess: () => {
       void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
+      void utils.document.getDocumentById.invalidate(documentId);
     },
   });
   const mutateRef = useRef(saveChangesMutation.mutate);
