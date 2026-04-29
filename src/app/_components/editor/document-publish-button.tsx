@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "~/app/_components/button";
 import {
@@ -76,6 +76,9 @@ export function DocumentPublishButton() {
   const [slugOverride, setSlugOverride] = useState("");
   const [publishFeedback, setPublishFeedback] =
     useState<PublishFeedbackState>("idle");
+  const [freezeFirstPublishActions, setFreezeFirstPublishActions] =
+    useState(false);
+  const closePopoverTimeoutRef = useRef<number | null>(null);
 
   const { data: docMeta } = api.document.getDocumentById.useQuery(
     documentId ?? "",
@@ -201,6 +204,15 @@ export function DocumentPublishButton() {
     ) : publishFeedback === "published" ? (
       <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
     ) : null;
+  const showPublishedPopoverActions = !!publication && !freezeFirstPublishActions;
+
+  useEffect(() => {
+    return () => {
+      if (closePopoverTimeoutRef.current != null) {
+        window.clearTimeout(closePopoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (isNew || !documentId) return null;
 
@@ -214,6 +226,15 @@ export function DocumentPublishButton() {
       return;
     }
 
+    if (closePopoverTimeoutRef.current != null) {
+      window.clearTimeout(closePopoverTimeoutRef.current);
+      closePopoverTimeoutRef.current = null;
+    }
+
+    const isFirstTimePublish = publication === null;
+    if (isFirstTimePublish) {
+      setFreezeFirstPublishActions(true);
+    }
     setPublishFeedback("publishing");
 
     try {
@@ -237,11 +258,12 @@ export function DocumentPublishButton() {
         setPublishFeedback("idle");
       }, 1400);
 
-      window.setTimeout(() => {
+      closePopoverTimeoutRef.current = window.setTimeout(() => {
         setOpen(false);
       }, 800);
     } catch (e) {
       setPublishFeedback("idle");
+      setFreezeFirstPublishActions(false);
 
       toast({
         variant: "destructive",
@@ -332,7 +354,10 @@ export function DocumentPublishButton() {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setSlugOverride("");
+        if (next) {
+          setSlugOverride("");
+          setFreezeFirstPublishActions(false);
+        }
       }}
     >
       <div
@@ -350,7 +375,7 @@ export function DocumentPublishButton() {
           variant="ghost"
           className={cn(
             /* Match title control padding/size: py-1 px-2 text-sm rounded-sm */
-            "h-auto min-h-0 w-[120px] rounded-none py-1 pl-2 pr-2 text-sm shadow-none",
+            "h-auto min-h-0 w-[130px] justify-start rounded-none py-1 pl-2 pr-2 text-sm shadow-none",
             "shrink-0 whitespace-nowrap",
             "transition-all duration-200 ease-out active:scale-[0.98]",
             !hasChangesToPublish &&
@@ -408,7 +433,7 @@ export function DocumentPublishButton() {
           </p>
         </div>
 
-        {publication ? (
+        {showPublishedPopoverActions ? (
           <section
             className="flex flex-col gap-4"
             aria-label="Published article status"
@@ -446,7 +471,7 @@ export function DocumentPublishButton() {
           <div className="grid gap-2">{urlSlugCluster}</div>
         )}
 
-        {publication ? (
+        {showPublishedPopoverActions ? (
           <div className="flex w-full gap-2">
             <Button
               type="button"
@@ -470,7 +495,12 @@ export function DocumentPublishButton() {
               className={cn(
                 "min-w-0 flex-1 transition-all duration-200 ease-out active:scale-[0.98]",
               )}
-              disabled={busy || !editor}
+              disabled={
+                busy ||
+                !editor ||
+                publicationLoading ||
+                (!hasChangesToPublish && publishFeedback === "idle")
+              }
               onClick={() => {
                 void handlePublish();
               }}
@@ -485,7 +515,9 @@ export function DocumentPublishButton() {
                   ? "Publishing..."
                   : publishFeedback === "published"
                     ? "Published"
-                    : "Publish Changes"}
+                    : hasChangesToPublish
+                      ? "Publish changes"
+                      : "Up to date"}
               </span>
             </Button>
           </div>
