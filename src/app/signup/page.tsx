@@ -3,6 +3,7 @@
 import { signup } from "./actions";
 import { Button } from "../_components/button";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -201,9 +202,9 @@ export default function SignUpPage() {
 
           <div className="mt-6 w-full items-start text-left text-sm text-muted-foreground">
             Already have an account?{" "}
-            <a href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="text-primary hover:underline">
               Login
-            </a>
+            </Link>
           </div>
         </form>
       </Form>
