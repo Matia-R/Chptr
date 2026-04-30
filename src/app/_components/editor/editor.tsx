@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
+import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
 
@@ -49,6 +50,8 @@ export default function Editor({
 }: EditorProps) {
   const { theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
+
+  const setDocumentEditor = useDocumentEditorStore((s) => s.setEditor);
 
   const editor = useCreateBlockNote(
     {
@@ -79,6 +82,13 @@ export default function Editor({
     },
     [userName, userColor, provider, ydoc],
   );
+
+  useEffect(() => {
+    setDocumentEditor(editor);
+    return () => {
+      setDocumentEditor(null);
+    };
+  }, [editor, setDocumentEditor]);
 
   // --- Theme handling ---
   useEffect(() => {

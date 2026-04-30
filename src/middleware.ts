@@ -1,9 +1,11 @@
 import { type NextRequest } from 'next/server'
+import { applyPublishedDocumentSecurityHeaders } from '~/lib/published-csp'
 import { updateSession } from './utils/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-    // update user's auth session
-    return await updateSession(request)
+    const response = await updateSession(request)
+    applyPublishedDocumentSecurityHeaders(request.nextUrl.pathname, response)
+    return response
 }
 
 export const config = {

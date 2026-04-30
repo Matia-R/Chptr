@@ -14,6 +14,10 @@ import {
   getDocumentChanges,
   getDocumentTailCount,
   compactDocument,
+  getPublicationByDocumentId,
+  getPublicationOwnerPathSegmentForDocument,
+  publishDocument,
+  unpublishDocument,
 } from "~/server/db";
 
 function authFromCtx(ctx: { user: { id: string }; supabase: AuthContext["supabase"] }): AuthContext {
@@ -124,5 +128,47 @@ export const documentRouter = createTRPCRouter({
         .input(z.string())
         .query(async ({ input, ctx }) => {
             return getDocumentChanges(input, authFromCtx(ctx));
+        }),
+
+    getPublicationByDocumentId: protectedProcedure
+        .input(z.string().uuid())
+        .query(async ({ input, ctx }) => {
+            return getPublicationByDocumentId(input, authFromCtx(ctx));
+        }),
+
+    /** Owner's URL prefix: `username` if set, else `firstname`+`lastname` (document owner, not current user). */
+    getPublicationOwnerPathSegment: protectedProcedure
+        .input(z.string().uuid())
+        .query(async ({ input, ctx }) => {
+            return getPublicationOwnerPathSegmentForDocument(input, authFromCtx(ctx));
+        }),
+
+    publishDocument: protectedProcedure
+        .input(
+            z.object({
+                documentId: z.string().uuid(),
+                title: z.string().min(1).max(500),
+                bodyHtml: z.string().min(1).max(3_000_000),
+                blocksJson: z.string().max(8_000_000),
+                slug: z.string().min(1).max(200).optional(),
+            }),
+        )
+        .mutation(async ({ input, ctx }) => {
+            return publishDocument(
+                {
+                    documentId: input.documentId,
+                    title: input.title,
+                    bodyHtml: input.bodyHtml,
+                    blocksJson: input.blocksJson,
+                    slug: input.slug,
+                },
+                authFromCtx(ctx),
+            );
+        }),
+
+    unpublishDocument: protectedProcedure
+        .input(z.string().uuid())
+        .mutation(async ({ input, ctx }) => {
+            return unpublishDocument(input, authFromCtx(ctx));
         }),
 });

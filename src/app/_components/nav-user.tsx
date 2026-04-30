@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/avatar";
+import { UserAvatar } from "~/app/_components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,24 +29,18 @@ import {
   useSidebar,
 } from "~/app/_components/sidebar";
 import { useTheme } from "next-themes";
-import { cn } from "~/lib/utils";
 import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
-import {
-  getAvatarColorTailwindClass,
-  getAvatarColorHex,
-} from "~/lib/avatar-colors";
 
 export function NavUser({
   user,
   isLoading,
 }: {
   user?: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
     username: string | null;
-    /** Shown when `username` is unset (username is optional). */
     email: string;
     avatar_url: string | null;
     default_avatar_background_color: string;
@@ -94,27 +88,6 @@ export function NavUser({
     );
   }
 
-  const initials =
-    `${user.first_name?.[0] ?? ""}${user.last_name?.[0] ?? ""}`.toUpperCase() ||
-    "?";
-  const fallbackAvatarBackgroundClass = getAvatarColorTailwindClass(
-    user.default_avatar_background_color,
-  );
-  const fallbackAvatarBackgroundColor = getAvatarColorHex(
-    user.default_avatar_background_color,
-  );
-
-  // Ensure the background class overrides the default bg-muted from AvatarFallback
-  // tailwind-merge should automatically remove bg-muted when we pass a conflicting bg-* class
-  // We also add an inline style as a fallback to ensure the color is applied
-  const avatarFallbackClassName = cn(
-    "rounded-lg text-black",
-    fallbackAvatarBackgroundClass,
-  );
-  const avatarFallbackStyle = {
-    backgroundColor: fallbackAvatarBackgroundColor,
-  };
-
   const subtitle = user.username
     ? `@${user.username}`
     : user.email
@@ -130,21 +103,15 @@ export function NavUser({
               size="lg"
               className="focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                {user.avatar_url ? (
-                  <AvatarImage
-                    src={user.avatar_url}
-                    alt={`${user.first_name} ${user.last_name}`}
-                  />
-                ) : (
-                  <AvatarFallback
-                    className={avatarFallbackClassName}
-                    style={avatarFallbackStyle}
-                  >
-                    {initials}
-                  </AvatarFallback>
-                )}
-              </Avatar>
+              <UserAvatar
+                first_name={user.first_name}
+                last_name={user.last_name}
+                avatar_url={user.avatar_url}
+                default_avatar_background_color={
+                  user.default_avatar_background_color
+                }
+                alt={`${user.first_name} ${user.last_name}`}
+              />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
                 {subtitle ? (
@@ -164,21 +131,15 @@ export function NavUser({
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  {user.avatar_url ? (
-                    <AvatarImage
-                      src={user.avatar_url}
-                      alt={`${user.first_name} ${user.last_name}`}
-                    />
-                  ) : (
-                    <AvatarFallback
-                      className={avatarFallbackClassName}
-                      style={avatarFallbackStyle}
-                    >
-                      {initials}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
+                <UserAvatar
+                  first_name={user.first_name}
+                  last_name={user.last_name}
+                  avatar_url={user.avatar_url}
+                  default_avatar_background_color={
+                    user.default_avatar_background_color
+                  }
+                  alt={`${user.first_name} ${user.last_name}`}
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
                   {subtitle ? (

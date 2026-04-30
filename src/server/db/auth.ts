@@ -4,8 +4,8 @@ import { createClient, type AuthContext } from './shared'
 type UserProfile = {
   updated_at: string
   avatar_url: string
-  first_name: string
-  last_name: string
+  first_name: string | null
+  last_name: string | null
   default_avatar_background_color: string
   username: string | null
 }

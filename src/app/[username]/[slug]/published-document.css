@@ -1,0 +1,23 @@
+/**
+ * Published article HTML is BlockNote export: empty blocks render as
+ * <p class="bn-inline-content"></p> (or headings) with no text, which collapse
+ * to 0 height in browsers. Match a normal line box (~26px at default scale).
+ */
+.published-document-content .bn-block-content
+  :is(p, h1, h2, h3, h4, h5, h6).bn-inline-content:empty {
+  display: block;
+  min-height: 1.625em;
+}
+
+/**
+ * Match the editor: `.bn-shadcn a` uses color/text-decoration inherit (Tailwind reset).
+ * Inside `.bn-editor`, links use `revert` for default link styling. Published HTML has no
+ * `.bn-editor` wrapper, so links looked like plain text — restore UA link appearance.
+ * (See editor/style.css `.bn-shadcn .bn-editor a`.)
+ */
+.published-document-content a[href] {
+  color: revert;
+  -webkit-text-decoration: revert;
+  text-decoration: revert;
+  cursor: pointer;
+}

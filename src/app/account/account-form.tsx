@@ -1,10 +1,12 @@
 "use client";
 
-import { updateProfile } from "./actions";
-import { Button } from "../_components/button";
+import type { User } from "@supabase/supabase-js";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+
+import { updateProfile } from "./actions";
+import { Button } from "../_components/button";
 import {
   Form,
   FormControl,
@@ -16,7 +18,6 @@ import {
 } from "../_components/form";
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
-import { User } from "@supabase/supabase-js";
 
 const formSchema = z.object({
   email: z
@@ -34,19 +35,33 @@ const formSchema = z.object({
     .refine((s) => s.length === 0 || s.length >= 2, {
       message: "Username must be at least 2 characters when provided",
     }),
+  first_name: z.string().max(100).optional().default(""),
+  last_name: z.string().max(100).optional().default(""),
 });
 
 interface AccountFormProps {
   user: User | null;
+  initialEmail?: string;
+  initialUsername?: string;
+  initialFirstName?: string;
+  initialLastName?: string;
 }
 
-export default function AccountForm({ user }: AccountFormProps) {
+export default function AccountForm({
+  user: _user,
+  initialEmail = "",
+  initialUsername = "",
+  initialFirstName = "",
+  initialLastName = "",
+}: AccountFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      email: initialEmail,
       password: "",
-      username: "",
+      username: initialUsername,
+      first_name: initialFirstName,
+      last_name: initialLastName,
     },
   });
 
@@ -56,6 +71,8 @@ export default function AccountForm({ user }: AccountFormProps) {
       formData.append("email", values.email);
       formData.append("password", values.password);
       formData.append("username", values.username);
+      formData.append("first_name", values.first_name ?? "");
+      formData.append("last_name", values.last_name ?? "");
 
       await updateProfile(formData);
       console.log("Profile updated successfully");
@@ -99,6 +116,42 @@ export default function AccountForm({ user }: AccountFormProps) {
                 </FormLabel>
                 <FormControl>
                   <Input placeholder="Username" {...field} />
+                </FormControl>
+                <FormDescription className="text-sm text-gray-500">
+                  If set, your public docs use <span className="font-mono">/[username]/…</span>.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="first_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="block text-sm font-medium">
+                  First name
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="First name" {...field} />
+                </FormControl>
+                <FormDescription className="text-sm text-gray-500">
+                  Used for public URLs when username is not set (with last name).
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="last_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="block text-sm font-medium">
+                  Last name
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Last name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

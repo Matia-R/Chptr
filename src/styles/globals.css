@@ -21,6 +21,29 @@ body {
   width: 100%;
 }
 
+/* Long standalone pages (published docs): restore window scroll. See PublishedScrollRoot.
+   Single scrollport on <html> only; <body> stays overflow visible so wheel events scroll
+   correctly (dual overflow:auto on html+body breaks trackpad/wheel in WebKit/Chromium). */
+html.published-page-scroll {
+  height: auto;
+  min-height: 100dvh;
+  position: static;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  touch-action: auto;
+}
+
+html.published-page-scroll body {
+  height: auto;
+  position: static;
+  width: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+  touch-action: auto;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
