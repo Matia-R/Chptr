@@ -2,7 +2,9 @@
 -- Needed when email confirmation is on: no session after signUp, so only this trigger creates the row.
 
 ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS username text;
+  ADD COLUMN IF NOT EXISTS username text,
+  ADD COLUMN IF NOT EXISTS first_name text,
+  ADD COLUMN IF NOT EXISTS last_name text;
 
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
   ON public.profiles (lower(trim(username)))

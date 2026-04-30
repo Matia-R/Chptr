@@ -59,7 +59,8 @@ export function publicationOwnerPathSegment(profile: {
       return u;
     }
   }
-  return ownerHandleFromProfileNames(profile.first_name, profile.last_name);
+  const fallback = ownerHandleFromProfileNames(profile.first_name, profile.last_name);
+  return isValidOwnerPathSegment(fallback) ? fallback : "";
 }
 
 export function isValidPublicationSlug(slug: string): boolean {

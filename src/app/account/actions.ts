@@ -18,6 +18,8 @@ export async function updateProfile(formData: FormData) {
   const username = ((formData.get("username") as string) ?? "").trim();
   const first_name = (formData.get("first_name") as string) ?? "";
   const last_name = (formData.get("last_name") as string) ?? "";
+  const trimmedFirst = first_name.trim();
+  const trimmedLast = last_name.trim();
 
   try {
     if (email !== user.email) {
@@ -33,8 +35,8 @@ export async function updateProfile(formData: FormData) {
     const { error } = await supabase.from("profiles").upsert({
       id: user.id,
       username: username.length > 0 ? username : null,
-      first_name: first_name.trim(),
-      last_name: last_name.trim(),
+      first_name: trimmedFirst.length > 0 ? trimmedFirst : null,
+      last_name: trimmedLast.length > 0 ? trimmedLast : null,
       updated_at: new Date().toISOString(),
     });
 

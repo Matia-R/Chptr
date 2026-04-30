@@ -429,6 +429,13 @@ export async function publishDocument(
     .eq('document_id', input.documentId)
     .maybeSingle()
 
+  if (priorResult.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: priorResult.error.message,
+    })
+  }
+
   const priorPub = priorResult.data as PriorPublicationRow | null
 
   const publishedAt = priorPub?.published_at ?? new Date().toISOString()
