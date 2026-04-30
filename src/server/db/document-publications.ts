@@ -11,7 +11,6 @@ import {
   publicationOwnerPathSegment,
   slugifyTitle,
 } from '~/lib/slug'
-import { sanitizePublishedHtml } from '~/lib/published-html'
 
 import type { AuthContext } from './shared'
 
@@ -415,6 +414,7 @@ export async function publishDocument(
     input.documentId
   )
 
+  const { sanitizePublishedHtml } = await import('~/lib/published-html')
   const bodyHtml = sanitizePublishedHtml(input.bodyHtml)
   if (!bodyHtml.trim()) {
     throw new TRPCError({
