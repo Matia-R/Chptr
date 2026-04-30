@@ -1,18 +1,69 @@
-import DOMPurify from "isomorphic-dompurify";
-import type { Config } from "dompurify";
+import sanitizeHtml from "sanitize-html";
 
 /**
- * DOMPurify config for BlockNote-exported article HTML (rich text, code blocks,
- * tables, data-* attributes, limited inline style from highlighters).
+ * Sanitize config for BlockNote-exported article HTML (rich text, code blocks,
+ * tables, data-* attributes, and limited inline style from highlighters).
  */
-const SANITIZE_CONFIG: Config = {
-  USE_PROFILES: { html: true },
-  ALLOW_DATA_ATTR: true,
-  ADD_TAGS: ["mark", "figure", "figcaption", "picture", "source"],
-  ADD_ATTR: ["target", "rel", "loading", "decoding"],
-  // External links from the editor should not get window.opener access
-  ALLOWED_URI_REGEXP:
-    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+const SANITIZE_CONFIG: sanitizeHtml.IOptions = {
+  allowedTags: [
+    ...sanitizeHtml.defaults.allowedTags,
+    "img",
+    "mark",
+    "figure",
+    "figcaption",
+    "picture",
+    "source",
+  ],
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    "*": ["class", "style", "data-*"],
+    a: ["href", "name", "target", "rel"],
+    img: [
+      "src",
+      "srcset",
+      "alt",
+      "title",
+      "width",
+      "height",
+      "loading",
+      "decoding",
+    ],
+    source: ["srcset", "type", "media", "sizes"],
+  },
+  allowedSchemes: ["http", "https", "mailto", "tel", "data"],
+  allowedSchemesByTag: {
+    img: ["http", "https", "data"],
+  },
+  // Allow syntax-highlighter styles but keep them constrained.
+  allowedStyles: {
+    "*": {
+      color: [/^[#\w(),.%\s-]+$/],
+      "background-color": [/^[#\w(),.%\s-]+$/],
+      "font-weight": [/^(normal|bold|[1-9]00)$/],
+      "font-style": [/^(normal|italic|oblique)$/],
+      "text-decoration": [/^[\w\s-]+$/],
+    },
+  },
+  transformTags: {
+    a: (tagName, attribs) => {
+      const relTokens = new Set(
+        (attribs.rel ?? "")
+          .split(/\s+/)
+          .map((token) => token.trim())
+          .filter(Boolean)
+      );
+      relTokens.add("noopener");
+      relTokens.add("noreferrer");
+
+      return {
+        tagName,
+        attribs: {
+          ...attribs,
+          rel: Array.from(relTokens).join(" "),
+        },
+      };
+    },
+  },
 };
 
 /**
@@ -21,5 +72,5 @@ const SANITIZE_CONFIG: Config = {
  */
 export function sanitizePublishedHtml(html: string): string {
   if (!html.trim()) return "";
-  return DOMPurify.sanitize(html, SANITIZE_CONFIG);
+  return sanitizeHtml(html, SANITIZE_CONFIG);
 }
