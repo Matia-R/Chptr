@@ -6,7 +6,7 @@ import { Separator } from "./separator";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
 import { CommandMenuButton } from "./command-menu-button";
-import { DocumentPublishButton } from "./editor/document-publish-button";
+import { DocumentPublishButton } from "./document-publish-button";
 
 export function Header() {
   const pathname = usePathname();
@@ -15,7 +15,7 @@ export function Header() {
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 rounded-t-2xl bg-background px-4">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         <SidebarTrigger className="-ml-1" />
         {isDocumentPage && (
           <>
@@ -25,9 +25,13 @@ export function Header() {
         )}
       </div>
       <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-        {isDocumentPage && <DocumentPublishButton />}
+        {isDocumentPage ? (
+          <>
+            <DocumentPublishButton />
+            <DocumentActions />
+          </>
+        ) : null}
         {/* <CommandMenuButton /> */}
-        {isDocumentPage && <DocumentActions />}
       </div>
     </header>
   );

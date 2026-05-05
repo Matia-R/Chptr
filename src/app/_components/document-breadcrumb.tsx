@@ -129,14 +129,14 @@ export function DocumentBreadcrumb() {
   };
 
   const sharedStyles =
-    "w-[200px] py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
+    "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none md:max-w-[200px]";
 
   // Show loading skeleton only for existing documents that are loading
   if (isLoading && !isNew) {
     return (
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem className="md:block">
+      <Breadcrumb className="min-w-0 flex-1 overflow-hidden md:flex-none">
+        <BreadcrumbList className="min-w-0 flex-nowrap">
+          <BreadcrumbItem className="min-w-0 flex-1 md:block md:max-w-[200px] md:flex-none">
             <div className={cn(sharedStyles, "h-4 animate-pulse bg-accent")} />
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -149,12 +149,12 @@ export function DocumentBreadcrumb() {
   const displayName = editingName || "Untitled";
 
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem className="md:block">
-          <div className="group relative">
+    <Breadcrumb className="min-w-0 flex-1 overflow-hidden md:flex-none">
+      <BreadcrumbList className="min-w-0 flex-nowrap">
+        <BreadcrumbItem className="min-w-0 flex-1 md:block md:max-w-[200px] md:flex-none">
+          <div className="group relative min-w-0">
             {isEditing ? (
-              <div className="flex items-center">
+              <div className="flex min-w-0 items-center">
                 <input
                   type="text"
                   value={editingName}
@@ -189,7 +189,7 @@ export function DocumentBreadcrumb() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center">
+              <div className="flex min-w-0 items-center">
                 <button
                   onClick={() => setIsEditing(true)}
                   className={cn(
