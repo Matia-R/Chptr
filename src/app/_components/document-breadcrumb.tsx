@@ -9,6 +9,12 @@ import { cn } from "~/lib/utils";
 import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/app/_components/popover";
+import { Input } from "~/app/_components/input";
 
 export function DocumentBreadcrumb() {
   const params = useParams();
@@ -17,7 +23,6 @@ export function DocumentBreadcrumb() {
   const utils = api.useUtils();
   const { toast } = useToast();
 
-  // Don't fetch document data for new documents - show "Untitled" optimistically
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
@@ -25,12 +30,13 @@ export function DocumentBreadcrumb() {
     },
   );
 
-  // Track the previous name for reverting on error
   const previousNameRef = React.useRef<string>("Untitled");
+  const closingWithoutCommitRef = React.useRef(false);
+  /** Enter already ran commitTitle; skip duplicate if onOpenChange(false) follows. */
+  const skipCommitOnNextCloseRef = React.useRef(false);
 
   const updateName = api.document.updateDocumentName.useMutation({
     onError: (err) => {
-      // Revert to the previous name
       setEditingName(previousNameRef.current);
 
       toast({
@@ -46,67 +52,60 @@ export function DocumentBreadcrumb() {
     },
   });
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [editingName, setEditingName] = useState("Untitled");
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Sync editingName with document data or reset for new documents
   React.useEffect(() => {
     if (document?.document?.name) {
-      // Existing document loaded - use its name
       setEditingName(document.document.name);
     } else if (isNew) {
-      // New document - use "Untitled"
       setEditingName("Untitled");
     } else {
-      // Existing document loading - reset to empty (skeleton will show)
       setEditingName("");
     }
   }, [documentId, document?.document?.name, isNew]);
 
-  const handleSave = () => {
-    const trimmedName = editingName.trim();
-    const currentName = document?.document?.name ?? "Untitled";
+  React.useEffect(() => {
+    if (!popoverOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      const el = titleInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.select();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [popoverOpen]);
 
-    // If no valid name or no change, just cancel
-    if (!trimmedName || trimmedName === currentName) {
-      handleCancel();
-      return;
-    }
+  const persistName = React.useCallback(
+    (trimmedName: string) => {
+      previousNameRef.current = document?.document?.name ?? "Untitled";
 
-    // Store the previous name for potential revert
-    previousNameRef.current = currentName;
+      if (isNew) {
+        clearFlag();
+      }
 
-    // Clear the "new" flag when user changes the name
-    if (isNew) {
-      clearFlag();
-    }
+      setEditingName(trimmedName);
 
-    // Optimistically update the input immediately
-    setEditingName(trimmedName);
+      utils.document.getDocumentIdsForAuthenticatedUser.setData(
+        undefined,
+        (old) => {
+          if (!old?.documents) {
+            return {
+              success: true,
+              documents: [{ id: documentId, name: trimmedName }],
+            };
+          }
 
-    // Optimistically update the documents list (add if new, update if exists)
-    utils.document.getDocumentIdsForAuthenticatedUser.setData(
-      undefined,
-      (old) => {
-        if (!old?.documents) {
-          // No documents yet - create the list with this one
-          return {
-            success: true,
-            documents: [{ id: documentId, name: trimmedName }],
-          };
-        }
-
-        const exists = old.documents.some((doc) => doc.id === documentId);
-        if (exists) {
-          // Update existing
-          return {
-            ...old,
-            documents: old.documents.map((doc) =>
-              doc.id === documentId ? { ...doc, name: trimmedName } : doc,
-            ),
-          };
-        } else {
-          // Add new document to list
+          const exists = old.documents.some((doc) => doc.id === documentId);
+          if (exists) {
+            return {
+              ...old,
+              documents: old.documents.map((doc) =>
+                doc.id === documentId ? { ...doc, name: trimmedName } : doc,
+              ),
+            };
+          }
           return {
             ...old,
             documents: [
@@ -114,29 +113,47 @@ export function DocumentBreadcrumb() {
               ...old.documents,
             ],
           };
-        }
-      },
-    );
+        },
+      );
 
-    updateName.mutate({ id: documentId, name: trimmedName });
-    setIsEditing(false);
-  };
+      updateName.mutate({ id: documentId, name: trimmedName });
+    },
+    [
+      clearFlag,
+      document?.document?.name,
+      documentId,
+      isNew,
+      updateName,
+      utils.document.getDocumentIdsForAuthenticatedUser,
+    ],
+  );
 
-  const handleCancel = () => {
-    // Revert to the current document name (or "Untitled" for new docs)
+  const commitTitle = React.useCallback(() => {
+    const trimmedName = editingName.trim();
+    const currentName = document?.document?.name ?? "Untitled";
+
+    if (!trimmedName || trimmedName === currentName) {
+      setEditingName(currentName);
+      return;
+    }
+
+    persistName(trimmedName);
+  }, [document?.document?.name, editingName, persistName]);
+
+  const handleCancel = React.useCallback(() => {
+    closingWithoutCommitRef.current = true;
     setEditingName(document?.document?.name ?? "Untitled");
-    setIsEditing(false);
-  };
+    setPopoverOpen(false);
+  }, [document?.document?.name]);
 
   const sharedStyles =
-    "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none md:max-w-[200px]";
+    "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
 
-  // Show loading skeleton only for existing documents that are loading
   if (isLoading && !isNew) {
     return (
-      <Breadcrumb className="min-w-0 flex-1 overflow-hidden md:flex-none">
+      <Breadcrumb className="min-w-0 w-full max-w-full flex-1 overflow-hidden">
         <BreadcrumbList className="min-w-0 flex-nowrap">
-          <BreadcrumbItem className="min-w-0 flex-1 md:block md:max-w-[200px] md:flex-none">
+          <BreadcrumbItem className="min-w-0 w-full max-w-full flex-1">
             <div className={cn(sharedStyles, "h-4 animate-pulse bg-accent")} />
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -144,71 +161,97 @@ export function DocumentBreadcrumb() {
     );
   }
 
-  // Use editingName for display - it's kept in sync with document name
-  // and updated optimistically when user saves
   const displayName = editingName || "Untitled";
 
   return (
-    <Breadcrumb className="min-w-0 flex-1 overflow-hidden md:flex-none">
+    <Breadcrumb className="min-w-0 w-full max-w-full flex-1 overflow-hidden">
       <BreadcrumbList className="min-w-0 flex-nowrap">
-        <BreadcrumbItem className="min-w-0 flex-1 md:block md:max-w-[200px] md:flex-none">
-          <div className="group relative min-w-0">
-            {isEditing ? (
-              <div className="flex min-w-0 items-center">
-                <input
-                  type="text"
-                  value={editingName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setEditingName(e.target.value)
-                  }
-                  onBlur={handleSave}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                    if (e.key === "Enter") {
-                      handleSave();
-                    }
-                    if (e.key === "Escape") {
-                      handleCancel();
-                    }
-                  }}
+        <BreadcrumbItem className="min-w-0 w-full max-w-full flex-1">
+          <Popover
+            open={popoverOpen}
+            onOpenChange={(open) => {
+              if (open) {
+                closingWithoutCommitRef.current = false;
+                skipCommitOnNextCloseRef.current = false;
+                setEditingName(document?.document?.name ?? "Untitled");
+                setPopoverOpen(true);
+                return;
+              }
+              if (closingWithoutCommitRef.current) {
+                closingWithoutCommitRef.current = false;
+              } else if (skipCommitOnNextCloseRef.current) {
+                skipCommitOnNextCloseRef.current = false;
+              } else {
+                commitTitle();
+              }
+              setPopoverOpen(false);
+            }}
+          >
+            <div className="group relative min-w-0">
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
                   className={cn(
                     sharedStyles,
-                    "bg-transparent pr-8 outline-none",
-                    "truncate focus:bg-accent focus:text-accent-foreground",
+                    "flex w-full min-w-0 items-center gap-2 pr-2 text-left hover:bg-accent hover:text-accent-foreground",
                   )}
-                  autoFocus
+                  title={displayName}
+                >
+                  <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                  <SquarePen
+                    className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                    aria-hidden
+                  />
+                </button>
+              </PopoverTrigger>
+            </div>
+
+            <PopoverContent
+              align="start"
+              side="bottom"
+              sideOffset={8}
+              alignOffset={-8}
+              className={cn(
+                "w-[min(100vw-2rem,28rem)] max-w-[min(100vw-2rem,28rem)] border-border bg-sidebar p-2 shadow-lg",
+                "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2",
+              )}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => {
+                e.preventDefault();
+                handleCancel();
+              }}
+            >
+              <div className="flex items-center gap-2 rounded-md border border-sidebar-border bg-background pr-1 shadow-sm">
+                <Input
+                  ref={titleInputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitTitle();
+                      skipCommitOnNextCloseRef.current = true;
+                      setPopoverOpen(false);
+                    }
+                  }}
+                  className="h-8 flex-1 border-0 bg-transparent px-2 py-1 text-sm font-semibold shadow-none focus-visible:ring-0"
+                  aria-label="Document title"
                 />
                 <button
+                  type="button"
                   onMouseDown={(e) => {
-                    // Prevent the input's onBlur from firing
                     e.preventDefault();
                   }}
                   onClick={handleCancel}
-                  className="absolute right-1 rounded-sm p-1 hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring"
+                  className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label="Cancel rename"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
-            ) : (
-              <div className="flex min-w-0 items-center">
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className={cn(
-                    sharedStyles,
-                    "truncate pr-8 text-left hover:bg-accent hover:text-accent-foreground",
-                  )}
-                  title={displayName}
-                >
-                  {displayName}
-                </button>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="absolute right-1 rounded-sm p-1 opacity-0 hover:bg-accent/50 focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
-                >
-                  <SquarePen className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-          </div>
+            </PopoverContent>
+          </Popover>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
