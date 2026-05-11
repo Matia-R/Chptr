@@ -27,7 +27,10 @@ export function Header() {
       <div className="ml-auto flex flex-shrink-0 items-center gap-2">
         {isDocumentPage ? (
           <>
-            <DocumentPublishButton />
+            {/* CSS breakpoint only — avoids flash: JS viewport hooks default "desktop" until effect runs */}
+            <div className="hidden shrink-0 md:flex md:items-center">
+              <DocumentPublishButton />
+            </div>
             <DocumentActions />
           </>
         ) : null}

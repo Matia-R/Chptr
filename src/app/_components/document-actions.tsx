@@ -25,6 +25,15 @@ import {
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useIsMobile } from "~/hooks/use-mobile";
 
+function formatPublicationDate(iso: string): string {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
+}
+
 export function DocumentActions() {
   const params = useParams();
   const documentId = params.documentId as string;
@@ -97,19 +106,53 @@ export function DocumentActions() {
     <div className="text-sm text-muted-foreground">{renderContent()}</div>
   );
 
+  const mobileDrawerStatusRow = (() => {
+    if (!publishCtx) {
+      return renderContent();
+    }
+    if (publishCtx.publicationLoading && !publishCtx.publication) {
+      return <Skeleton className="h-4 w-[min(100%,14rem)]" />;
+    }
+    if (publishCtx.publication) {
+      const isOutOfDate =
+        publishCtx.hasUnpublishedChanges || publishCtx.hasPendingSlugChange;
+      return (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span
+            className={
+              isOutOfDate
+                ? "size-2 shrink-0 rounded-full bg-amber-500 ring-2 ring-background"
+                : "size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
+            }
+            aria-hidden
+          />
+          <span>
+            Live ·{" "}
+            {formatPublicationDate(publishCtx.publication.updated_at)}
+            {isOutOfDate ? " · Out of date" : ""}
+          </span>
+        </span>
+      );
+    }
+    return renderContent();
+  })();
+
   if (isMobile) {
     return (
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent className="max-h-[90vh] overflow-y-auto p-0">
+        <DrawerContent className="h-auto max-h-none overflow-hidden p-0">
           <DrawerHeader className="text-left">
             <DrawerTitle className="text-sidebar-foreground">
               Publish
             </DrawerTitle>
           </DrawerHeader>
-          <div className="border-b border-border px-4 pb-4">{statusText}</div>
+          <div className="px-4 pb-4 text-sm text-muted-foreground">
+            {mobileDrawerStatusRow}
+          </div>
+          {/* <div className="border-b border-border px-4 pb-4">{statusText}</div> */}
           {publishCtx ? (
-            <div className="border-t border-sidebar-border bg-sidebar text-sidebar-foreground dark:border-sidebar-border">
+            <div className="bg-sidebar text-sidebar-foreground">
               <DocumentPublishMobileDrawerPanel />
             </div>
           ) : null}

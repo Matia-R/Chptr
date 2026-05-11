@@ -5,9 +5,9 @@ import {
   CloudUpload,
   ExternalLink,
   Globe,
+  GlobeOff,
   Link as LinkIcon,
   Loader2,
-  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -57,17 +57,14 @@ export function DocumentPublishPopoverPanel() {
   const pub = publication;
   if (!documentId) return null;
 
-  const hasSomethingUnpublished = hasUnpublishedChanges || hasPendingSlugChange;
+  const isOutOfDate = hasUnpublishedChanges || hasPendingSlugChange;
 
   return (
     <>
       <div className="flex flex-col space-y-1.5 text-center sm:text-left">
         <h2 className="text-lg font-semibold leading-none tracking-tight">
-          Publish to the web
+          Publish
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Share your article with the world.
-        </p>
       </div>
 
       {showPublishedPopoverActions && pub ? (
@@ -77,12 +74,18 @@ export function DocumentPublishPopoverPanel() {
         >
           <div className="flex flex-col gap-1.5 text-sm">
             <div className="flex w-full items-start justify-between gap-3">
-              <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+              <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-muted-foreground">
                 <span
-                  className="size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
+                  className={cn(
+                    "size-2 shrink-0 rounded-full ring-2 ring-background",
+                    isOutOfDate ? "bg-amber-500" : "bg-emerald-500",
+                  )}
                   aria-hidden
                 />
-                <span>Live · {formatPublicationDate(pub.updated_at)}</span>
+                <span>
+                  Live · {formatPublicationDate(pub.updated_at)}
+                  {isOutOfDate ? " · Out of date" : ""}
+                </span>
               </p>
               <Link
                 href={`/${pub.owner_username}/${pub.slug}`}
@@ -94,11 +97,6 @@ export function DocumentPublishPopoverPanel() {
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
               </Link>
             </div>
-            {hasSomethingUnpublished ? (
-              <p className="pl-3.5 text-xs text-muted-foreground">
-                Unpublished changes
-              </p>
-            ) : null}
           </div>
           <div className="grid gap-2">{buildUrlSlugCluster("popover")}</div>
         </section>
@@ -214,14 +212,9 @@ export function DocumentPublishMobileDrawerPanel() {
     buildUrlSlugCluster,
     unpublish,
     unpublishPending,
-    hasPendingSlugChange,
-    hasUnpublishedChanges: docHasUnpublishedChanges,
   } = ctx;
 
   if (!documentId) return null;
-
-  const hasSomethingUnpublished =
-    docHasUnpublishedChanges || hasPendingSlugChange;
 
   const publishRowLabel =
     publishFeedback === "publishing"
@@ -236,33 +229,11 @@ export function DocumentPublishMobileDrawerPanel() {
 
   const publishIcon = publishFeedback === "publishing" ? Loader2 : CloudUpload;
 
-  const sectionTitle = (
-    <p className="px-1 text-[13px] font-medium uppercase tracking-wide text-muted-foreground">
-      Publish
-    </p>
-  );
-
   const pub = publication;
 
   if (showPublishedPopoverActions && pub) {
     return (
       <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
-        {sectionTitle}
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
-              aria-hidden
-            />
-            Live · {formatPublicationDate(pub.updated_at)}
-          </span>
-          {hasSomethingUnpublished ? (
-            <span className="text-amber-700 dark:text-amber-400">
-              Unpublished changes
-            </span>
-          ) : null}
-        </p>
-
         <MobileActionGroup>
           <MobileActionLinkRow
             icon={ExternalLink}
@@ -314,7 +285,7 @@ export function DocumentPublishMobileDrawerPanel() {
 
         <MobileActionGroup>
           <MobileActionButtonRow
-            icon={Trash2}
+            icon={GlobeOff}
             label="Unpublish"
             destructive
             disabled={busy || publicationLoading}
@@ -335,7 +306,6 @@ export function DocumentPublishMobileDrawerPanel() {
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
-      {sectionTitle}
       <MobileActionGroup>
         <MobileActionExpandingRow
           icon={Globe}
