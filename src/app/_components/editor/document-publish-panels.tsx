@@ -112,8 +112,7 @@ function waitForKeyboardDismiss(callback: () => void) {
     return;
   }
 
-  const keyboardLikelyOpen = () =>
-    viewport.height < window.innerHeight * 0.85;
+  const keyboardLikelyOpen = () => viewport.height < window.innerHeight * 0.85;
 
   if (!keyboardLikelyOpen()) {
     finish();
@@ -207,7 +206,7 @@ function MobilePublishEditUrlView({
 
   return (
     <>
-      <header className="flex min-h-[52px] shrink-0 items-center justify-between gap-3 border-b border-sidebar-border px-4 py-3">
+      <header className="flex min-h-[52px] shrink-0 items-center justify-between gap-3 px-4 py-3">
         <Button
           type="button"
           variant="ghost"
@@ -312,70 +311,70 @@ function MobilePublishMainView({
       <div className="w-full">
         {header}
         <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
-        <MobileActionGroup>
-          <MobileActionLinkRow
-            icon={ExternalLink}
-            label="View article"
-            href={`/${pub.owner_username}/${pub.slug}`}
-          />
-          <MobileActionButtonRow
-            icon={LinkIcon}
-            label="Copy link"
-            disabled={busy || !ownerPreview}
-            onClick={() => {
-              void copyPublicUrl();
-            }}
-          />
-          <MobileActionButtonRow
-            icon={Globe}
-            label="Edit URL"
-            disabled={busy}
-            onClick={onEditUrl}
-          />
-        </MobileActionGroup>
+          <MobileActionGroup>
+            <MobileActionLinkRow
+              icon={ExternalLink}
+              label="View article"
+              href={`/${pub.owner_username}/${pub.slug}`}
+            />
+            <MobileActionButtonRow
+              icon={LinkIcon}
+              label="Copy link"
+              disabled={busy || !ownerPreview}
+              onClick={() => {
+                void copyPublicUrl();
+              }}
+            />
+            <MobileActionButtonRow
+              icon={Globe}
+              label="Edit URL"
+              disabled={busy}
+              onClick={onEditUrl}
+            />
+          </MobileActionGroup>
 
-        {!ownerPreview ? (
-          <p className="px-1 text-xs text-muted-foreground">
-            Add a username in Account to use your real URL path.
-          </p>
-        ) : null}
+          {!ownerPreview ? (
+            <p className="px-1 text-xs text-muted-foreground">
+              Add a username in Account to use your real URL path.
+            </p>
+          ) : null}
 
-        <MobileActionGroup>
-          <MobileActionButtonRow
-            icon={publishIcon}
-            iconClassName={
-              publishFeedback === "publishing" ? "animate-spin" : undefined
-            }
-            label={publishRowLabel}
-            disabled={
-              busy ||
-              !editor ||
-              publicationLoading ||
-              (!hasChangesToPublish && publishFeedback === "idle")
-            }
-            onClick={() => {
-              void handlePublish();
-            }}
-          />
-        </MobileActionGroup>
+          <MobileActionGroup>
+            <MobileActionButtonRow
+              icon={publishIcon}
+              iconClassName={
+                publishFeedback === "publishing" ? "animate-spin" : undefined
+              }
+              label={publishRowLabel}
+              disabled={
+                busy ||
+                !editor ||
+                publicationLoading ||
+                (!hasChangesToPublish && publishFeedback === "idle")
+              }
+              onClick={() => {
+                void handlePublish();
+              }}
+            />
+          </MobileActionGroup>
 
-        <MobileActionGroup>
-          <MobileActionButtonRow
-            icon={GlobeOff as LucideIcon}
-            label="Unpublish"
-            destructive
-            disabled={busy || publicationLoading}
-            trailing={
-              unpublishPending ? (
-                <Loader2
-                  className="size-4 animate-spin opacity-70"
-                  aria-hidden
-                />
-              ) : undefined
-            }
-            onClick={unpublish}
-          />
-        </MobileActionGroup>
+          <MobileActionGroup>
+            <MobileActionButtonRow
+              icon={GlobeOff as LucideIcon}
+              label="Unpublish"
+              destructive
+              disabled={busy || publicationLoading}
+              trailing={
+                unpublishPending ? (
+                  <Loader2
+                    className="size-4 animate-spin opacity-70"
+                    aria-hidden
+                  />
+                ) : undefined
+              }
+              onClick={unpublish}
+            />
+          </MobileActionGroup>
         </div>
       </div>
     );
@@ -432,10 +431,13 @@ export function DocumentPublishMobileDrawer({
   const mainMeasureRef = useRef<HTMLDivElement>(null);
   const editMeasureRef = useRef<HTMLDivElement>(null);
 
-  const goToView = useCallback((next: MobileDrawerView, nextDirection: number) => {
-    setDirection(nextDirection);
-    setView(next);
-  }, [setView]);
+  const goToView = useCallback(
+    (next: MobileDrawerView, nextDirection: number) => {
+      setDirection(nextDirection);
+      setView(next);
+    },
+    [setView],
+  );
 
   const measureMainStage = useCallback(() => {
     const node = mainMeasureRef.current ?? stageRef.current;
@@ -645,10 +647,14 @@ export function DocumentPublishPopoverPanel() {
               </Link>
             </div>
           </div>
-          <div className="grid min-w-0 gap-2">{buildUrlSlugCluster("popover")}</div>
+          <div className="grid min-w-0 gap-2">
+            {buildUrlSlugCluster("popover")}
+          </div>
         </section>
       ) : (
-        <div className="grid min-w-0 gap-2">{buildUrlSlugCluster("popover")}</div>
+        <div className="grid min-w-0 gap-2">
+          {buildUrlSlugCluster("popover")}
+        </div>
       )}
 
       {showPublishedPopoverActions ? (
