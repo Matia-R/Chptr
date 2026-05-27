@@ -16,6 +16,7 @@ import {
   useMemo,
   useRef,
   type ReactNode,
+  type Ref,
 } from "react";
 
 import { Button } from "~/app/_components/button";
@@ -80,7 +81,15 @@ export type DocumentPublishValue = {
   hasUnpublishedChanges: boolean;
   ownerPreview: string | null;
   copyPublicUrl: () => Promise<void>;
-  buildUrlSlugCluster: (surface: "popover" | "mobile") => ReactNode;
+  buildUrlSlugCluster: (
+    surface: "popover" | "mobile",
+    options?: {
+      inputId?: string;
+      value?: string;
+      onChange?: (value: string) => void;
+      inputRef?: Ref<HTMLInputElement>;
+    },
+  ) => ReactNode;
   unpublish: () => void;
   unpublishPending: boolean;
   /** Effective path segment for the public URL (slug override or publication). */
@@ -387,16 +396,31 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   }, [ownerPreview, previewSlugSegment, toast]);
 
   const buildUrlSlugCluster = useCallback(
-    (surface: "popover" | "mobile") => {
-      const isMobileSurface = surface === "mobile";
-      const showInlineRevert = hasPendingSlugChange;
+    (
+      surface: "popover" | "mobile",
+      options?: {
+        inputId?: string;
+        value?: string;
+        onChange?: (value: string) => void;
+        inputRef?: Ref<HTMLInputElement>;
+      },
+    ) => {
+      const isDrawerMobileSurface = surface === "mobile";
+      const isControlled = options?.value !== undefined && !!options.onChange;
+      const inputValue = isControlled ? options.value : slugOverride;
+      const inputId =
+        options?.inputId ??
+        (isDrawerMobileSurface ? "publish-slug-mobile" : "publish-slug");
+      const showInlineRevert =
+        !isControlled && hasPendingSlugChange && surface !== "mobile";
+      const useInsetPadding = surface === "popover";
 
-      return (
+      const cluster = (
         <>
           <div
             className={cn(
-              "flex w-full items-stretch overflow-hidden",
-              isMobileSurface
+              "flex w-full min-w-0 items-stretch overflow-hidden",
+              isDrawerMobileSurface
                 ? cn(
                     "min-h-10 rounded-lg border border-sidebar-border/70 bg-background/50 shadow-inner",
                     "dark:border-white/[0.12] dark:bg-black/35",
@@ -413,7 +437,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
             <span
               className={cn(
                 "inline-flex shrink-0 items-center border-r px-2 py-1.5 text-xs sm:text-sm",
-                isMobileSurface
+                isDrawerMobileSurface
                   ? "border-sidebar-border/60 bg-muted/30 text-muted-foreground dark:border-white/[0.1] dark:bg-white/[0.06]"
                   : "border-input bg-muted/40 text-muted-foreground dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground/70",
               )}
@@ -423,15 +447,28 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               {urlPrefixDisplay}
             </span>
             <Input
-              id={isMobileSurface ? "publish-slug-mobile" : "publish-slug"}
+              ref={options?.inputRef}
+              id={inputId}
+              type="text"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
               className={cn(
-                "h-9 min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
+                "min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
+                isDrawerMobileSurface ? "h-10 text-base" : "h-9",
                 showInlineRevert ? "rounded-none" : "rounded-r-md",
               )}
               placeholder={slugPlaceholder}
-              value={slugOverride}
+              value={inputValue}
               onChange={(e) => {
-                setSlugOverride(e.target.value.replace(/\s+/g, "-"));
+                const next = e.target.value.replace(/\s+/g, "-");
+                if (isControlled) {
+                  options.onChange?.(next);
+                } else {
+                  setSlugOverride(next);
+                }
               }}
               disabled={busy}
             />
@@ -450,12 +487,27 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               </Button>
             ) : null}
           </div>
-          {!ownerPreview && !isMobileSurface ? (
+          {!ownerPreview && surface === "popover" ? (
             <p className="text-xs text-muted-foreground">
               Add a username in Account to use your real URL path.
             </p>
           ) : null}
         </>
+      );
+
+      if (!useInsetPadding) {
+        return cluster;
+      }
+
+      return (
+        <div
+          className={cn(
+            "box-border w-full min-w-0 max-w-full",
+            surface === "popover" && "px-4",
+          )}
+        >
+          {cluster}
+        </div>
       );
     },
     [

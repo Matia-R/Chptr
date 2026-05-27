@@ -44,15 +44,18 @@ export function MobileActionButtonRow({
   trailing,
   iconClassName,
   onClick,
+  onPointerDown,
 }: RowBase & {
   iconClassName?: string;
   onClick: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       className={cn(
         "flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
         "border-t border-sidebar-border/55 first:border-t-0 dark:border-white/[0.08]",

@@ -100,7 +100,7 @@ export function DocumentPublishButton() {
         sideOffset={8}
         onOpenAutoFocus={(e) => e.preventDefault()}
         className={cn(
-          "relative w-[min(100vw-2rem,28rem)] max-w-md border border-sidebar-border bg-sidebar p-6 text-sidebar-foreground shadow-lg",
+          "relative w-[min(100vw-2rem,28rem)] max-w-md overflow-x-hidden border border-sidebar-border bg-sidebar p-6 text-sidebar-foreground shadow-lg",
           "grid gap-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         )}
       >

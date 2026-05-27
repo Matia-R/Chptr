@@ -151,9 +151,9 @@ export function DocumentBreadcrumb() {
 
   if (isLoading && !isNew) {
     return (
-      <Breadcrumb className="min-w-0 w-full max-w-full flex-1 overflow-hidden">
+      <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
         <BreadcrumbList className="min-w-0 flex-nowrap">
-          <BreadcrumbItem className="min-w-0 w-full max-w-full flex-1">
+          <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
             <div className={cn(sharedStyles, "h-4 animate-pulse bg-accent")} />
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -164,9 +164,9 @@ export function DocumentBreadcrumb() {
   const displayName = editingName || "Untitled";
 
   return (
-    <Breadcrumb className="min-w-0 w-full max-w-full flex-1 overflow-hidden">
+    <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
       <BreadcrumbList className="min-w-0 flex-nowrap">
-        <BreadcrumbItem className="min-w-0 w-full max-w-full flex-1">
+        <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
           <Popover
             open={popoverOpen}
             onOpenChange={(open) => {

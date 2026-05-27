@@ -66,7 +66,7 @@ export function PublishedDocumentTitleSection({
           }
           initials={authorAvatarInitials(authorProfile, authorLabel)}
           alt={authorLabel}
-          className="h-12 w-12 rounded-lg"
+          className="h-12 w-12 rounded-full"
         />
         <div className="min-w-0 text-left">
           <p className="text-sm font-medium text-foreground">{authorLabel}</p>

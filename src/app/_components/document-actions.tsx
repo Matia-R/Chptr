@@ -5,13 +5,7 @@ import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import { MoreVertical } from "lucide-react";
 import { Button } from "./button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "./drawer";
+import { Drawer, DrawerContent, DrawerTrigger } from "./drawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +13,10 @@ import {
 } from "./dropdown-menu";
 import { Skeleton } from "./skeleton";
 import {
-  DocumentPublishMobileDrawerPanel,
+  DocumentPublishMobileDrawer,
   useDocumentPublish,
 } from "./editor/document-publish";
+import { useDocumentPublishStore } from "./editor/document-publish-store";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useIsMobile } from "~/hooks/use-mobile";
 
@@ -43,7 +38,11 @@ export function DocumentActions() {
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
 
   const drawerOpen = publishCtx?.mobileDrawerOpen ?? localDrawerOpen;
+  const mobileDrawerView = useDocumentPublishStore((s) => s.mobileDrawerView);
   const setDrawerOpen = (next: boolean) => {
+    if (!next) {
+      useDocumentPublishStore.getState().setMobileDrawerView("main");
+    }
     if (publishCtx) {
       publishCtx.onAuxiliaryOpenChange(next);
       publishCtx.setMobileDrawerOpen(next);
@@ -127,8 +126,7 @@ export function DocumentActions() {
             aria-hidden
           />
           <span>
-            Live ·{" "}
-            {formatPublicationDate(publishCtx.publication.updated_at)}
+            Live · {formatPublicationDate(publishCtx.publication.updated_at)}
             {isOutOfDate ? " · Out of date" : ""}
           </span>
         </span>
@@ -139,22 +137,15 @@ export function DocumentActions() {
 
   if (isMobile) {
     return (
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+      <Drawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        repositionInputs={mobileDrawerView === "edit-url"}
+      >
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
         <DrawerContent className="h-auto max-h-none overflow-hidden p-0">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="text-sidebar-foreground">
-              Publish
-            </DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-4 text-sm text-muted-foreground">
-            {mobileDrawerStatusRow}
-          </div>
-          {/* <div className="border-b border-border px-4 pb-4">{statusText}</div> */}
           {publishCtx ? (
-            <div className="bg-sidebar text-sidebar-foreground">
-              <DocumentPublishMobileDrawerPanel />
-            </div>
+            <DocumentPublishMobileDrawer statusRow={mobileDrawerStatusRow} />
           ) : null}
         </DrawerContent>
       </Drawer>

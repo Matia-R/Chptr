@@ -59,7 +59,7 @@ export default async function RootLayout({
             <div className="flex h-screen min-w-0 flex-col">
               <Header />
               <main className="flex-1 overflow-auto">
-                <div className="min-h-full pb-20 pl-8 pr-4 pt-20 md:pb-28 md:pl-8 md:pr-4 md:pt-28 lg:pb-36 lg:pl-12 lg:pr-4 lg:pt-28">
+                <div className="min-h-full pb-20 pt-20 md:pb-28 md:pl-8 md:pr-4 md:pt-28 lg:pb-36 lg:pl-12 lg:pr-4 lg:pt-28">
                   <div className="mx-auto min-w-0 max-w-[720px]">
                     {children}
                   </div>
