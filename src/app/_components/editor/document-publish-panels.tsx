@@ -42,6 +42,7 @@ import {
 import {
   useDocumentPublishStore,
   type MobileDrawerView,
+  type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
 
 const drawerViewTransition = {
@@ -51,6 +52,9 @@ const drawerViewTransition = {
 
 const STAGE_HEIGHT_TRANSITION_CLASS =
   "transition-[min-height] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+const MOBILE_DRAWER_TITLE_CLASS =
+  "text-lg font-semibold leading-none tracking-tight text-sidebar-foreground";
 
 /** Minimum stage height for the edit-url layout (header + field + helper copy). */
 const EDIT_URL_MIN_CONTENT_PX = 268;
@@ -137,6 +141,45 @@ function waitForKeyboardDismiss(callback: () => void) {
   window.setTimeout(complete, fallbackMs);
 }
 
+function getMobilePublishActionRow(
+  publishFeedback: PublishFeedbackState,
+  options: {
+    showPublishedPopoverActions: boolean;
+    hasChangesToPublish: boolean;
+    firstPublishLabel?: string;
+  },
+) {
+  const label =
+    publishFeedback === "publishing"
+      ? "Publishing..."
+      : publishFeedback === "published"
+        ? "Published"
+        : options.showPublishedPopoverActions
+          ? options.hasChangesToPublish
+            ? "Publish changes"
+            : "Up to date"
+          : (options.firstPublishLabel ?? "Publish");
+
+  const icon: LucideIcon =
+    publishFeedback === "publishing"
+      ? Loader2
+      : publishFeedback === "published"
+        ? Check
+        : CloudUpload;
+
+  const iconClassName =
+    publishFeedback === "publishing"
+      ? "animate-spin"
+      : publishFeedback === "published"
+        ? "text-emerald-600"
+        : undefined;
+
+  const disabledWhenIdle =
+    !options.hasChangesToPublish && publishFeedback === "idle";
+
+  return { label, icon, iconClassName, disabledWhenIdle };
+}
+
 function formatPublicationDate(iso: string): string {
   const d = new Date(iso);
   return new Intl.DateTimeFormat("en-US", {
@@ -217,9 +260,14 @@ function MobilePublishEditUrlView({
           <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden />
           Back
         </Button>
-        <h2 className="min-w-0 flex-1 text-center text-lg font-semibold leading-none tracking-tight">
+        <DrawerTitle
+          className={cn(
+            MOBILE_DRAWER_TITLE_CLASS,
+            "min-w-0 flex-1 text-center",
+          )}
+        >
           Edit URL
-        </h2>
+        </DrawerTitle>
         <Button
           type="button"
           variant="ghost"
@@ -280,24 +328,16 @@ function MobilePublishMainView({
 
   if (!documentId) return null;
 
-  const publishRowLabel =
-    publishFeedback === "publishing"
-      ? "Publishing..."
-      : publishFeedback === "published"
-        ? "Published"
-        : showPublishedPopoverActions
-          ? hasChangesToPublish
-            ? "Publish changes"
-            : "Up to date"
-          : "Publish";
-
-  const publishIcon = publishFeedback === "publishing" ? Loader2 : CloudUpload;
+  const publishAction = getMobilePublishActionRow(publishFeedback, {
+    showPublishedPopoverActions,
+    hasChangesToPublish,
+  });
   const pub = publication;
 
   const header = (
     <>
       <DrawerHeader className="text-left">
-        <DrawerTitle className="text-sidebar-foreground">Publish</DrawerTitle>
+        <DrawerTitle className={MOBILE_DRAWER_TITLE_CLASS}>Publish</DrawerTitle>
         <DrawerDescription className="sr-only">
           Publish and manage this article
         </DrawerDescription>
@@ -341,16 +381,14 @@ function MobilePublishMainView({
 
           <MobileActionGroup>
             <MobileActionButtonRow
-              icon={publishIcon}
-              iconClassName={
-                publishFeedback === "publishing" ? "animate-spin" : undefined
-              }
-              label={publishRowLabel}
+              icon={publishAction.icon}
+              iconClassName={publishAction.iconClassName}
+              label={publishAction.label}
               disabled={
                 busy ||
                 !editor ||
                 publicationLoading ||
-                (!hasChangesToPublish && publishFeedback === "idle")
+                publishAction.disabledWhenIdle
               }
               onClick={() => {
                 void handlePublish();
@@ -399,12 +437,10 @@ function MobilePublishMainView({
         ) : null}
         <MobileActionGroup>
           <MobileActionButtonRow
-            icon={publishIcon}
-            iconClassName={
-              publishFeedback === "publishing" ? "animate-spin" : undefined
-            }
-            label={publishRowLabel}
-            disabled={busy || !editor}
+            icon={publishAction.icon}
+            iconClassName={publishAction.iconClassName}
+            label={publishAction.label}
+            disabled={busy || !editor || publishAction.disabledWhenIdle}
             onClick={() => {
               void handlePublish();
             }}

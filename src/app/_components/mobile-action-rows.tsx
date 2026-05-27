@@ -157,10 +157,7 @@ export function MobileActionExpandingRow({
           "text-sidebar-foreground",
         )}
       >
-        <Icon
-          className="size-[22px] shrink-0 stroke-[1.35]"
-          aria-hidden
-        />
+        <Icon className="size-[22px] shrink-0 stroke-[1.35]" aria-hidden />
         <span className="min-w-0 flex-1 text-[17px] font-normal leading-snug tracking-tight">
           {label}
         </span>
