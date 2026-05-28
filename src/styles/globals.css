@@ -129,4 +129,9 @@ html.published-page-scroll body {
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Vaul drawer content — keep side/top edges, never a bottom rule (see drawer.tsx). */
+  [data-vaul-drawer] {
+    border-bottom-width: 0;
+  }
 }

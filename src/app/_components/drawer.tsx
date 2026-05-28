@@ -46,8 +46,9 @@ const DrawerContent = React.forwardRef<
       ref={ref}
       className={cn(
         // overflow-hidden: Vaul adds a tall ::after for drag/backdrop; without clipping it becomes scrollable empty space.
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-none flex-col overflow-hidden rounded-t-[10px] border bg-sidebar",
-        "transition-[height,bottom] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+        // border-x/t only — shorthand `border` draws a bottom edge above the keyboard / home indicator.
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-none flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
+        "duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] transition-[height,bottom]",
         className,
       )}
       {...props}

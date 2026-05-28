@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Skeleton } from "./skeleton";
+import { MOBILE_DRAWER_SHELL_CLASS } from "~/app/_components/mobile-drawer";
 import {
   DocumentPublishMobileDrawer,
   useDocumentPublish,
@@ -143,7 +144,7 @@ export function DocumentActions() {
         repositionInputs={mobileDrawerView === "edit-url"}
       >
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent className="h-auto max-h-none overflow-hidden p-0">
+        <DrawerContent className={MOBILE_DRAWER_SHELL_CLASS}>
           {publishCtx ? (
             <DocumentPublishMobileDrawer statusRow={mobileDrawerStatusRow} />
           ) : null}
