@@ -413,7 +413,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         (isDrawerMobileSurface ? "publish-slug-mobile" : "publish-slug");
       const showInlineRevert =
         !isControlled && hasPendingSlugChange && surface !== "mobile";
-      const useInsetPadding = surface === "popover";
 
       const cluster = (
         <>
@@ -495,20 +494,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         </>
       );
 
-      if (!useInsetPadding) {
-        return cluster;
-      }
-
-      return (
-        <div
-          className={cn(
-            "box-border w-full min-w-0 max-w-full",
-            surface === "popover" && "px-4",
-          )}
-        >
-          {cluster}
-        </div>
-      );
+      return cluster;
     },
     [
       busy,

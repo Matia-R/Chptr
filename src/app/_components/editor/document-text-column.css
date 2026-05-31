@@ -1,0 +1,19 @@
+/**
+ * Horizontal bounds of BlockNote textual content (.bn-block-content / .bn-inline-content).
+ * Side menus float in this padding zone; text starts at the inner edge.
+ */
+.bn-editor {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  outline: none;
+  padding-inline: var(--document-content-inline-padding, 44px);
+  --N800: #172b4d;
+  --N40: #dfe1e6;
+}
+
+.document-loading-skeleton {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}

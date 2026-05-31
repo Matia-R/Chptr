@@ -1,3 +1,5 @@
+@import "./document-text-column.css";
+
 .bn-shadcn *,
 .bn-shadcn :before,
 .bn-shadcn :after {
@@ -802,13 +804,6 @@
   bottom: 0;
   background: #c8c8ff66;
   pointer-events: none;
-}
-
-.bn-editor {
-  outline: none;
-  padding-inline: 54px;
-  --N800: #172b4d;
-  --N40: #dfe1e6;
 }
 
 .bn-root {
