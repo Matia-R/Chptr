@@ -4,7 +4,7 @@ import { updateSession } from './utils/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
     const response = await updateSession(request)
-    applyPublishedDocumentSecurityHeaders(request.nextUrl.pathname, response)
+    applyPublishedDocumentSecurityHeaders(request.nextUrl.pathname, response, request)
     return response
 }
 
