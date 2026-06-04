@@ -4,6 +4,7 @@ import {
   Check,
   CloudUpload,
   ExternalLink,
+  X,
   Globe,
   GlobeOff,
   Link as LinkIcon,
@@ -53,25 +54,31 @@ function getMobilePublishActionRow(
       ? "Publishing..."
       : publishFeedback === "published"
         ? "Published"
-        : options.showPublishedPopoverActions
-          ? options.hasChangesToPublish
-            ? "Publish changes"
-            : "Up to date"
-          : (options.firstPublishLabel ?? "Publish");
+        : publishFeedback === "failed"
+          ? "Failed to publish"
+          : options.showPublishedPopoverActions
+            ? options.hasChangesToPublish
+              ? "Publish changes"
+              : "Up to date"
+            : (options.firstPublishLabel ?? "Publish");
 
   const icon: LucideIcon =
     publishFeedback === "publishing"
       ? Loader2
       : publishFeedback === "published"
         ? Check
-        : CloudUpload;
+        : publishFeedback === "failed"
+          ? X
+          : CloudUpload;
 
   const iconClassName =
     publishFeedback === "publishing"
       ? "animate-spin"
       : publishFeedback === "published"
         ? "text-emerald-600"
-        : undefined;
+        : publishFeedback === "failed"
+          ? "text-destructive"
+          : undefined;
 
   const disabledWhenIdle =
     !options.hasChangesToPublish && publishFeedback === "idle";

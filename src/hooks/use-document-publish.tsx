@@ -354,15 +354,13 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       closePopoverTimeoutRef.current = window.setTimeout(() => {
         closeBothPanels();
       }, 800);
-    } catch (e) {
-      setPublishFeedback("idle");
+    } catch {
+      setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
-      toast({
-        variant: "destructive",
-        title: "Could not publish",
-        description: e instanceof Error ? e.message : "Unknown error",
-      });
+      window.setTimeout(() => {
+        setPublishFeedback("idle");
+      }, 1400);
     }
   }, [
     documentId,

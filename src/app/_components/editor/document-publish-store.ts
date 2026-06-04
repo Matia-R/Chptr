@@ -2,7 +2,11 @@
 
 import { create } from "zustand";
 
-export type PublishFeedbackState = "idle" | "publishing" | "published";
+export type PublishFeedbackState =
+  | "idle"
+  | "publishing"
+  | "published"
+  | "failed";
 
 export type MobileDrawerView = "main" | "edit-url";
 
