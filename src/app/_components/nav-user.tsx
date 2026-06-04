@@ -65,7 +65,7 @@ export function NavUser({
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg">
-            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-8 w-8 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />

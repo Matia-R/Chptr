@@ -19,7 +19,7 @@ export type UserAvatarProps = {
   initials?: string;
   /** Defaults to trimmed `first_name` + `last_name`, else `"User"`. */
   alt?: string;
-  /** Passed to `Avatar` root; default matches NavUser (`h-8 w-8 rounded-lg`). */
+  /** Passed to `Avatar` root; default matches NavUser (`h-8 w-8 rounded-full`). */
   className?: string;
 };
 
@@ -46,7 +46,7 @@ export function UserAvatar({
   );
 
   const avatarFallbackClassName = cn(
-    "rounded-lg text-black",
+    "rounded-full text-black",
     fallbackAvatarBackgroundClass,
   );
   const avatarFallbackStyle = {
@@ -61,7 +61,7 @@ export function UserAvatar({
     })();
 
   return (
-    <Avatar className={cn("h-8 w-8 rounded-lg", className)}>
+    <Avatar className={cn("h-8 w-8 rounded-full", className)}>
       {src ? (
         <AvatarImage src={src} alt={altText} />
       ) : (

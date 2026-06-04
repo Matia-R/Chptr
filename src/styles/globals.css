@@ -6,6 +6,8 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  /* BlockNote side-menu gutter — where .bn-block-content text begins horizontally */
+  --document-content-inline-padding: 44px;
   overscroll-behavior: none;
   overscroll-behavior-y: none;
   touch-action: pan-x pan-y;
@@ -128,5 +130,10 @@ html.published-page-scroll body {
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Vaul drawer content — keep side/top edges, never a bottom rule (see drawer.tsx). */
+  [data-vaul-drawer] {
+    border-bottom-width: 0;
   }
 }
