@@ -98,7 +98,13 @@ export function MobileActionLinkRow({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-disabled={disabled}
+      aria-disabled={disabled ? true : undefined}
+      tabIndex={disabled ? -1 : 0}
+      onClick={(event) => {
+        if (!disabled) return;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       className={cn(
         "flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
         "border-t border-sidebar-border/55 first:border-t-0 dark:border-white/[0.08]",
