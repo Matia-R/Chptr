@@ -12,7 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Skeleton } from "./skeleton";
-import { MOBILE_DRAWER_SHELL_CLASS } from "~/app/_components/mobile-drawer";
+import {
+  MOBILE_DRAWER_SHELL_CLASS,
+  MobileDrawerScreenHeader,
+} from "~/app/_components/mobile-drawer";
 import {
   DocumentPublishMobileDrawer,
   useDocumentPublish,
@@ -147,7 +150,13 @@ export function DocumentActions() {
         <DrawerContent className={MOBILE_DRAWER_SHELL_CLASS}>
           {publishCtx ? (
             <DocumentPublishMobileDrawer statusRow={mobileDrawerStatusRow} />
-          ) : null}
+          ) : (
+            <MobileDrawerScreenHeader
+              title="Publish"
+              description="Publish and manage this article"
+              subtitle={<span>No changes yet</span>}
+            />
+          )}
         </DrawerContent>
       </Drawer>
     );

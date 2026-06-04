@@ -170,7 +170,12 @@ export function DocumentBreadcrumb() {
       <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
         <BreadcrumbList className="min-w-0 flex-nowrap">
           <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
-            <div className={cn(sharedStyles, "h-4 animate-pulse bg-accent")} />
+            <div
+              className={cn(
+                sharedStyles,
+                "h-4 w-full max-w-[24rem] animate-pulse bg-accent",
+              )}
+            />
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
