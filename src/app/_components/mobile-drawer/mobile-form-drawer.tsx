@@ -55,7 +55,7 @@ export function MobileFormDrawer({
 }: MobileFormDrawerProps) {
   const [draft, setDraft] = useState(initialValue);
   const snapshotRef = useRef(initialValue);
-  const internalInputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLInputElement | null>(null);
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
