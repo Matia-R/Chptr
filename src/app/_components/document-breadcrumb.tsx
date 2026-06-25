@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { flushSync } from "react-dom";
 import { api } from "~/trpc/react";
 import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
@@ -15,7 +16,11 @@ import {
   PopoverTrigger,
 } from "~/app/_components/popover";
 import { Input } from "~/app/_components/input";
-import { MobileFormDrawer } from "~/app/_components/mobile-drawer";
+import {
+  applyMobileDrawerKeyboardInset,
+  focusMobileDrawerInput,
+  MobileFormDrawer,
+} from "~/app/_components/mobile-drawer";
 import { useIsMobile } from "~/hooks/use-mobile";
 
 export function DocumentBreadcrumb() {
@@ -156,7 +161,13 @@ export function DocumentBreadcrumb() {
   const openTitleEditor = React.useCallback(() => {
     setEditingName(document?.document?.name ?? "Untitled");
     if (isMobile) {
-      setDrawerOpen(true);
+      flushSync(() => {
+        setDrawerOpen(true);
+      });
+      focusMobileDrawerInput(titleInputRef.current);
+      window.setTimeout(() => {
+        applyMobileDrawerKeyboardInset();
+      }, 50);
     } else {
       setPopoverOpen(true);
     }
@@ -217,6 +228,7 @@ export function DocumentBreadcrumb() {
                 onCommit={commitTitle}
                 inputId="document-title-mobile"
                 inputLabel="Document title"
+                inputRef={titleInputRef}
               />
             </>
           ) : (

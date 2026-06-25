@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 
 import { Drawer, DrawerContent, DrawerTrigger } from "~/app/_components/drawer";
 import { Input } from "~/app/_components/input";
@@ -10,8 +16,6 @@ import { MOBILE_DRAWER_SHELL_CLASS } from "./constants";
 import { MobileDrawerEditBody } from "./mobile-drawer-edit-body";
 import { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
 import {
-  applyMobileDrawerKeyboardInset,
-  focusMobileDrawerInput,
   resetMobileDrawerKeyboardStyles,
   waitForMobileDrawerKeyboardDismiss,
 } from "./utils";
@@ -28,6 +32,7 @@ export type MobileFormDrawerProps = {
   disabled?: boolean;
   trigger?: React.ReactNode;
   contentClassName?: string;
+  inputRef?: MutableRefObject<HTMLInputElement | null>;
 };
 
 /**
@@ -46,10 +51,11 @@ export function MobileFormDrawer({
   disabled = false,
   trigger,
   contentClassName,
+  inputRef,
 }: MobileFormDrawerProps) {
   const [draft, setDraft] = useState(initialValue);
   const snapshotRef = useRef(initialValue);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLInputElement>(null);
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -60,16 +66,15 @@ export function MobileFormDrawer({
     wasOpenRef.current = open;
   }, [open, initialValue]);
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      focusMobileDrawerInput(inputRef.current);
-      window.setTimeout(() => {
-        applyMobileDrawerKeyboardInset();
-      }, 50);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      internalInputRef.current = node;
+      if (inputRef) {
+        inputRef.current = node;
+      }
+    },
+    [inputRef],
+  );
 
   const closeDrawer = useCallback(() => {
     onOpenChange(false);
@@ -77,7 +82,7 @@ export function MobileFormDrawer({
 
   const leave = useCallback(
     (commit: boolean) => {
-      inputRef.current?.blur();
+      internalInputRef.current?.blur();
       const trimmed = draft.trim();
 
       waitForMobileDrawerKeyboardDismiss(() => {
@@ -117,7 +122,7 @@ export function MobileFormDrawer({
           className={contentClassName}
         >
           <Input
-            ref={inputRef}
+            ref={setInputRef}
             id={inputId}
             type="text"
             value={draft}
