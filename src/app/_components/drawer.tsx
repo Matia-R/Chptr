@@ -6,20 +6,39 @@ import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "~/lib/utils";
 
 const Drawer = ({
-  shouldScaleBackground = true,
+  shouldScaleBackground = false,
+  noBodyStyles = true,
+  fixed = true,
+  repositionInputs = true,
+  open,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-);
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
+  React.useEffect(() => {
+    if (!open) return;
+
+    document.documentElement.dataset.mobileDrawerOpen = "";
+
+    return () => {
+      delete document.documentElement.dataset.mobileDrawerOpen;
+    };
+  }, [open]);
+
+  return (
+    <DrawerPrimitive.Root
+      shouldScaleBackground={shouldScaleBackground}
+      noBodyStyles={noBodyStyles}
+      fixed={fixed}
+      repositionInputs={repositionInputs}
+      open={open}
+      {...props}
+    />
+  );
+};
+
 Drawer.displayName = "Drawer";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
-
 const DrawerPortal = DrawerPrimitive.Portal;
-
 const DrawerClose = DrawerPrimitive.Close;
 
 const DrawerOverlay = React.forwardRef<
@@ -32,32 +51,59 @@ const DrawerOverlay = React.forwardRef<
     {...props}
   />
 ));
+
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content> & {
     overlayClassName?: string;
+    showHandle?: boolean;
+    bottomUnderlay?: boolean;
+    bottomUnderlayHeight?: number;
   }
->(({ className, overlayClassName, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay className={overlayClassName} />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        // overflow-hidden: Vaul adds a tall ::after for drag/backdrop; without clipping it becomes scrollable empty space.
-        // border-x/t only — shorthand `border` draws a bottom edge above the keyboard / home indicator.
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-none flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
-        "duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] transition-[height,bottom]",
-        className,
-      )}
-      {...props}
-    >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-sidebar-border" />
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-));
+>(
+  (
+    {
+      className,
+      overlayClassName,
+      showHandle = true,
+      bottomUnderlay = false,
+      bottomUnderlayHeight,
+      children,
+      ...props
+    },
+    ref,
+  ) => (
+    <DrawerPortal>
+      <DrawerOverlay className={overlayClassName} />
+
+      {bottomUnderlay && bottomUnderlayHeight && bottomUnderlayHeight > 0 ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-[51] bg-sidebar"
+          style={{ height: `${bottomUnderlayHeight}px` }}
+        />
+      ) : null}
+
+      <DrawerPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-[52] mt-24 flex h-auto max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
+          className,
+        )}
+        {...props}
+      >
+        {showHandle ? (
+          <div className="mx-auto mt-4 h-2 w-[100px] shrink-0 rounded-full bg-sidebar-border" />
+        ) : null}
+
+        {children}
+      </DrawerPrimitive.Content>
+    </DrawerPortal>
+  ),
+);
+
 DrawerContent.displayName = "DrawerContent";
 
 const DrawerHeader = ({
@@ -69,6 +115,7 @@ const DrawerHeader = ({
     {...props}
   />
 );
+
 DrawerHeader.displayName = "DrawerHeader";
 
 const DrawerFooter = ({
@@ -80,6 +127,7 @@ const DrawerFooter = ({
     {...props}
   />
 );
+
 DrawerFooter.displayName = "DrawerFooter";
 
 const DrawerTitle = React.forwardRef<
@@ -95,6 +143,7 @@ const DrawerTitle = React.forwardRef<
     {...props}
   />
 ));
+
 DrawerTitle.displayName = DrawerPrimitive.Title.displayName;
 
 const DrawerDescription = React.forwardRef<
@@ -107,6 +156,7 @@ const DrawerDescription = React.forwardRef<
     {...props}
   />
 ));
+
 DrawerDescription.displayName = DrawerPrimitive.Description.displayName;
 
 export {

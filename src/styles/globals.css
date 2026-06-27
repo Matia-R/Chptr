@@ -137,3 +137,18 @@ html.published-page-scroll body {
     border-bottom-width: 0;
   }
 }
+
+/* Vaul / Radix scroll lock must not reflow our fixed app shell. */
+html body[data-scroll-locked] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Keep the document editor pinned while a mobile drawer is open. */
+html[data-mobile-drawer-open] [data-app-scroll-root] {
+  overflow: hidden !important;
+}
