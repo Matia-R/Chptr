@@ -13,10 +13,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 import { Button } from "~/app/_components/button";
 import { cn } from "~/lib/utils";
 import {
+  applyMobileDrawerKeyboardInset,
+  focusMobileDrawerInput,
   MobileDrawerEditBody,
   MobileDrawerNavHeader,
   MobileDrawerScreenHeader,
@@ -349,7 +352,6 @@ export function DocumentPublishMobileDrawer({
       stageIsMeasured={stage.stageIsMeasured}
       stageRef={stage.stageRef}
       getMotionRef={stage.getMotionRef}
-      focusInputIdOnEnter={{ "edit-url": "publish-slug-mobile" }}
       renderView={(currentView) =>
         currentView === "edit-url" ? (
           <MobilePublishEditUrlView
@@ -364,8 +366,17 @@ export function DocumentPublishMobileDrawer({
             statusRow={statusRow}
             onEditUrl={() => {
               stage.measureMainStage();
-              stage.expandStageForKeyboardView();
-              stage.goToView("edit-url", 1);
+              flushSync(() => {
+                stage.expandStageForKeyboardView();
+                stage.goToView("edit-url", 1);
+              });
+              const input = document.getElementById("publish-slug-mobile");
+              if (input instanceof HTMLInputElement) {
+                focusMobileDrawerInput(input);
+                window.setTimeout(() => {
+                  applyMobileDrawerKeyboardInset();
+                }, 50);
+              }
             }}
           />
         )

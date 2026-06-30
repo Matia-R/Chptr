@@ -18,32 +18,7 @@ body {
   overscroll-behavior: none;
   overscroll-behavior-y: none;
   touch-action: pan-x pan-y;
-  height: 100%;
-  position: fixed;
-  width: 100%;
-}
-
-/* Long standalone pages (published docs): restore window scroll. See PublishedScrollRoot.
-   Single scrollport on <html> only; <body> stays overflow visible so wheel events scroll
-   correctly (dual overflow:auto on html+body breaks trackpad/wheel in WebKit/Chromium). */
-html.published-page-scroll {
-  height: auto;
-  min-height: 100dvh;
-  position: static;
-  width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: auto;
-  touch-action: auto;
-}
-
-html.published-page-scroll body {
-  height: auto;
-  position: static;
-  width: 100%;
-  overflow: visible;
-  overscroll-behavior: auto;
-  touch-action: auto;
+  min-height: 100%;
 }
 
 @layer base {
@@ -136,4 +111,18 @@ html.published-page-scroll body {
   [data-vaul-drawer] {
     border-bottom-width: 0;
   }
+}
+
+/* Vaul / Radix scroll lock. */
+html body[data-scroll-locked] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html[data-mobile-drawer-open] [data-app-scroll-root] {
+  overflow: hidden !important;
 }

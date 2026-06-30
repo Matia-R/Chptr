@@ -42,7 +42,6 @@ export function DocumentActions() {
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
 
   const drawerOpen = publishCtx?.mobileDrawerOpen ?? localDrawerOpen;
-  const mobileDrawerView = useDocumentPublishStore((s) => s.mobileDrawerView);
   const setDrawerOpen = (next: boolean) => {
     if (!next) {
       useDocumentPublishStore.getState().setMobileDrawerView("main");
@@ -144,7 +143,7 @@ export function DocumentActions() {
       <Drawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        repositionInputs={mobileDrawerView === "edit-url"}
+        repositionInputs={false}
       >
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
         <DrawerContent className={MOBILE_DRAWER_SHELL_CLASS}>

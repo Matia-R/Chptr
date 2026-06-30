@@ -10,10 +10,6 @@ import {
   mobileDrawerViewTransition,
   mobileDrawerViewVariants,
 } from "./constants";
-import {
-  applyMobileDrawerKeyboardInset,
-  focusMobileDrawerInput,
-} from "./utils";
 
 export type MobileDrawerViewStackProps<T extends string> = {
   view: T;
@@ -22,8 +18,6 @@ export type MobileDrawerViewStackProps<T extends string> = {
   stageIsMeasured: boolean;
   stageRef: RefObject<HTMLDivElement | null>;
   getMotionRef: (view: T) => RefObject<HTMLDivElement | null> | undefined;
-  /** When this view finishes entering, focus the input with this id. */
-  focusInputIdOnEnter?: Partial<Record<T, string>>;
   renderView: (view: T) => ReactNode;
   className?: string;
 };
@@ -38,12 +32,9 @@ export function MobileDrawerViewStack<T extends string>({
   stageIsMeasured,
   stageRef,
   getMotionRef,
-  focusInputIdOnEnter,
   renderView,
   className,
 }: MobileDrawerViewStackProps<T>) {
-  const focusId = focusInputIdOnEnter?.[view];
-
   return (
     <div className={cn("bg-sidebar text-sidebar-foreground", className)}>
       <div
@@ -54,7 +45,7 @@ export function MobileDrawerViewStack<T extends string>({
         )}
         style={stageIsMeasured ? { minHeight: stageMinHeight } : undefined}
       >
-        <AnimatePresence initial={false} mode="wait" custom={direction}>
+        <AnimatePresence initial={false} custom={direction}>
           <motion.div
             key={view}
             ref={getMotionRef(view) as Ref<HTMLDivElement>}
@@ -68,15 +59,6 @@ export function MobileDrawerViewStack<T extends string>({
               "w-full bg-sidebar",
               stageIsMeasured && "absolute inset-x-0 top-0",
             )}
-            onAnimationComplete={(definition) => {
-              if (definition !== "center" || !focusId) return;
-              const input = document.getElementById(focusId);
-              if (!(input instanceof HTMLInputElement)) return;
-              focusMobileDrawerInput(input);
-              window.setTimeout(() => {
-                applyMobileDrawerKeyboardInset();
-              }, 50);
-            }}
           >
             {renderView(view)}
           </motion.div>

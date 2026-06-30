@@ -68,10 +68,10 @@ export function applyMobileDrawerKeyboardInset(
 export function focusMobileDrawerInput(input: HTMLInputElement | null) {
   if (!input) return;
   try {
-    input.focus();
+    input.focus({ preventScroll: true });
     const end = input.value.length;
     input.setSelectionRange(end, end);
   } catch {
-    input.focus();
+    input.focus({ preventScroll: true });
   }
 }

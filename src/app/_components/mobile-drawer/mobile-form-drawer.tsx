@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MutableRefObject,
+} from "react";
 
 import { Drawer, DrawerContent, DrawerTrigger } from "~/app/_components/drawer";
 import { Input } from "~/app/_components/input";
@@ -9,12 +16,6 @@ import { cn } from "~/lib/utils";
 import { MOBILE_DRAWER_SHELL_CLASS } from "./constants";
 import { MobileDrawerEditBody } from "./mobile-drawer-edit-body";
 import { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
-import {
-  applyMobileDrawerKeyboardInset,
-  focusMobileDrawerInput,
-  resetMobileDrawerKeyboardStyles,
-  waitForMobileDrawerKeyboardDismiss,
-} from "./utils";
 
 export type MobileFormDrawerProps = {
   open: boolean;
@@ -28,12 +29,13 @@ export type MobileFormDrawerProps = {
   disabled?: boolean;
   trigger?: React.ReactNode;
   contentClassName?: string;
+  inputRef?: MutableRefObject<HTMLInputElement | null>;
 };
 
-/**
- * Single-screen mobile drawer for editing a text field (title, slug, etc.).
- * Matches publish drawer edit screens: nav header, padded field, keyboard handling.
- */
+type DrawerKeyboardStyle = CSSProperties & {
+  "--mobile-keyboard-offset"?: string;
+};
+
 export function MobileFormDrawer({
   open,
   onOpenChange,
@@ -46,10 +48,16 @@ export function MobileFormDrawer({
   disabled = false,
   trigger,
   contentClassName,
+  inputRef,
 }: MobileFormDrawerProps) {
   const [draft, setDraft] = useState(initialValue);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [visualViewportHeight, setVisualViewportHeight] = useState<
+    number | null
+  >(null);
+
   const snapshotRef = useRef(initialValue);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLInputElement | null>(null);
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -57,54 +65,124 @@ export function MobileFormDrawer({
       snapshotRef.current = initialValue;
       setDraft(initialValue);
     }
+
     wasOpenRef.current = open;
   }, [open, initialValue]);
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => {
-      focusMobileDrawerInput(inputRef.current);
-      window.setTimeout(() => {
-        applyMobileDrawerKeyboardInset();
-      }, 50);
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      internalInputRef.current = node;
+
+      if (inputRef) {
+        inputRef.current = node;
+      }
+    },
+    [inputRef],
+  );
+
+  const focusInput = useCallback(() => {
+    if (disabled) return;
+
+    requestAnimationFrame(() => {
+      internalInputRef.current?.focus({ preventScroll: true });
     });
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
+  }, [disabled]);
 
   const closeDrawer = useCallback(() => {
     onOpenChange(false);
+
+    window.setTimeout(() => {
+      internalInputRef.current?.blur();
+    }, 250);
   }, [onOpenChange]);
 
   const leave = useCallback(
     (commit: boolean) => {
-      inputRef.current?.blur();
       const trimmed = draft.trim();
 
-      waitForMobileDrawerKeyboardDismiss(() => {
-        resetMobileDrawerKeyboardStyles();
-        if (commit) {
-          onCommit(trimmed);
-        } else {
-          setDraft(snapshotRef.current);
-        }
-        closeDrawer();
-      });
+      if (commit) {
+        onCommit(trimmed);
+      } else {
+        setDraft(snapshotRef.current);
+      }
+
+      closeDrawer();
     },
     [closeDrawer, draft, onCommit],
   );
 
-  const handleOpenChange = (next: boolean) => {
-    if (next) {
-      onOpenChange(true);
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (next) {
+        onOpenChange(true);
+        return;
+      }
+
+      leave(false);
+    },
+    [leave, onOpenChange],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    focusInput();
+  }, [open, focusInput]);
+
+  useEffect(() => {
+    if (!open) {
+      setKeyboardOffset(0);
+      setVisualViewportHeight(null);
       return;
     }
-    leave(false);
+
+    const viewport = window.visualViewport;
+
+    if (!viewport) return;
+
+    const updateViewport = () => {
+      const nextKeyboardOffset = Math.max(
+        0,
+        window.innerHeight - viewport.height - viewport.offsetTop,
+      );
+
+      setKeyboardOffset(nextKeyboardOffset);
+      setVisualViewportHeight(viewport.height);
+    };
+
+    updateViewport();
+
+    viewport.addEventListener("resize", updateViewport);
+    viewport.addEventListener("scroll", updateViewport);
+
+    return () => {
+      viewport.removeEventListener("resize", updateViewport);
+      viewport.removeEventListener("scroll", updateViewport);
+    };
+  }, [open]);
+
+  const drawerStyle: DrawerKeyboardStyle = {
+    bottom: `${keyboardOffset}px`,
+    maxHeight: visualViewportHeight
+      ? `calc(${visualViewportHeight}px - 16px)`
+      : "calc(100dvh - 16px)",
+    "--mobile-keyboard-offset": `${keyboardOffset}px`,
   };
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} repositionInputs={open}>
+    <Drawer
+      open={open}
+      onOpenChange={handleOpenChange}
+      repositionInputs={false}
+    >
       {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
-      <DrawerContent className={MOBILE_DRAWER_SHELL_CLASS}>
+
+      <DrawerContent
+        bottomUnderlay={keyboardOffset > 0}
+        bottomUnderlayHeight={keyboardOffset}
+        style={drawerStyle}
+        className={cn(MOBILE_DRAWER_SHELL_CLASS)}
+      >
         <MobileDrawerNavHeader
           title={title}
           disabled={disabled}
@@ -112,12 +190,13 @@ export function MobileFormDrawer({
           onBack={() => leave(false)}
           onDone={() => leave(true)}
         />
+
         <MobileDrawerEditBody
           helperText={helperText}
           className={contentClassName}
         >
           <Input
-            ref={inputRef}
+            ref={setInputRef}
             id={inputId}
             type="text"
             value={draft}

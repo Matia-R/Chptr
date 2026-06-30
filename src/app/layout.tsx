@@ -3,7 +3,7 @@ import { ThemeProvider } from "./_components/theme-provider";
 
 import { GeistSans } from "geist/font/sans";
 import { Inter, Lora, Noto_Serif } from "next/font/google";
-import { type Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
 
@@ -24,6 +24,10 @@ const notoSerif = Noto_Serif({
   variable: "--font-noto-serif",
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Chptr",
