@@ -18,32 +18,7 @@ body {
   overscroll-behavior: none;
   overscroll-behavior-y: none;
   touch-action: pan-x pan-y;
-  height: 100%;
-  position: fixed;
-  width: 100%;
-}
-
-/* Long standalone pages (published docs): restore window scroll. See PublishedScrollRoot.
-   Single scrollport on <html> only; <body> stays overflow visible so wheel events scroll
-   correctly (dual overflow:auto on html+body breaks trackpad/wheel in WebKit/Chromium). */
-html.published-page-scroll {
-  height: auto;
-  min-height: 100dvh;
-  position: static;
-  width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: auto;
-  touch-action: auto;
-}
-
-html.published-page-scroll body {
-  height: auto;
-  position: static;
-  width: 100%;
-  overflow: visible;
-  overscroll-behavior: auto;
-  touch-action: auto;
+  min-height: 100%;
 }
 
 @layer base {
@@ -138,7 +113,7 @@ html.published-page-scroll body {
   }
 }
 
-/* Vaul / Radix scroll lock must not reflow our fixed app shell. */
+/* Vaul / Radix scroll lock. */
 html body[data-scroll-locked] {
   position: fixed !important;
   top: 0 !important;
@@ -148,7 +123,6 @@ html body[data-scroll-locked] {
   padding: 0 !important;
 }
 
-/* Keep the document editor pinned while a mobile drawer is open. */
 html[data-mobile-drawer-open] [data-app-scroll-root] {
   overflow: hidden !important;
 }

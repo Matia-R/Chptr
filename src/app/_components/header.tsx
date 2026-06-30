@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "./sidebar";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
-import { CommandMenuButton } from "./command-menu-button";
 import { DocumentPublishButton } from "./document-publish-button";
 
 export function Header() {
@@ -13,7 +12,7 @@ export function Header() {
     pathname.startsWith("/documents/") && pathname !== "/documents";
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-2 rounded-t-2xl bg-background px-4">
+    <header className="z-10 flex h-12 shrink-0 items-center justify-between gap-2 bg-background px-4 max-md:absolute max-md:inset-x-0 max-md:top-0 md:relative md:rounded-t-2xl">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger />
         {isDocumentPage ? (
