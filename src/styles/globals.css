@@ -107,9 +107,46 @@ body {
     @apply bg-background text-foreground;
   }
 
+  html {
+    background-color: hsl(var(--background));
+  }
+
+  html[data-overlay-open] {
+    background-color: color-mix(in srgb, black 80%, hsl(var(--background)));
+  }
+
+  /* Safe-area chrome tint via theme-color (overlay-backdrop.ts). */
+  /* Keep app chrome below portaled scrim (iOS paints absolute header above fixed overlays). */
+  html[data-overlay-open] .group\/sidebar-wrapper {
+    position: relative;
+    z-index: 0;
+  }
+
+  html[data-overlay-open] [data-app-header] {
+    z-index: 0;
+  }
+
+  @media (max-width: 767px) {
+    html[data-overlay-open] [data-app-header] {
+      pointer-events: none;
+    }
+  }
+
   /* Vaul drawer content — keep side/top edges, never a bottom rule (see drawer.tsx). */
   [data-vaul-drawer] {
     border-bottom-width: 0;
+  }
+
+  @supports (-webkit-touch-callout: none) {
+    .drawer-scrim,
+    .overlay-backdrop {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    [data-vaul-drawer] {
+      -webkit-transform: translate3d(0, 0, 0);
+      transform: translate3d(0, 0, 0);
+    }
   }
 }
 
@@ -123,6 +160,6 @@ html body[data-scroll-locked] {
   padding: 0 !important;
 }
 
-html[data-mobile-drawer-open] [data-app-scroll-root] {
+html[data-drawer-overlay] [data-app-scroll-root] {
   overflow: hidden !important;
 }

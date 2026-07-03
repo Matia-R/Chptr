@@ -4,6 +4,7 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "~/lib/utils";
+import { drawerOverlayClass, setOverlayOpen } from "./overlay-backdrop";
 
 const Drawer = ({
   shouldScaleBackground = false,
@@ -11,17 +12,21 @@ const Drawer = ({
   fixed = true,
   repositionInputs = true,
   open,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
   React.useEffect(() => {
-    if (!open) return;
-
-    document.documentElement.dataset.mobileDrawerOpen = "";
-
-    return () => {
-      delete document.documentElement.dataset.mobileDrawerOpen;
-    };
+    if (typeof open !== "boolean") return;
+    setOverlayOpen(open);
   }, [open]);
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      setOverlayOpen(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange],
+  );
 
   return (
     <DrawerPrimitive.Root
@@ -30,6 +35,7 @@ const Drawer = ({
       fixed={fixed}
       repositionInputs={repositionInputs}
       open={open}
+      onOpenChange={handleOpenChange}
       {...props}
     />
   );
@@ -41,18 +47,20 @@ const DrawerTrigger = DrawerPrimitive.Trigger;
 const DrawerPortal = DrawerPrimitive.Portal;
 const DrawerClose = DrawerPrimitive.Close;
 
+/** Plain scrim — not Vaul/Radix overlay (opacity + RemoveScroll stacking break on iOS). */
 const DrawerOverlay = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
+  <div
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/80", className)}
+    aria-hidden="true"
+    className={cn(drawerOverlayClass, className)}
     {...props}
   />
 ));
 
-DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
+DrawerOverlay.displayName = "DrawerOverlay";
 
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
@@ -76,12 +84,14 @@ const DrawerContent = React.forwardRef<
     ref,
   ) => (
     <DrawerPortal>
-      <DrawerOverlay className={overlayClassName} />
+      <DrawerClose asChild>
+        <DrawerOverlay className={overlayClassName} />
+      </DrawerClose>
 
       {bottomUnderlay && bottomUnderlayHeight && bottomUnderlayHeight > 0 ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-[51] bg-sidebar"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 bg-sidebar"
           style={{ height: `${bottomUnderlayHeight}px` }}
         />
       ) : null}
@@ -89,7 +99,7 @@ const DrawerContent = React.forwardRef<
       <DrawerPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[52] mt-24 flex h-auto max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
+          "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
           className,
         )}
         {...props}
