@@ -13,27 +13,67 @@ export const dialogOverlayClass = cn(
   "duration-200",
 );
 
-function getDefaultThemeColor() {
-  return document.documentElement.classList.contains("dark")
-    ? "#1a1a1a"
-    : "#ffffff";
+type ThemeColorScheme = "light" | "dark" | "default";
+
+const DEFAULT_THEME_COLORS: Record<ThemeColorScheme, string> = {
+  light: "#ffffff",
+  dark: "#1a1a1a",
+  default: "#ffffff",
+};
+
+const OVERLAY_THEME_COLORS: Record<ThemeColorScheme, string> = {
+  light: "#333333",
+  dark: "#050505",
+  default: "#333333",
+};
+
+function getThemeColorScheme(meta: HTMLMetaElement): ThemeColorScheme {
+  const media = meta.media;
+  if (media.includes("dark")) return "dark";
+  if (media.includes("light")) return "light";
+  return "default";
 }
 
-/** ~80% black scrim composited over the page background. */
-function getOverlayThemeColor() {
-  return document.documentElement.classList.contains("dark")
-    ? "#050505"
-    : "#333333";
-}
+function forEachThemeColorMeta(
+  apply: (meta: HTMLMetaElement, scheme: ThemeColorScheme) => void,
+) {
+  const metas = document.querySelectorAll<HTMLMetaElement>(
+    'meta[name="theme-color"]',
+  );
 
-function setThemeColor(color: string) {
-  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (!meta) {
-    meta = document.createElement("meta");
+  if (metas.length === 0) {
+    const meta = document.createElement("meta");
     meta.name = "theme-color";
     document.head.appendChild(meta);
+    apply(meta, document.documentElement.classList.contains("dark") ? "dark" : "light");
+    return;
   }
-  meta.content = color;
+
+  metas.forEach((meta) => {
+    apply(meta, getThemeColorScheme(meta));
+  });
+}
+
+function setDefaultThemeColors() {
+  forEachThemeColorMeta((meta, scheme) => {
+    meta.content =
+      scheme === "default"
+        ? document.documentElement.classList.contains("dark")
+          ? DEFAULT_THEME_COLORS.dark
+          : DEFAULT_THEME_COLORS.light
+        : DEFAULT_THEME_COLORS[scheme];
+  });
+}
+
+function setOverlayThemeColors() {
+  forEachThemeColorMeta((meta, scheme) => {
+    meta.content =
+      scheme === "default"
+        ? document.documentElement.classList.contains("dark")
+          ? OVERLAY_THEME_COLORS.dark
+          : OVERLAY_THEME_COLORS.light
+        : OVERLAY_THEME_COLORS[scheme];
+  });
 }
 
 function isOverlayDimmed() {
@@ -44,8 +84,10 @@ function isOverlayDimmed() {
 }
 
 function clearOverlayChrome() {
+  if (isOverlayDimmed()) return;
+
   delete document.documentElement.dataset.overlayOpen;
-  setThemeColor(getDefaultThemeColor());
+  setDefaultThemeColors();
 }
 
 /** Drive iOS safe-area chrome — instant snap, separate from scrim opacity. */
@@ -54,7 +96,7 @@ export function refreshOverlayChrome() {
 
   if (isOverlayDimmed()) {
     html.dataset.overlayOpen = "";
-    setThemeColor(getOverlayThemeColor());
+    setOverlayThemeColors();
     return;
   }
 
@@ -71,7 +113,5 @@ export function setOverlayOpen(open: boolean) {
   }
 
   delete html.dataset.drawerOverlay;
-  // Clear immediately — Radix can keep data-scroll-locked briefly after close,
-  // which would otherwise leave the safe-area chrome dimmed via :has() / refresh.
-  clearOverlayChrome();
+  refreshOverlayChrome();
 }

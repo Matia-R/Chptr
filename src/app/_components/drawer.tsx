@@ -17,7 +17,14 @@ const Drawer = ({
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
   React.useEffect(() => {
     if (typeof open !== "boolean") return;
+
     setOverlayOpen(open);
+
+    return () => {
+      if (open) {
+        setOverlayOpen(false);
+      }
+    };
   }, [open]);
 
   const handleOpenChange = React.useCallback(
