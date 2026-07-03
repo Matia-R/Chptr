@@ -6,6 +6,7 @@ import { Inter, Lora, Noto_Serif } from "next/font/google";
 import { type Metadata, type Viewport } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import { OverlayThemeSync } from "./_components/overlay-theme-sync";
 
 const lora = Lora({
   subsets: ["latin"],
@@ -27,6 +28,10 @@ const notoSerif = Noto_Serif({
 
 export const viewport: Viewport = {
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -56,6 +61,7 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${lora.variable} ${inter.variable} ${notoSerif.variable}`}
     >
       <body>
+        <OverlayThemeSync />
         <TRPCReactProvider>
           <ThemeProvider
             attribute="class"

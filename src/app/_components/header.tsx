@@ -12,7 +12,10 @@ export function Header() {
     pathname.startsWith("/documents/") && pathname !== "/documents";
 
   return (
-    <header className="z-10 flex h-12 shrink-0 items-center justify-between gap-2 bg-background px-4 max-md:absolute max-md:inset-x-0 max-md:top-0 md:relative md:rounded-t-2xl">
+    <header
+      data-app-header
+      className="z-10 flex h-12 shrink-0 items-center justify-between gap-2 bg-background px-4 max-md:absolute max-md:inset-x-0 max-md:top-0 md:relative md:rounded-t-2xl"
+    >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger />
         {isDocumentPage ? (
