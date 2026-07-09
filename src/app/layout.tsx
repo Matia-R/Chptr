@@ -37,23 +37,24 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Chptr",
   description: "A powerful app to develop and share your ideas",
-  icons: [
-    {
-      rel: "icon",
-      url: "/light_favicon.ico",
-      media: "(prefers-color-scheme: light)",
-    },
-    {
-      rel: "icon",
-      url: "/dark_favicon.ico",
-      media: "(prefers-color-scheme: dark)",
-    },
-    {
-      rel: "apple-touch-icon",
-      url: "/apple-touch-icon.png",
-      sizes: "180x180",
-    },
-  ],
+  icons: {
+    icon: [
+      {
+        url: "/light_favicon.ico",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/dark_favicon.ico",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    apple: [
+      {
+        url: "/apple-touch-icon.png",
+        sizes: "180x180",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
