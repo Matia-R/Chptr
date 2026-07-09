@@ -48,6 +48,11 @@ export const metadata: Metadata = {
       url: "/dark_favicon.ico",
       media: "(prefers-color-scheme: dark)",
     },
+    {
+      rel: "apple-touch-icon",
+      url: "/apple-touch-icon.png",
+      sizes: "180x180",
+    },
   ],
 };
 
