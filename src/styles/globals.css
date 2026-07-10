@@ -142,18 +142,17 @@ body {
 }
 
 /*
- * Overlay safe-area fill — unlayered so it wins over Tailwind bg-* utilities.
+ * Drawer status-bar chrome — unlayered so it wins over Tailwind bg-* utilities.
  *
  * iOS 26 Safari ignores theme-color and samples the nearest fixed/sticky background
- * at the viewport edge. Our fixed white header is what kept the status bar white.
- * While overlays are open: clear the header fill so the scrim shows through, and show
- * a thin fixed top sampler in the overlay chrome color for Safari to sample.
+ * at the viewport edge. Enabled only while a drawer sets data-drawer-chrome-sampler
+ * (see Drawer chromeSampler prop) — not for sidebar sheets / other overlays.
  */
-html[data-overlay-open] {
+html[data-drawer-chrome-sampler] {
   background-color: #333333;
 }
 
-html.dark[data-overlay-open] {
+html.dark[data-drawer-chrome-sampler] {
   background-color: #050505;
 }
 
@@ -163,7 +162,7 @@ html.dark[data-overlay-open] {
 }
 
 @media (max-width: 767px) {
-  html[data-overlay-open] [data-app-header] {
+  html[data-drawer-chrome-sampler] [data-app-header] {
     background-color: transparent;
   }
 
@@ -177,11 +176,11 @@ html.dark[data-overlay-open] {
     background-color: #333333;
   }
 
-  html[data-overlay-open] [data-overlay-chrome-sampler] {
+  html[data-drawer-chrome-sampler] [data-overlay-chrome-sampler] {
     display: block;
   }
 
-  html.dark[data-overlay-open] [data-overlay-chrome-sampler] {
+  html.dark[data-drawer-chrome-sampler] [data-overlay-chrome-sampler] {
     background-color: #050505;
   }
 }

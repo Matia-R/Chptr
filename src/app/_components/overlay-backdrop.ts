@@ -100,6 +100,7 @@ function clearOverlayChrome() {
   if (isOverlayDimmed()) return;
 
   delete document.documentElement.dataset.overlayOpen;
+  delete document.documentElement.dataset.drawerChromeSampler;
   setDefaultThemeColors();
 }
 
@@ -116,15 +117,33 @@ export function refreshOverlayChrome() {
   clearOverlayChrome();
 }
 
-export function setOverlayOpen(open: boolean) {
+export type SetOverlayOpenOptions = {
+  /**
+   * iOS 26 status-bar chrome sampler (fixed top strip + transparent header).
+   * Defaults to true for drawers; set false to skip.
+   */
+  chromeSampler?: boolean;
+};
+
+export function setOverlayOpen(
+  open: boolean,
+  options: SetOverlayOpenOptions = {},
+) {
   const html = document.documentElement;
+  const chromeSampler = options.chromeSampler !== false;
 
   if (open) {
     html.dataset.drawerOverlay = "";
+    if (chromeSampler) {
+      html.dataset.drawerChromeSampler = "";
+    } else {
+      delete html.dataset.drawerChromeSampler;
+    }
     refreshOverlayChrome();
     return;
   }
 
   delete html.dataset.drawerOverlay;
+  delete html.dataset.drawerChromeSampler;
   refreshOverlayChrome();
 }

@@ -6,9 +6,8 @@ import { refreshOverlayChrome } from "./overlay-backdrop";
 /**
  * Sync safe-area chrome when Radix sets body[data-scroll-locked] on dialogs/sheets.
  *
- * iOS 26 Safari ignores theme-color and samples the nearest fixed/sticky background
- * at the viewport edge. The opaque sampler below is what actually tints the status bar
- * while overlays are open (see globals.css).
+ * The fixed sampler below only paints while a drawer sets data-drawer-chrome-sampler
+ * (Drawer chromeSampler prop). Sidebar sheets and other overlays leave it hidden.
  */
 export function OverlayThemeSync() {
   useEffect(() => {

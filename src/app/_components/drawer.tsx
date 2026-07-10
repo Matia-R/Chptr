@@ -11,28 +11,32 @@ const Drawer = ({
   noBodyStyles = true,
   fixed = true,
   repositionInputs = true,
+  chromeSampler = true,
   open,
   onOpenChange,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
+}: React.ComponentProps<typeof DrawerPrimitive.Root> & {
+  /** Tint iOS status-bar chrome to match the scrim (mobile). Default true. */
+  chromeSampler?: boolean;
+}) => {
   React.useEffect(() => {
     if (typeof open !== "boolean") return;
 
-    setOverlayOpen(open);
+    setOverlayOpen(open, { chromeSampler });
 
     return () => {
       if (open) {
         setOverlayOpen(false);
       }
     };
-  }, [open]);
+  }, [open, chromeSampler]);
 
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
-      setOverlayOpen(next);
+      setOverlayOpen(next, { chromeSampler });
       onOpenChange?.(next);
     },
-    [onOpenChange],
+    [chromeSampler, onOpenChange],
   );
 
   return (
