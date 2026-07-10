@@ -111,18 +111,9 @@ body {
     background-color: hsl(var(--background));
   }
 
-  html[data-overlay-open] {
-    background-color: color-mix(in srgb, black 80%, hsl(var(--background)));
-  }
-
-  /* Safe-area chrome tint via theme-color (overlay-backdrop.ts). */
-  /* Keep app chrome below portaled scrim (iOS paints absolute header above fixed overlays). */
+  /* Keep app chrome below portaled scrim. */
   html[data-overlay-open] .group\/sidebar-wrapper {
     position: relative;
-    z-index: 0;
-  }
-
-  html[data-overlay-open] [data-app-header] {
     z-index: 0;
   }
 
@@ -147,6 +138,50 @@ body {
       -webkit-transform: translate3d(0, 0, 0);
       transform: translate3d(0, 0, 0);
     }
+  }
+}
+
+/*
+ * Drawer status-bar chrome — unlayered so it wins over Tailwind bg-* utilities.
+ *
+ * iOS 26 Safari ignores theme-color and samples the nearest fixed/sticky background
+ * at the viewport edge. Enabled only while a drawer sets data-drawer-chrome-sampler
+ * (see Drawer chromeSampler prop) — not for sidebar sheets / other overlays.
+ */
+html[data-drawer-chrome-sampler] {
+  background-color: #333333;
+}
+
+html.dark[data-drawer-chrome-sampler] {
+  background-color: #050505;
+}
+
+/* display:none when idle — opacity:0 still gets sampled by Safari 26. */
+[data-overlay-chrome-sampler] {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  html[data-drawer-chrome-sampler] [data-app-header] {
+    background-color: transparent;
+  }
+
+  [data-overlay-chrome-sampler] {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 45;
+    height: 12px;
+    pointer-events: none;
+    background-color: #333333;
+  }
+
+  html[data-drawer-chrome-sampler] [data-overlay-chrome-sampler] {
+    display: block;
+  }
+
+  html.dark[data-drawer-chrome-sampler] [data-overlay-chrome-sampler] {
+    background-color: #050505;
   }
 }
 

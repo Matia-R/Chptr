@@ -54,26 +54,39 @@ function forEachThemeColorMeta(
   });
 }
 
-function setDefaultThemeColors() {
+function activeThemeScheme(): Exclude<ThemeColorScheme, "default"> {
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+/**
+ * Safari often ignores content updates on media-conditioned theme-color metas.
+ * Keep those in sync, and also stamp a media-less meta Safari reliably repaints.
+ */
+function setThemeColors(colors: Record<ThemeColorScheme, string>) {
   forEachThemeColorMeta((meta, scheme) => {
     meta.content =
-      scheme === "default"
-        ? document.documentElement.classList.contains("dark")
-          ? DEFAULT_THEME_COLORS.dark
-          : DEFAULT_THEME_COLORS.light
-        : DEFAULT_THEME_COLORS[scheme];
+      scheme === "default" ? colors[activeThemeScheme()] : colors[scheme];
   });
+
+  let active = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]:not([media])',
+  );
+
+  if (!active) {
+    active = document.createElement("meta");
+    active.name = "theme-color";
+    document.head.appendChild(active);
+  }
+
+  active.content = colors[activeThemeScheme()];
+}
+
+function setDefaultThemeColors() {
+  setThemeColors(DEFAULT_THEME_COLORS);
 }
 
 function setOverlayThemeColors() {
-  forEachThemeColorMeta((meta, scheme) => {
-    meta.content =
-      scheme === "default"
-        ? document.documentElement.classList.contains("dark")
-          ? OVERLAY_THEME_COLORS.dark
-          : OVERLAY_THEME_COLORS.light
-        : OVERLAY_THEME_COLORS[scheme];
-  });
+  setThemeColors(OVERLAY_THEME_COLORS);
 }
 
 function isOverlayDimmed() {
@@ -87,6 +100,7 @@ function clearOverlayChrome() {
   if (isOverlayDimmed()) return;
 
   delete document.documentElement.dataset.overlayOpen;
+  delete document.documentElement.dataset.drawerChromeSampler;
   setDefaultThemeColors();
 }
 
@@ -103,15 +117,33 @@ export function refreshOverlayChrome() {
   clearOverlayChrome();
 }
 
-export function setOverlayOpen(open: boolean) {
+export type SetOverlayOpenOptions = {
+  /**
+   * iOS 26 status-bar chrome sampler (fixed top strip + transparent header).
+   * Defaults to true for drawers; set false to skip.
+   */
+  chromeSampler?: boolean;
+};
+
+export function setOverlayOpen(
+  open: boolean,
+  options: SetOverlayOpenOptions = {},
+) {
   const html = document.documentElement;
+  const chromeSampler = options.chromeSampler !== false;
 
   if (open) {
     html.dataset.drawerOverlay = "";
+    if (chromeSampler) {
+      html.dataset.drawerChromeSampler = "";
+    } else {
+      delete html.dataset.drawerChromeSampler;
+    }
     refreshOverlayChrome();
     return;
   }
 
   delete html.dataset.drawerOverlay;
+  delete html.dataset.drawerChromeSampler;
   refreshOverlayChrome();
 }

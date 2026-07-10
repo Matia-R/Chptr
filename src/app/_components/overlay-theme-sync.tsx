@@ -3,7 +3,12 @@
 import { useEffect } from "react";
 import { refreshOverlayChrome } from "./overlay-backdrop";
 
-/** Sync safe-area chrome when Radix sets body[data-scroll-locked] on dialogs/sheets. */
+/**
+ * Sync safe-area chrome when Radix sets body[data-scroll-locked] on dialogs/sheets.
+ *
+ * The fixed sampler below only paints while a drawer sets data-drawer-chrome-sampler
+ * (Drawer chromeSampler prop). Sidebar sheets and other overlays leave it hidden.
+ */
 export function OverlayThemeSync() {
   useEffect(() => {
     refreshOverlayChrome();
@@ -20,5 +25,7 @@ export function OverlayThemeSync() {
     return () => observer.disconnect();
   }, []);
 
-  return null;
+  return (
+    <div data-overlay-chrome-sampler aria-hidden="true" />
+  );
 }
