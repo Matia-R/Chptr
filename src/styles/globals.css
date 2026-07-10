@@ -111,18 +111,9 @@ body {
     background-color: hsl(var(--background));
   }
 
-  html[data-overlay-open] {
-    background-color: color-mix(in srgb, black 80%, hsl(var(--background)));
-  }
-
-  /* Safe-area chrome tint via theme-color (overlay-backdrop.ts). */
-  /* Keep app chrome below portaled scrim (fixed header can otherwise paint above overlays on iOS). */
+  /* Keep app chrome below portaled scrim. */
   html[data-overlay-open] .group\/sidebar-wrapper {
     position: relative;
-    z-index: 0;
-  }
-
-  html[data-overlay-open] [data-app-header] {
     z-index: 0;
   }
 
@@ -147,6 +138,51 @@ body {
       -webkit-transform: translate3d(0, 0, 0);
       transform: translate3d(0, 0, 0);
     }
+  }
+}
+
+/*
+ * Overlay safe-area fill — unlayered so it wins over Tailwind bg-* utilities.
+ *
+ * iOS 26 Safari ignores theme-color and samples the nearest fixed/sticky background
+ * at the viewport edge. Our fixed white header is what kept the status bar white.
+ * While overlays are open: clear the header fill so the scrim shows through, and show
+ * a thin fixed top sampler in the overlay chrome color for Safari to sample.
+ */
+html[data-overlay-open] {
+  background-color: #333333;
+}
+
+html.dark[data-overlay-open] {
+  background-color: #050505;
+}
+
+/* display:none when idle — opacity:0 still gets sampled by Safari 26. */
+[data-overlay-chrome-sampler] {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  html[data-overlay-open] [data-app-header] {
+    background-color: transparent;
+  }
+
+  [data-overlay-chrome-sampler] {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: 45;
+    height: 12px;
+    pointer-events: none;
+    background-color: #333333;
+  }
+
+  html[data-overlay-open] [data-overlay-chrome-sampler] {
+    display: block;
+  }
+
+  html.dark[data-overlay-open] [data-overlay-chrome-sampler] {
+    background-color: #050505;
   }
 }
 
