@@ -116,7 +116,7 @@ body {
   }
 
   /* Safe-area chrome tint via theme-color (overlay-backdrop.ts). */
-  /* Keep app chrome below portaled scrim (iOS paints absolute header above fixed overlays). */
+  /* Keep app chrome below portaled scrim (fixed header can otherwise paint above overlays on iOS). */
   html[data-overlay-open] .group\/sidebar-wrapper {
     position: relative;
     z-index: 0;
