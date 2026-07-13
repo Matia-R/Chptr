@@ -11,12 +11,11 @@ import { Button } from "~/app/_components/button";
 import { Input } from "~/app/_components/input";
 import { Separator } from "~/app/_components/separator";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "~/app/_components/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from "~/app/_components/drawer";
 import { Skeleton } from "~/app/_components/skeleton";
 import {
   Tooltip,
@@ -28,7 +27,8 @@ import {
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
-const SIDEBAR_WIDTH_MOBILE = "18rem";
+/** Nearly full-width navigation screen on mobile (~90–92vw). */
+const SIDEBAR_WIDTH_MOBILE = "91vw";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -101,6 +101,14 @@ const SidebarProvider = React.forwardRef<
         ? setOpenMobile((open) => !open)
         : setOpen((open) => !open);
     }, [isMobile, setOpen, setOpenMobile]);
+
+    // Command menu (and similar) can request the mobile nav to close.
+    React.useEffect(() => {
+      const handleCloseMobile = () => setOpenMobile(false);
+      window.addEventListener("close-mobile-sidebar", handleCloseMobile);
+      return () =>
+        window.removeEventListener("close-mobile-sidebar", handleCloseMobile);
+    }, []);
 
     // Adds a keyboard shortcut to toggle the sidebar (Cmd+Shift+B).
     React.useEffect(() => {
@@ -208,26 +216,35 @@ const Sidebar = React.forwardRef<
     }
 
     if (isMobile) {
+      const drawerSide = side === "right" ? "right" : "left";
+
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <SheetContent
+        <Drawer
+          open={openMobile}
+          onOpenChange={setOpenMobile}
+          direction={drawerSide}
+          chromeSampler={false}
+        >
+          <DrawerContent
+            side={drawerSide}
+            showHandle={false}
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] max-w-[--sidebar-width] p-0 text-sidebar-foreground"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
               } as React.CSSProperties
             }
-            side={side}
+            overlayClassName="duration-500 animate-in fade-in-0"
           >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Sidebar</SheetTitle>
-              <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-            </SheetHeader>
+            <DrawerTitle className="sr-only">Navigation</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Browse documents and account settings.
+            </DrawerDescription>
             <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       );
     }
 

@@ -80,49 +80,63 @@ const DrawerContent = React.forwardRef<
     showHandle?: boolean;
     bottomUnderlay?: boolean;
     bottomUnderlayHeight?: number;
+    /** Visual placement — pair with Drawer `direction` (`left` / `bottom`). */
+    side?: "bottom" | "left" | "right";
   }
 >(
   (
     {
       className,
       overlayClassName,
-      showHandle = true,
+      showHandle,
       bottomUnderlay = false,
       bottomUnderlayHeight,
+      side = "bottom",
       children,
       ...props
     },
     ref,
-  ) => (
-    <DrawerPortal>
-      <DrawerClose asChild>
-        <DrawerOverlay className={overlayClassName} />
-      </DrawerClose>
+  ) => {
+    const isSideDrawer = side === "left" || side === "right";
+    const resolvedShowHandle = showHandle ?? !isSideDrawer;
 
-      {bottomUnderlay && bottomUnderlayHeight && bottomUnderlayHeight > 0 ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 bg-sidebar"
-          style={{ height: `${bottomUnderlayHeight}px` }}
-        />
-      ) : null}
+    return (
+      <DrawerPortal>
+        <DrawerClose asChild>
+          <DrawerOverlay className={overlayClassName} />
+        </DrawerClose>
 
-      <DrawerPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-[10px] border-x border-t border-sidebar-border bg-sidebar",
-          className,
-        )}
-        {...props}
-      >
-        {showHandle ? (
-          <div className="mx-auto mt-4 h-2 w-[100px] shrink-0 rounded-full bg-sidebar-border" />
+        {bottomUnderlay && bottomUnderlayHeight && bottomUnderlayHeight > 0 ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-x-0 bottom-0 z-50 bg-sidebar"
+            style={{ height: `${bottomUnderlayHeight}px` }}
+          />
         ) : null}
 
-        {children}
-      </DrawerPrimitive.Content>
-    </DrawerPortal>
-  ),
+        <DrawerPrimitive.Content
+          ref={ref}
+          className={cn(
+            "z-50 flex flex-col overflow-hidden bg-sidebar",
+            isSideDrawer
+              ? cn(
+                  "fixed inset-y-0 h-full w-[91vw] max-w-[91vw] border-sidebar-border",
+                  side === "left" ? "left-0 border-r" : "right-0 border-l",
+                )
+              : "fixed inset-x-0 bottom-0 mt-24 h-auto max-h-[calc(100dvh-1rem)] rounded-t-[10px] border-x border-t border-sidebar-border",
+            className,
+          )}
+          {...props}
+        >
+          {resolvedShowHandle ? (
+            <div className="mx-auto mt-4 h-2 w-[100px] shrink-0 rounded-full bg-sidebar-border" />
+          ) : null}
+
+          {children}
+        </DrawerPrimitive.Content>
+      </DrawerPortal>
+    );
+  },
 );
 
 DrawerContent.displayName = "DrawerContent";

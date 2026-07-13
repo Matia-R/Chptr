@@ -128,6 +128,17 @@ body {
     border-bottom-width: 0;
   }
 
+  /*
+   * Mobile navigation sheet — slightly heavier iOS-like spring than Vaul defaults.
+   * Backdrop fade is handled separately via overlay classes.
+   */
+  [data-vaul-drawer][data-vaul-drawer-direction="left"],
+  [data-vaul-drawer][data-vaul-drawer-direction="right"] {
+    transition: transform 0.58s cubic-bezier(0.32, 0.72, 0, 1);
+    animation-duration: 0.58s;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
   @supports (-webkit-touch-callout: none) {
     .drawer-scrim,
     .overlay-backdrop {
@@ -146,7 +157,7 @@ body {
  *
  * iOS 26 Safari ignores theme-color and samples the nearest fixed/sticky background
  * at the viewport edge. Enabled only while a drawer sets data-drawer-chrome-sampler
- * (see Drawer chromeSampler prop) — not for sidebar sheets / other overlays.
+ * (see Drawer chromeSampler prop) — not for mobile nav / other overlays.
  */
 html[data-drawer-chrome-sampler] {
   background-color: #333333;

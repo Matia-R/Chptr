@@ -18,6 +18,9 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        /** Circular icon control — ghost surface, not a primary FAB. */
+        circularGhost:
+          "rounded-full hover:bg-accent hover:text-accent-foreground active:bg-accent",
         /** No horizontal padding, no hover fill — hover darkens text only (aligns with inline copy). */
         ghostText:
           "text-muted-foreground hover:bg-transparent hover:text-foreground",
@@ -39,6 +42,11 @@ const buttonVariants = cva(
         variant: "ghostText",
         /** Override size `px-*` so horizontal padding stays zero. */
         class: "!px-0",
+      },
+      {
+        variant: "circularGhost",
+        size: "icon",
+        class: "rounded-full",
       },
     ],
   },
