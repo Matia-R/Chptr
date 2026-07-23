@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Home, Plus, Search } from "lucide-react";
+import { Home, PanelLeftClose, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -150,37 +150,24 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     </div>
   );
 
-  const desktopDocumentList = (
-    <div
-      className="relative"
+  const desktopDocumentList = documents?.documents?.map((doc, index) => (
+    <SidebarMenuItem
+      key={doc.id}
+      className="ease-[cubic-bezier(0.4,0,0.2,1)] absolute inset-x-0 top-0 transform transition-transform duration-300"
       style={
         {
-          "--item-count": documents?.documents?.length ?? 0,
-          "--row-height": `${DESKTOP_DOC_ROW_HEIGHT}px`,
-          height: "calc(var(--item-count) * var(--row-height))",
+          "--index": index,
+          transform: "translateY(calc(var(--index) * var(--row-height)))",
         } as React.CSSProperties
       }
     >
-      {documents?.documents?.map((doc, index) => (
-        <SidebarMenuItem
-          key={doc.id}
-          className="ease-[cubic-bezier(0.4,0,0.2,1)] absolute inset-x-0 top-0 transform transition-transform duration-300"
-          style={
-            {
-              "--index": index,
-              transform: "translateY(calc(var(--index) * var(--row-height)))",
-            } as React.CSSProperties
-          }
-        >
-          <SidebarMenuButton asChild>
-            <Link href={`/documents/${doc.id}`} prefetch={true}>
-              {doc.name}
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ))}
-    </div>
-  );
+      <SidebarMenuButton asChild>
+        <Link href={`/documents/${doc.id}`} prefetch={true}>
+          {doc.name}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  ));
 
   const documentScroll = (list: React.ReactNode) => (
     <div className="relative h-full min-h-0">
@@ -211,11 +198,21 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             paddingLeft: "env(safe-area-inset-left)",
           }}
         >
-          {/* Header */}
-          <div className="flex shrink-0 items-center px-4 pb-1.5 pt-2.5">
+          {/* Header — match document layout header height (h-12) */}
+          <div className="flex h-12 shrink-0 items-center justify-between px-4">
             <div className="font-lora text-2xl font-medium leading-none">
               Chptr
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              aria-label="Close navigation"
+              onClick={dismissMobileNav}
+            >
+              <PanelLeftClose />
+              <span className="sr-only">Close navigation</span>
+            </Button>
           </div>
 
           {/* Search + Home — equal spacing between logo and Documents */}
@@ -316,7 +313,18 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             {documentScroll(
               <SidebarContent>
                 <SidebarGroup>
-                  <SidebarMenu>{desktopDocumentList}</SidebarMenu>
+                  <SidebarMenu
+                    className="relative gap-0"
+                    style={
+                      {
+                        "--item-count": documents?.documents?.length ?? 0,
+                        "--row-height": `${DESKTOP_DOC_ROW_HEIGHT}px`,
+                        height: "calc(var(--item-count) * var(--row-height))",
+                      } as React.CSSProperties
+                    }
+                  >
+                    {desktopDocumentList}
+                  </SidebarMenu>
                 </SidebarGroup>
               </SidebarContent>,
             )}
