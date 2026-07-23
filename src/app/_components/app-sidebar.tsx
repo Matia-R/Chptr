@@ -295,9 +295,9 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             </SidebarHeader>
             <SidebarHeader className="pt-0">
               <div className="flex items-center justify-between px-2 text-sm font-semibold">
-                <span>Recents</span>
+                <span>Documents</span>
                 <Button
-                  variant="iconSubtle"
+                  variant="ghost"
                   size="icon"
                   className="size-8"
                   aria-label="Create new document"
