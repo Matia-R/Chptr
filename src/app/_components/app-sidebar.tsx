@@ -212,44 +212,32 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           }}
         >
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between px-4 pb-1.5 pt-2.5">
+          <div className="flex shrink-0 items-center px-4 pb-1.5 pt-2.5">
             <div className="font-lora text-2xl font-medium leading-none">
               Chptr
             </div>
           </div>
 
-          {/* Search */}
-          <div className="shrink-0 px-3 pb-2">
+          {/* Search + Home — equal spacing between logo and Documents */}
+          <div className="flex shrink-0 flex-col gap-0.5 px-3 py-3">
             <Button
-              className="h-10 w-full justify-start gap-2 px-3"
+              className="h-10 w-full justify-start gap-2 px-3 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
               variant="ghost"
               onClick={openSearch}
             >
-              <Search className="size-4" />
+              <Search className="size-4 shrink-0" aria-hidden />
               <span className="text-sm">Search</span>
             </Button>
-          </div>
-
-          {/* Primary navigation */}
-          <div className="shrink-0 px-3 pb-3">
-            <MobileActionGroup className="rounded-lg">
-              <Button
-                variant="ghost"
-                asChild
-                className="h-auto min-h-12 w-full justify-start gap-3 rounded-lg px-3 py-2 text-left font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
-              >
-                <Link href="/documents" onClick={dismissMobileNav}>
-                  <Home
-                    className="size-5 shrink-0 stroke-[1.35]"
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1 text-[16px] font-normal leading-snug tracking-tight">
-                    Home
-                  </span>
-                </Link>
-              </Button>
-              {/* Future: Shared, Templates, Trash */}
-            </MobileActionGroup>
+            <Button
+              variant="ghost"
+              asChild
+              className="h-10 w-full justify-start gap-2 px-3 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
+            >
+              <Link href="/documents" onClick={dismissMobileNav}>
+                <Home className="size-4 shrink-0" aria-hidden />
+                <span className="text-sm">Home</span>
+              </Link>
+            </Button>
           </div>
 
           {/* Documents — primary content */}
@@ -259,7 +247,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 Documents
               </span>
               <Button
-                variant="circularGhost"
+                variant="iconSubtle"
                 size="icon"
                 aria-label="Create new document"
                 onClick={handleCreateDocument}
@@ -312,9 +300,10 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               <div className="flex items-center justify-between px-2 text-sm font-semibold">
                 <span>Recents</span>
                 <Button
-                  variant="ghost"
+                  variant="iconSubtle"
                   size="icon"
-                  className="h-6 w-6"
+                  className="size-8"
+                  aria-label="Create new document"
                   onClick={handleCreateDocument}
                 >
                   <Plus className="size-4" />

@@ -18,9 +18,12 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        /** Circular icon control — ghost surface, not a primary FAB. */
-        circularGhost:
-          "rounded-full hover:bg-accent hover:text-accent-foreground active:bg-accent",
+        /**
+         * Always-visible circular icon control — subtle resting fill so the
+         * full circle reads as tappable (Apple Notes-style), between ghost and secondary.
+         */
+        iconSubtle:
+          "rounded-full bg-foreground/[0.06] text-foreground transition-[color,background-color,transform] hover:bg-foreground/[0.1] active:scale-95 active:bg-foreground/[0.14]",
         /** No horizontal padding, no hover fill — hover darkens text only (aligns with inline copy). */
         ghostText:
           "text-muted-foreground hover:bg-transparent hover:text-foreground",
@@ -44,7 +47,7 @@ const buttonVariants = cva(
         class: "!px-0",
       },
       {
-        variant: "circularGhost",
+        variant: "iconSubtle",
         size: "icon",
         class: "rounded-full",
       },
