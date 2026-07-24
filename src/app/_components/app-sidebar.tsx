@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Home, PanelLeftClose, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { ScrollArea } from "~/app/_components/scroll-area";
 
@@ -33,9 +33,11 @@ const DESKTOP_DOC_ROW_HEIGHT = 48;
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
+  const isHomeActive = pathname === "/documents";
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -215,50 +217,59 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             </Button>
           </div>
 
-          {/* Search + Home — equal spacing between logo and Documents */}
-          <div className="flex shrink-0 flex-col gap-0.5 px-3 py-3">
-            <Button
-              className="h-10 w-full justify-start gap-2 px-3 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
-              variant="ghost"
-              onClick={openSearch}
-            >
-              <Search className="size-4 shrink-0" aria-hidden />
-              <span className="text-sm">Search</span>
-            </Button>
-            <Button
-              variant="ghost"
-              asChild
-              className="h-10 w-full justify-start gap-2 px-3 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
-            >
-              <Link href="/documents" onClick={dismissMobileNav}>
-                <Home className="size-4 shrink-0" aria-hidden />
-                <span className="text-sm">Home</span>
-              </Link>
-            </Button>
+          {/* Home + Search toolbar */}
+          <div className="shrink-0 px-4 pb-4 pt-6">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="iconSubtle"
+                asChild
+                className="h-8 gap-2 rounded-full px-3 font-normal"
+              >
+                <Link
+                  href="/documents"
+                  onClick={dismissMobileNav}
+                  aria-current={isHomeActive ? "page" : undefined}
+                >
+                  <Home className="size-4 shrink-0" aria-hidden />
+                  <span className="text-sm">Home</span>
+                </Link>
+              </Button>
+              <Button
+                variant="iconSubtle"
+                size="icon"
+                className="size-8 shrink-0"
+                aria-label="Search"
+                onClick={openSearch}
+              >
+                <Search className="size-4" />
+              </Button>
+            </div>
           </div>
 
-          {/* Documents — primary content */}
-          <section className="flex min-h-0 flex-1 flex-col px-3">
-            <div className="flex shrink-0 items-center justify-between px-1 pb-2">
+          {/* Documents — collection header + new document */}
+          <section className="flex min-h-0 flex-1 flex-col px-4">
+            <div className="flex shrink-0 items-center justify-between pb-3 pt-4">
               <span className="text-sm font-semibold text-sidebar-foreground">
                 Documents
               </span>
               <Button
                 variant="iconSubtle"
                 size="icon"
+                className="size-8 shrink-0"
                 aria-label="Create new document"
                 onClick={handleCreateDocument}
               >
                 <Plus className="size-4" />
               </Button>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
+
+            <div className="min-h-0 flex-1 overflow-hidden pt-1">
               {documentScroll(mobileDocumentList)}
             </div>
           </section>
 
           {/* Account — pinned bottom group */}
-          <div className="shrink-0 px-3 pb-3 pt-3">
+          <div className="shrink-0 px-4 pb-3 pt-3">
             <MobileActionGroup className="p-1">{account}</MobileActionGroup>
           </div>
         </div>
