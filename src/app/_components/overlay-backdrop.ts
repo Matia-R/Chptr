@@ -5,9 +5,10 @@ export const drawerOverlayClass = cn(
   "drawer-scrim fixed inset-0 z-40 bg-black/80",
 );
 
-/** Dialog/sheet scrim — Radix drives data-state reliably for fade. */
+/** Dialog/sheet scrim — frosted glass. Radix drives data-state reliably for fade. */
 export const dialogOverlayClass = cn(
-  "overlay-backdrop fixed inset-0 z-50 bg-black/80",
+  "overlay-backdrop fixed inset-0 z-50",
+  "bg-black/30 backdrop-blur-sm",
   "data-[state=open]:animate-in data-[state=closed]:animate-out",
   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
   "duration-200",
