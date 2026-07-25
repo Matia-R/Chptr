@@ -140,8 +140,7 @@ body {
   }
 
   @supports (-webkit-touch-callout: none) {
-    .drawer-scrim,
-    .overlay-backdrop {
+    .drawer-scrim {
       background-color: rgba(0, 0, 0, 0.8);
     }
 
