@@ -13,6 +13,7 @@ export { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
 export { MobileDrawerScreenHeader } from "./mobile-drawer-screen-header";
 export { MobileDrawerViewStack } from "./mobile-drawer-view-stack";
 export { MobileFormDrawer } from "./mobile-form-drawer";
+export { useMobileDrawerKeyboardOffset } from "./use-mobile-drawer-keyboard";
 export { useMobileDrawerStage } from "./use-mobile-drawer-stage";
 
 export {

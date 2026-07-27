@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { ChevronLeft } from "lucide-react";
 
 import { Button } from "~/app/_components/button";
@@ -14,8 +15,11 @@ export type MobileDrawerNavHeaderProps = {
   onDone: () => void;
   /** "Cancel" (no chevron) for standalone edit drawers; "Back" (with chevron) for drill-down. */
   backLabel?: string;
-  doneLabel?: string;
+  /** A node so callers can pair the label with a spinner or checkmark. */
+  doneLabel?: React.ReactNode;
   disabled?: boolean;
+  /** Keeps Done undimmed during save feedback while still blocking presses. */
+  doneClassName?: string;
   className?: string;
 };
 
@@ -27,6 +31,7 @@ export function MobileDrawerNavHeader({
   backLabel = "Back",
   doneLabel = "Done",
   disabled = false,
+  doneClassName,
   className,
 }: MobileDrawerNavHeaderProps) {
   const showBackChevron = backLabel !== "Cancel";
@@ -61,7 +66,10 @@ export function MobileDrawerNavHeader({
       <Button
         type="button"
         variant="ghost"
-        className="h-11 min-h-[44px] shrink-0 px-3 text-[17px] font-semibold"
+        className={cn(
+          "h-11 min-h-[44px] shrink-0 px-3 text-[17px] font-semibold transition-[transform,opacity] duration-200 ease-out active:scale-[0.98]",
+          doneClassName,
+        )}
         disabled={disabled}
         onClick={onDone}
       >

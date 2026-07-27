@@ -32,6 +32,7 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
+import { useAccountSettingsStore } from "~/hooks/use-account-settings";
 
 export function NavUser({
   user,
@@ -47,10 +48,20 @@ export function NavUser({
   };
   isLoading?: boolean;
 }) {
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const openAccountSettings = useAccountSettingsStore((state) => state.open);
+
+  // On mobile the nav itself is a drawer; dismiss it before opening the
+  // settings drawer so the two don't stack.
+  const handleOpenAccountSettings = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+    openAccountSettings();
+  };
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -97,7 +108,14 @@ export function NavUser({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        {/*
+         * Non-modal: a modal menu disables pointer events on <body>, and Radix
+         * tracks the value to restore in a module-level variable shared by all
+         * dismissable layers. Opening the settings dialog from a menu item
+         * overlaps the two layers and that bookkeeping restores `none`, leaving
+         * the page dead after the dialog closes.
+         */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -159,7 +177,7 @@ export function NavUser({
             </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleOpenAccountSettings}>
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>

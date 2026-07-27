@@ -20,7 +20,11 @@ export type UseMobileDrawerStageOptions<T extends string> = {
   view: T;
   setView: (view: T) => void;
   mainView: T;
-  keyboardView: T | null;
+  /**
+   * View(s) that open the software keyboard. Pass a stable array reference when
+   * more than one sub-screen has inputs.
+   */
+  keyboardView: T | readonly T[] | null;
   /** Minimum content height when expanding for the keyboard view. */
   keyboardMinContentPx?: number;
   keyboardClearancePx?: number;
@@ -43,6 +47,16 @@ export function useMobileDrawerStage<T extends string>({
   const stageRef = useRef<HTMLDivElement>(null);
   const mainMeasureRef = useRef<HTMLDivElement>(null);
   const keyboardMeasureRef = useRef<HTMLDivElement>(null);
+
+  const isKeyboardView = useCallback(
+    (candidate: T) => {
+      if (keyboardView == null) return false;
+      return typeof keyboardView === "string"
+        ? keyboardView === candidate
+        : keyboardView.includes(candidate);
+    },
+    [keyboardView],
+  );
 
   const goToView = useCallback(
     (next: T, nextDirection: number) => {
@@ -85,12 +99,10 @@ export function useMobileDrawerStage<T extends string>({
   const getMotionRef = useCallback(
     (currentView: T) => {
       if (currentView === mainView) return mainMeasureRef;
-      if (keyboardView != null && currentView === keyboardView) {
-        return keyboardMeasureRef;
-      }
+      if (isKeyboardView(currentView)) return keyboardMeasureRef;
       return undefined;
     },
-    [keyboardView, mainView],
+    [isKeyboardView, mainView],
   );
 
   useLayoutEffect(() => {
@@ -101,17 +113,17 @@ export function useMobileDrawerStage<T extends string>({
   }, [view, mainView, measureMainStage, ...measureDeps]);
 
   useLayoutEffect(() => {
-    if (keyboardView == null || view !== keyboardView) return;
+    if (!isKeyboardView(view)) return;
     if (!keyboardMeasureRef.current) return;
     const editH = keyboardMeasureRef.current.getBoundingClientRect().height;
     if (editH <= 0) return;
     const target =
       Math.max(mainStageHeight ?? 0, editH) + keyboardClearancePx;
     setStageMinHeight((prev) => Math.max(prev ?? 0, target));
-  }, [view, keyboardView, mainStageHeight, keyboardClearancePx]);
+  }, [view, isKeyboardView, mainStageHeight, keyboardClearancePx]);
 
   useEffect(() => {
-    if (keyboardView == null || view !== keyboardView) return;
+    if (!isKeyboardView(view)) return;
 
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -129,7 +141,7 @@ export function useMobileDrawerStage<T extends string>({
       viewport.removeEventListener("resize", onViewportChange);
       cancelAnimationFrame(frame);
     };
-  }, [keyboardView, view]);
+  }, [isKeyboardView, view]);
 
   return {
     direction,

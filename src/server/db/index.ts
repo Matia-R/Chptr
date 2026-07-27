@@ -1,5 +1,13 @@
 export type { AuthContext } from './shared'
-export { getCurrentUser, getCurrentUserProfile } from './auth'
+export {
+  getCurrentUser,
+  getCurrentUserProfile,
+  updateUserAvatar,
+  updateUserPassword,
+  updateUserProfile,
+  type UpdateUserProfileInput,
+  type UserProfile,
+} from './auth'
 export {
   createDocument,
   getDocumentById,

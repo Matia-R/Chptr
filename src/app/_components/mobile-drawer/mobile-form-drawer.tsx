@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type MutableRefObject,
 } from "react";
 
@@ -16,6 +15,7 @@ import { cn } from "~/lib/utils";
 import { MOBILE_DRAWER_SHELL_CLASS } from "./constants";
 import { MobileDrawerEditBody } from "./mobile-drawer-edit-body";
 import { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
+import { useMobileDrawerKeyboardOffset } from "./use-mobile-drawer-keyboard";
 
 export type MobileFormDrawerProps = {
   open: boolean;
@@ -30,10 +30,6 @@ export type MobileFormDrawerProps = {
   trigger?: React.ReactNode;
   contentClassName?: string;
   inputRef?: MutableRefObject<HTMLInputElement | null>;
-};
-
-type DrawerKeyboardStyle = CSSProperties & {
-  "--mobile-keyboard-offset"?: string;
 };
 
 export function MobileFormDrawer({
@@ -51,10 +47,7 @@ export function MobileFormDrawer({
   inputRef,
 }: MobileFormDrawerProps) {
   const [draft, setDraft] = useState(initialValue);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [visualViewportHeight, setVisualViewportHeight] = useState<
-    number | null
-  >(null);
+  const { keyboardOffset, drawerStyle } = useMobileDrawerKeyboardOffset(open);
 
   const snapshotRef = useRef(initialValue);
   const internalInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,46 +121,6 @@ export function MobileFormDrawer({
 
     focusInput();
   }, [open, focusInput]);
-
-  useEffect(() => {
-    if (!open) {
-      setKeyboardOffset(0);
-      setVisualViewportHeight(null);
-      return;
-    }
-
-    const viewport = window.visualViewport;
-
-    if (!viewport) return;
-
-    const updateViewport = () => {
-      const nextKeyboardOffset = Math.max(
-        0,
-        window.innerHeight - viewport.height - viewport.offsetTop,
-      );
-
-      setKeyboardOffset(nextKeyboardOffset);
-      setVisualViewportHeight(viewport.height);
-    };
-
-    updateViewport();
-
-    viewport.addEventListener("resize", updateViewport);
-    viewport.addEventListener("scroll", updateViewport);
-
-    return () => {
-      viewport.removeEventListener("resize", updateViewport);
-      viewport.removeEventListener("scroll", updateViewport);
-    };
-  }, [open]);
-
-  const drawerStyle: DrawerKeyboardStyle = {
-    bottom: `${keyboardOffset}px`,
-    maxHeight: visualViewportHeight
-      ? `calc(${visualViewportHeight}px - 16px)`
-      : "calc(100dvh - 16px)",
-    "--mobile-keyboard-offset": `${keyboardOffset}px`,
-  };
 
   return (
     <Drawer

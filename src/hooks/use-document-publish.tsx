@@ -21,6 +21,11 @@ import {
 
 import { Button } from "~/app/_components/button";
 import { Input } from "~/app/_components/input";
+import {
+  SAVE_FEEDBACK_MIN_SAVING_MS,
+  SAVE_FEEDBACK_RESULT_MS,
+  SAVE_FEEDBACK_SETTLE_MS,
+} from "~/hooks/use-save-feedback";
 import { useToast } from "~/hooks/use-toast";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { slugifyTitle } from "~/lib/slug";
@@ -39,10 +44,6 @@ type PublishDocumentResult = RouterOutputs["document"]["publishDocument"];
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "An unexpected error occurred";
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const LIVE_HOST_DISPLAY = "chptr.io";
@@ -328,39 +329,45 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     if (isFirstTimePublish) {
       setFreezeFirstPublishActions(true);
     }
+
+    const startedAt = Date.now();
     setPublishFeedback("publishing");
 
     try {
       const bodyHtml = await blockNoteEditorToExportHtml(editor);
       const blocksJson = JSON.stringify(editor.document);
 
-      await Promise.all([
-        publishMutation.mutateAsync({
-          documentId,
-          title,
-          bodyHtml,
-          blocksJson,
-          slug: slugOverride.trim() || undefined,
-        }),
-        sleep(500),
-      ]);
+      await publishMutation.mutateAsync({
+        documentId,
+        title,
+        bodyHtml,
+        blocksJson,
+        slug: slugOverride.trim() || undefined,
+      });
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < SAVE_FEEDBACK_MIN_SAVING_MS) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, SAVE_FEEDBACK_MIN_SAVING_MS - elapsed),
+        );
+      }
 
       setPublishFeedback("published");
 
       window.setTimeout(() => {
         setPublishFeedback("idle");
-      }, 1400);
+      }, SAVE_FEEDBACK_RESULT_MS);
 
       closePopoverTimeoutRef.current = window.setTimeout(() => {
         closeBothPanels();
-      }, 800);
+      }, SAVE_FEEDBACK_SETTLE_MS);
     } catch {
       setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
       window.setTimeout(() => {
         setPublishFeedback("idle");
-      }, 1400);
+      }, SAVE_FEEDBACK_RESULT_MS);
     }
   }, [
     documentId,

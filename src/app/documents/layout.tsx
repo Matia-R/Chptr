@@ -9,6 +9,7 @@ import { AppSidebar } from "../_components/app-sidebar";
 import { Toaster } from "../_components/ui/toaster";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
+import { AccountSettings } from "../_components/account-settings";
 import { Header } from "../_components/header";
 
 export const metadata: Metadata = {
@@ -67,6 +68,7 @@ export default async function RootLayout({
           <Toaster />
         </SidebarProvider>
         <CommandMenu />
+        <AccountSettings />
       </ThemeProvider>
     </TRPCReactProvider>
   );

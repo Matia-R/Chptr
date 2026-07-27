@@ -16,6 +16,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import { Button } from "~/app/_components/button";
+import { PanelHeader } from "~/app/_components/panel-header";
+import {
+  publishFeedbackToSaveState,
+  SaveFeedbackLabel,
+} from "~/app/_components/save-feedback-label";
 import { cn } from "~/lib/utils";
 import {
   applyMobileDrawerKeyboardInset,
@@ -77,11 +82,9 @@ function getMobilePublishActionRow(
   const iconClassName =
     publishFeedback === "publishing"
       ? "animate-spin"
-      : publishFeedback === "published"
-        ? "text-emerald-600"
-        : publishFeedback === "failed"
-          ? "text-destructive"
-          : undefined;
+      : publishFeedback === "failed"
+        ? "text-destructive"
+        : undefined;
 
   const disabledWhenIdle =
     !options.hasChangesToPublish && publishFeedback === "idle";
@@ -414,11 +417,7 @@ export function DocumentPublishPopoverPanel() {
 
   return (
     <>
-      <div className="flex flex-col space-y-1.5 text-center sm:text-left">
-        <h2 className="text-lg font-semibold leading-none tracking-tight">
-          Publish
-        </h2>
-      </div>
+      <PanelHeader title="Publish" />
 
       {showPublishedPopoverActions && pub ? (
         <section
@@ -467,7 +466,7 @@ export function DocumentPublishPopoverPanel() {
             type="button"
             variant="outline"
             disabled={busy || publicationLoading}
-            className="min-w-0 flex-1 !px-4 transition-all duration-200 ease-out active:scale-[0.98]"
+            className="min-w-0 flex-1 !px-4 transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]"
             onClick={unpublish}
           >
             {unpublishPending ? (
@@ -479,7 +478,9 @@ export function DocumentPublishPopoverPanel() {
           <Button
             type="button"
             className={cn(
-              "min-w-0 flex-1 transition-all duration-200 ease-out active:scale-[0.98]",
+              "min-w-0 flex-1 transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
+              // Keep full contrast while pending/feedback plays; idle "Up to date" stays dimmed.
+              (busy || publishFeedback !== "idle") && "disabled:opacity-100",
             )}
             disabled={
               busy ||
@@ -491,45 +492,36 @@ export function DocumentPublishPopoverPanel() {
               void handlePublish();
             }}
           >
-            <span className="inline-flex items-center gap-2">
-              {publishFeedback === "publishing" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : publishFeedback === "published" ? (
-                <Check className="h-4 w-4 text-emerald-600" />
-              ) : null}
-              {publishFeedback === "publishing"
-                ? "Publishing..."
-                : publishFeedback === "published"
-                  ? "Published"
-                  : hasChangesToPublish
-                    ? "Publish changes"
-                    : "Up to date"}
-            </span>
+            <SaveFeedbackLabel
+              state={publishFeedbackToSaveState(publishFeedback)}
+              idleLabel={
+                hasChangesToPublish ? "Publish changes" : "Up to date"
+              }
+              savingLabel="Publishing..."
+              savedLabel="Published"
+              failedLabel="Failed to publish"
+            />
           </Button>
         </div>
       ) : (
         <Button
           type="button"
           className={cn(
-            "w-full transition-all duration-200 ease-out active:scale-[0.98]",
+            "w-full transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
+            (busy || publishFeedback !== "idle") && "disabled:opacity-100",
           )}
           disabled={busy || !editor}
           onClick={() => {
             void handlePublish();
           }}
         >
-          <span className="inline-flex items-center gap-2">
-            {publishFeedback === "publishing" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : publishFeedback === "published" ? (
-              <Check className="h-4 w-4 text-emerald-600" />
-            ) : null}
-            {publishFeedback === "publishing"
-              ? "Publishing..."
-              : publishFeedback === "published"
-                ? "Published"
-                : "Publish"}
-          </span>
+          <SaveFeedbackLabel
+            state={publishFeedbackToSaveState(publishFeedback)}
+            idleLabel="Publish"
+            savingLabel="Publishing..."
+            savedLabel="Published"
+            failedLabel="Failed to publish"
+          />
         </Button>
       )}
     </>
