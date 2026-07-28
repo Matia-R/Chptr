@@ -17,7 +17,10 @@ export type MobileDrawerNavHeaderProps = {
   backLabel?: string;
   /** A node so callers can pair the label with a spinner or checkmark. */
   doneLabel?: React.ReactNode;
+  /** Disables Back (and Done when `doneDisabled` is omitted). */
   disabled?: boolean;
+  /** Independent Done disable — e.g. nothing to save, or username taken. */
+  doneDisabled?: boolean;
   /** Keeps Done undimmed during save feedback while still blocking presses. */
   doneClassName?: string;
   className?: string;
@@ -31,10 +34,12 @@ export function MobileDrawerNavHeader({
   backLabel = "Back",
   doneLabel = "Done",
   disabled = false,
+  doneDisabled,
   doneClassName,
   className,
 }: MobileDrawerNavHeaderProps) {
   const showBackChevron = backLabel !== "Cancel";
+  const isDoneDisabled = doneDisabled ?? disabled;
 
   return (
     <header
@@ -70,7 +75,7 @@ export function MobileDrawerNavHeader({
           "h-11 min-h-[44px] shrink-0 px-3 text-[17px] font-semibold transition-[transform,opacity] duration-200 ease-out active:scale-[0.98]",
           doneClassName,
         )}
-        disabled={disabled}
+        disabled={isDoneDisabled}
         onClick={onDone}
       >
         {doneLabel}

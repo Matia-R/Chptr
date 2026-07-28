@@ -244,8 +244,7 @@ function AccountSettingsDrawerBody({
     submit,
     isSaving,
     isBusy,
-    canSave,
-    isUsernameTaken,
+    saveDisabled,
     saveState,
     usernameAvailabilityStatus,
   } = useAccountSettingsForm({
@@ -296,19 +295,12 @@ function AccountSettingsDrawerBody({
         title={title}
         backLabel="Back"
         doneLabel={<SaveFeedbackLabel state={saveState} />}
-        // Block Back during the request; Done uses isBusy in onDone so "Saved"
-        // can stay undimmed (disabled:opacity-100) while still ignoring presses.
+        // Back only locks during the request; Save matches the desktop rules.
         disabled={isSaving}
+        doneDisabled={saveDisabled || isBusy}
         doneClassName={isBusy ? "disabled:opacity-100" : undefined}
         onBack={stage.returnToMainView}
         onDone={() => {
-          if (isBusy) return;
-          // Stay on the screen when the username is taken so the user can fix it.
-          if (isUsernameTaken) return;
-          if (!canSave) {
-            stage.returnToMainView();
-            return;
-          }
           void submit();
         }}
       />

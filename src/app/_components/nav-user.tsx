@@ -57,10 +57,12 @@ export function NavUser({
   // On mobile the nav itself is a drawer; dismiss it before opening the
   // settings drawer so the two don't stack.
   const handleOpenAccountSettings = () => {
-    if (isMobile) {
-      setOpenMobile(false);
-    }
     openAccountSettings();
+    if (isMobile) {
+      // Defer so the account drawer can mount before the nav sheet tears down —
+      // closing synchronously lets the same tap fall through to the page.
+      window.setTimeout(() => setOpenMobile(false), 0);
+    }
   };
 
   const handleSignOut = async () => {
@@ -109,13 +111,12 @@ export function NavUser({
     <SidebarMenu>
       <SidebarMenuItem>
         {/*
-         * Non-modal: a modal menu disables pointer events on <body>, and Radix
-         * tracks the value to restore in a module-level variable shared by all
-         * dismissable layers. Opening the settings dialog from a menu item
-         * overlaps the two layers and that bookkeeping restores `none`, leaving
-         * the page dead after the dialog closes.
+         * Desktop stays non-modal: a modal menu + the account Dialog corrupt
+         * Radix's shared body pointer-events bookkeeping. Mobile uses a Vaul
+         * drawer instead, and needs modal so the menu sits above the nav sheet
+         * and actually receives hover/clicks.
          */}
-        <DropdownMenu modal={false}>
+        <DropdownMenu modal={isMobile}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -177,7 +178,10 @@ export function NavUser({
             </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={handleOpenAccountSettings}>
+              <DropdownMenuItem
+                className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+                onSelect={handleOpenAccountSettings}
+              >
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
@@ -185,7 +189,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
+              className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
             >
               {theme === "dark" ? (
                 <Sun className="size-4" />
@@ -194,7 +198,10 @@ export function NavUser({
               )}
               {theme === "dark" ? "Light" : "Dark"} mode
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleSignOut}>
+            <DropdownMenuItem
+              className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+              onClick={handleSignOut}
+            >
               <LogOut />
               Log out
             </DropdownMenuItem>
