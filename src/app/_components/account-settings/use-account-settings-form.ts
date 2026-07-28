@@ -15,6 +15,7 @@ import {
 import { api } from "~/trpc/react";
 
 import { useAvatarDraft } from "./use-avatar-draft";
+import { useUsernameAvailability } from "./use-username-availability";
 
 export type AccountSettingsProfile = {
   first_name: string | null;
@@ -63,12 +64,19 @@ export function useAccountSettingsForm({
 
   const avatar = useAvatarDraft(profile.avatar_url);
   const feedback = useSaveFeedback();
+  const watchedUsername = form.watch("username");
+  const usernameAvailability = useUsernameAvailability(
+    watchedUsername,
+    profile.username,
+  );
 
   const updateProfile = api.user.updateProfile.useMutation();
   const updatePassword = api.user.updatePassword.useMutation();
   const updateAvatar = api.user.updateAvatar.useMutation();
 
   const submit = form.handleSubmit(async (values) => {
+    if (usernameAvailability.isTaken) return;
+
     const defaults = form.formState.defaultValues;
     const profileChanged =
       values.first_name !== (defaults?.first_name ?? "") ||
@@ -177,6 +185,7 @@ export function useAccountSettingsForm({
   // Includes the success beat so the control stays non-interactive while
   // "Saved" is on screen, without forcing disabled:opacity-50.
   const isBusy = isSaving || feedback.state === "saved";
+  const isUsernameTaken = usernameAvailability.isTaken;
 
   return {
     form,
@@ -184,12 +193,17 @@ export function useAccountSettingsForm({
     submit,
     isSaving,
     isBusy,
+    isUsernameTaken,
+    usernameAvailabilityStatus: usernameAvailability.status,
     /** Drives the Save control's spinner / checkmark. */
     saveState: feedback.state,
     /** Whether a click should commit — distinct from the visual disabled state. */
-    canSave: dirty && !isBusy,
-    /** Only true when resting with nothing to save; keeps busy/success undimmed. */
-    saveDisabled: !dirty && !isBusy,
+    canSave: dirty && !isBusy && !isUsernameTaken,
+    /**
+     * Resting with nothing to save, or blocked because the username is taken.
+     * Busy/success stay undimmed via the caller's disabled:opacity-100.
+     */
+    saveDisabled: (!dirty && !isBusy) || isUsernameTaken,
   };
 }
 

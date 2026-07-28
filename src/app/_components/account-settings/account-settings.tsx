@@ -99,8 +99,16 @@ function AccountSettingsDialogBody({
 }: {
   profile: AccountSettingsProfile;
 }) {
-  const { form, avatar, submit, isSaving, isBusy, saveDisabled, saveState } =
-    useAccountSettingsForm({ profile });
+  const {
+    form,
+    avatar,
+    submit,
+    isSaving,
+    isBusy,
+    saveDisabled,
+    saveState,
+    usernameAvailabilityStatus,
+  } = useAccountSettingsForm({ profile });
 
   return (
     <>
@@ -152,6 +160,7 @@ function AccountSettingsDialogBody({
             avatar={avatar}
             defaultAvatarColor={profile.default_avatar_background_color}
             isSaving={isSaving}
+            usernameAvailabilityStatus={usernameAvailabilityStatus}
           />
         </DialogSection>
 
@@ -179,7 +188,7 @@ function AccountSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[min(85vh,44rem)] flex-col gap-0 overflow-hidden border-white/20 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-sidebar"
+        className="flex max-h-[min(90vh,52rem)] flex-col gap-0 overflow-hidden border-white/20 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-sidebar"
       >
         <DialogDescription className="sr-only">
           Manage your profile and password.
@@ -229,8 +238,17 @@ function AccountSettingsDrawerBody({
     measureDeps: [profile],
   });
 
-  const { form, avatar, submit, isSaving, isBusy, canSave, saveState } =
-    useAccountSettingsForm({
+  const {
+    form,
+    avatar,
+    submit,
+    isSaving,
+    isBusy,
+    canSave,
+    isUsernameTaken,
+    saveState,
+    usernameAvailabilityStatus,
+  } = useAccountSettingsForm({
       profile,
       onSaved: stage.returnToMainView,
     });
@@ -285,6 +303,8 @@ function AccountSettingsDrawerBody({
         onBack={stage.returnToMainView}
         onDone={() => {
           if (isBusy) return;
+          // Stay on the screen when the username is taken so the user can fix it.
+          if (isUsernameTaken) return;
           if (!canSave) {
             stage.returnToMainView();
             return;
@@ -314,6 +334,7 @@ function AccountSettingsDrawerBody({
               avatar={avatar}
               defaultAvatarColor={profile.default_avatar_background_color}
               isSaving={isSaving}
+              usernameAvailabilityStatus={usernameAvailabilityStatus}
             />,
           );
         }

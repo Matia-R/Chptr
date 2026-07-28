@@ -162,3 +162,36 @@ export async function updateUserPassword(
     })
   }
 }
+
+/** Escapes `%`, `_`, and `\` so `ilike` does an exact case-insensitive match. */
+function escapeIlikeExact(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+/**
+ * True when no other profile owns this username (case-insensitive). The caller's
+ * own username is always treated as available.
+ */
+export async function isUsernameAvailable(
+  auth: AuthContext,
+  username: string
+): Promise<boolean> {
+  const trimmed = username.trim()
+  if (trimmed.length === 0) return true
+
+  const { data, error } = await auth.supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', escapeIlikeExact(trimmed))
+    .neq('id', auth.userId)
+    .limit(1)
+
+  if (error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to check username',
+    })
+  }
+
+  return (data?.length ?? 0) === 0
+}

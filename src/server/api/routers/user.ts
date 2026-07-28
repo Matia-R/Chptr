@@ -1,6 +1,8 @@
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure, rateLimitMiddleware } from "~/server/api/trpc";
 import {
     getCurrentUserProfile,
+    isUsernameAvailable,
     updateUserAvatar,
     updateUserPassword,
     updateUserProfile,
@@ -10,6 +12,9 @@ import { avatarPathSchema } from "~/lib/avatar-schema";
 
 /** Credential changes are sensitive: 10 attempts per minute per user. */
 const credentialRateLimit = rateLimitMiddleware(10, 60_000);
+
+/** Username checks are cheap but spam-prone. */
+const usernameCheckRateLimit = rateLimitMiddleware(30, 60_000);
 
 /** Empty strings from the settings forms are stored as NULL. */
 const nullIfEmpty = (value: string) => (value.length > 0 ? value : null);
@@ -21,6 +26,18 @@ export const userRouter = createTRPCRouter({
     getCurrentUserProfile: protectedProcedure.query(async ({ ctx }) => {
         return await getCurrentUserProfile({ supabase: ctx.supabase, userId: ctx.user.id });
     }),
+    checkUsernameAvailability: protectedProcedure
+        .use(usernameCheckRateLimit)
+        .input(z.object({
+            username: z.string().trim().min(1).max(50),
+        }))
+        .query(async ({ ctx, input }) => {
+            const available = await isUsernameAvailable(
+                { supabase: ctx.supabase, userId: ctx.user.id },
+                input.username,
+            );
+            return { available };
+        }),
     updateProfile: protectedProcedure
         .input(profileSchema)
         .mutation(async ({ ctx, input }) => {

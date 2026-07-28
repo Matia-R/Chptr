@@ -2,6 +2,7 @@ export type { AuthContext } from './shared'
 export {
   getCurrentUser,
   getCurrentUserProfile,
+  isUsernameAvailable,
   updateUserAvatar,
   updateUserPassword,
   updateUserProfile,

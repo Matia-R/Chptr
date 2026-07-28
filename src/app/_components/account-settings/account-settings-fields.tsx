@@ -10,6 +10,8 @@ import { cn } from "~/lib/utils";
 import { AvatarField } from "./avatar-field";
 import type { AccountSettingsFormApi } from "./use-account-settings-form";
 import type { AvatarDraft } from "./use-avatar-draft";
+import type { UsernameAvailabilityStatus } from "./use-username-availability";
+import { UsernameAvailabilityFeedback } from "./username-availability-feedback";
 
 /** Desktop stacks every group; mobile shows one drilled-into screen at a time. */
 export type AccountSettingsSurface = "dialog" | "drawer";
@@ -29,12 +31,14 @@ function SettingsField({
   label,
   description,
   error,
+  status,
   children,
 }: {
   id: string;
   label: string;
   description?: React.ReactNode;
   error?: string;
+  status?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -45,6 +49,8 @@ function SettingsField({
       {children}
       {error ? (
         <p className="text-[0.8rem] font-medium text-destructive">{error}</p>
+      ) : status ? (
+        status
       ) : description ? (
         <p className="text-[0.8rem] text-muted-foreground">{description}</p>
       ) : null}
@@ -61,6 +67,7 @@ export type ProfileFieldsProps = AccountSettingsFieldsProps & {
   avatar: AvatarDraft;
   defaultAvatarColor: string | null;
   isSaving?: boolean;
+  usernameAvailabilityStatus?: UsernameAvailabilityStatus;
 };
 
 export function ProfileFields({
@@ -69,6 +76,7 @@ export function ProfileFields({
   avatar,
   defaultAvatarColor,
   isSaving,
+  usernameAvailabilityStatus = "idle",
 }: ProfileFieldsProps) {
   const errors = form.formState.errors;
   const className = inputClassName(surface);
@@ -117,6 +125,13 @@ export function ProfileFields({
         label="Username"
         description="Optional. Published documents live at /username/document."
         error={errors.username?.message}
+        status={
+          usernameAvailabilityStatus === "idle" ? null : (
+            <UsernameAvailabilityFeedback
+              status={usernameAvailabilityStatus}
+            />
+          )
+        }
       >
         <Input
           id="account-settings-username"
