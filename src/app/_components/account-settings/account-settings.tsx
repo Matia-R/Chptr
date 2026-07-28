@@ -11,18 +11,17 @@ import {
   DialogDescription,
   DialogTitle,
 } from "~/app/_components/dialog";
-import { Drawer, DrawerContent } from "~/app/_components/drawer";
 import {
   MobileActionButtonRow,
   MobileActionGroup,
 } from "~/app/_components/mobile-action-rows";
 import {
-  MOBILE_DRAWER_SHELL_CLASS,
-  MobileDrawerEditBody,
+  MobileDrawerFieldView,
   MobileDrawerNavHeader,
   MobileDrawerScreenHeader,
   MobileDrawerViewStack,
-  useMobileDrawerKeyboardOffset,
+  MobileMenuDrawer,
+  useMobileDrawerLeave,
   useMobileDrawerStage,
 } from "~/app/_components/mobile-drawer";
 import { PanelHeader } from "~/app/_components/panel-header";
@@ -253,14 +252,10 @@ function AccountSettingsDrawerBody({
     setView,
     mainView: "main",
     keyboardView: KEYBOARD_VIEWS,
-    // Single-field editors size to content. Skip the publish URL floor and the
-    // full-viewport Vaul shell inset (this drawer already pins above the
-    // keyboard via useMobileDrawerKeyboardOffset).
-    keyboardMinContentPx: 0,
-    keyboardClearancePx: 24,
-    keyboardShellInset: false,
     measureDeps: [profile],
   });
+
+  const leave = useMobileDrawerLeave();
 
   const {
     form,
@@ -275,7 +270,7 @@ function AccountSettingsDrawerBody({
     onSaved: () => {
       // Avatar saves stay on Profile; password returns to the account root.
       if (view === "password") {
-        stage.returnToMainView();
+        leave(stage.returnToMainView);
       }
     },
   });
@@ -283,9 +278,6 @@ function AccountSettingsDrawerBody({
   const openSubView = React.useCallback(
     (next: AccountSettingsView) => {
       stage.measureMainStage();
-      if (isProfileField(next) || next === "password") {
-        stage.expandStageForKeyboardView();
-      }
       stage.goToView(next, 1);
     },
     [stage],
@@ -381,23 +373,20 @@ function AccountSettingsDrawerBody({
   );
 
   const renderPasswordView = () => (
-    <form onSubmit={submit}>
-      <MobileDrawerNavHeader
-        title="Password"
-        backLabel="Back"
-        doneLabel={<SaveFeedbackLabel state={saveState} />}
-        disabled={isSaving}
-        doneDisabled={saveDisabled || isBusy}
-        doneClassName={isBusy ? "disabled:opacity-100" : undefined}
-        onBack={stage.returnToMainView}
-        onDone={() => {
-          void submit();
-        }}
-      />
-      <MobileDrawerEditBody>
-        <PasswordFields form={form} surface="drawer" />
-      </MobileDrawerEditBody>
-    </form>
+    <MobileDrawerFieldView
+      title="Password"
+      doneLabel={<SaveFeedbackLabel state={saveState} />}
+      disabled={isSaving}
+      doneDisabled={saveDisabled || isBusy}
+      doneClassName={isBusy ? "disabled:opacity-100" : undefined}
+      dismissKeyboardOnDone={false}
+      onBack={stage.returnToMainView}
+      onDone={() => {
+        void submit();
+      }}
+    >
+      <PasswordFields form={form} surface="drawer" />
+    </MobileDrawerFieldView>
   );
 
   return (
@@ -442,29 +431,21 @@ function AccountSettingsDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: profile, isLoading } = useUserProfile();
-  const { keyboardOffset, drawerStyle } = useMobileDrawerKeyboardOffset(open);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent
-        bottomUnderlay={keyboardOffset > 0}
-        bottomUnderlayHeight={keyboardOffset}
-        style={drawerStyle}
-        className={MOBILE_DRAWER_SHELL_CLASS}
-      >
-        {profile ? (
-          <AccountSettingsDrawerBody profile={profile} />
-        ) : (
-          <div className="pb-6">
-            <MobileDrawerScreenHeader
-              title="Account"
-              description="Manage your profile and password."
-            />
-            {isLoading ? <LoadingFields rows={2} /> : <UnavailableBody />}
-          </div>
-        )}
-      </DrawerContent>
-    </Drawer>
+    <MobileMenuDrawer open={open} onOpenChange={onOpenChange}>
+      {profile ? (
+        <AccountSettingsDrawerBody profile={profile} />
+      ) : (
+        <div className="pb-6">
+          <MobileDrawerScreenHeader
+            title="Account"
+            description="Manage your profile and password."
+          />
+          {isLoading ? <LoadingFields rows={2} /> : <UnavailableBody />}
+        </div>
+      )}
+    </MobileMenuDrawer>
   );
 }
 

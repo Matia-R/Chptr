@@ -65,12 +65,16 @@ export function applyMobileDrawerKeyboardInset(
   }
 }
 
-export function focusMobileDrawerInput(input: HTMLInputElement | null) {
+export function focusMobileDrawerInput(
+  input: HTMLInputElement | HTMLTextAreaElement | null,
+) {
   if (!input) return;
   try {
     input.focus({ preventScroll: true });
-    const end = input.value.length;
-    input.setSelectionRange(end, end);
+    if (input instanceof HTMLInputElement) {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    }
   } catch {
     input.focus({ preventScroll: true });
   }

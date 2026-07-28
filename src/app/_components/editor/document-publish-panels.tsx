@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { flushSync } from "react-dom";
 
 import { Button } from "~/app/_components/button";
 import { PanelHeader } from "~/app/_components/panel-header";
@@ -23,15 +22,10 @@ import {
 } from "~/app/_components/save-feedback-label";
 import { cn } from "~/lib/utils";
 import {
-  applyMobileDrawerKeyboardInset,
-  focusMobileDrawerInput,
-  MobileDrawerEditBody,
-  MobileDrawerNavHeader,
+  MobileDrawerFieldView,
   MobileDrawerScreenHeader,
   MobileDrawerViewStack,
-  resetMobileDrawerKeyboardStyles,
   useMobileDrawerStage,
-  waitForMobileDrawerKeyboardDismiss,
 } from "~/app/_components/mobile-drawer";
 
 import {
@@ -128,46 +122,36 @@ function MobilePublishEditUrlView({
   }, []);
 
   const leaveEditUrl = (commit: boolean) => {
-    inputRef.current?.blur();
     if (commit) {
       setSlugOverride(draftSlug);
+      onDone();
     } else {
       setSlugOverride(snapshotRef.current);
+      onBack();
     }
-
-    waitForMobileDrawerKeyboardDismiss(() => {
-      resetMobileDrawerKeyboardStyles();
-      if (commit) {
-        onDone();
-      } else {
-        onBack();
-      }
-    });
   };
 
   return (
-    <>
-      <MobileDrawerNavHeader
-        title="Edit URL"
-        disabled={busy}
-        onBack={() => leaveEditUrl(false)}
-        onDone={() => leaveEditUrl(true)}
-      />
-      <MobileDrawerEditBody helperText="URL changes apply after you publish.">
-        <div className="grid min-w-0 gap-2">
-          {buildUrlSlugCluster("mobile", {
-            value: draftSlug,
-            onChange: setDraftSlug,
-            inputRef,
-          })}
-        </div>
-        {!ownerPreview ? (
-          <p className="text-xs text-muted-foreground">
-            Add a username in Account to use your real URL path.
-          </p>
-        ) : null}
-      </MobileDrawerEditBody>
-    </>
+    <MobileDrawerFieldView
+      title="Edit URL"
+      helperText="URL changes apply after you publish."
+      disabled={busy}
+      onBack={() => leaveEditUrl(false)}
+      onDone={() => leaveEditUrl(true)}
+    >
+      <div className="grid min-w-0 gap-2">
+        {buildUrlSlugCluster("mobile", {
+          value: draftSlug,
+          onChange: setDraftSlug,
+          inputRef,
+        })}
+      </div>
+      {!ownerPreview ? (
+        <p className="text-xs text-muted-foreground">
+          Add a username in Account to use your real URL path.
+        </p>
+      ) : null}
+    </MobileDrawerFieldView>
   );
 }
 
@@ -369,17 +353,7 @@ export function DocumentPublishMobileDrawer({
             statusRow={statusRow}
             onEditUrl={() => {
               stage.measureMainStage();
-              flushSync(() => {
-                stage.expandStageForKeyboardView();
-                stage.goToView("edit-url", 1);
-              });
-              const input = document.getElementById("publish-slug-mobile");
-              if (input instanceof HTMLInputElement) {
-                focusMobileDrawerInput(input);
-                window.setTimeout(() => {
-                  applyMobileDrawerKeyboardInset();
-                }, 50);
-              }
+              stage.goToView("edit-url", 1);
             }}
           />
         )

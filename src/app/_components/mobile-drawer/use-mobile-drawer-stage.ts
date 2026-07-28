@@ -25,13 +25,16 @@ export type UseMobileDrawerStageOptions<T extends string> = {
    * more than one sub-screen has inputs.
    */
   keyboardView: T | readonly T[] | null;
-  /** Minimum content height when expanding for the keyboard view. */
+  /**
+   * Optional floor for keyboard-view stage height. Default 0 — size from
+   * measured content (correct for single-field drills and URL editors alike).
+   */
   keyboardMinContentPx?: number;
   keyboardClearancePx?: number;
   /**
-   * When true (default), grow the Vaul shell to the visual viewport while the
-   * keyboard is open. Disable when the drawer already uses
-   * `useMobileDrawerKeyboardOffset` — the inset otherwise fills the screen.
+   * Grow the Vaul shell to the visual viewport while the keyboard is open.
+   * Default false — use `MobileMenuDrawer` (keyboard offset) instead. The inset
+   * fills the screen when combined with offset.
    */
   keyboardShellInset?: boolean;
   /** Re-measure the main view when these change. */
@@ -43,9 +46,9 @@ export function useMobileDrawerStage<T extends string>({
   setView,
   mainView,
   keyboardView,
-  keyboardMinContentPx = 268,
+  keyboardMinContentPx = 0,
   keyboardClearancePx = MOBILE_DRAWER_KEYBOARD_CLEARANCE_PX,
-  keyboardShellInset = true,
+  keyboardShellInset = false,
   measureDeps = [],
 }: UseMobileDrawerStageOptions<T>) {
   const [direction, setDirection] = useState(1);
@@ -240,10 +243,7 @@ export function useMobileDrawerStage<T extends string>({
   useLayoutEffect(() => {
     if (!isKeyboardView(view)) return;
 
-    // Clear any leftover Vaul height from a previous shell-inset session.
-    if (!keyboardShellInset) {
-      resetMobileDrawerKeyboardStyles();
-    }
+    resetMobileDrawerKeyboardStyles();
 
     const node = keyboardMeasureRef.current;
     if (!node) return;
@@ -255,7 +255,7 @@ export function useMobileDrawerStage<T extends string>({
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [view, isKeyboardView, keyboardShellInset, applyKeyboardHeight]);
+  }, [view, isKeyboardView, applyKeyboardHeight]);
 
   useEffect(() => {
     if (!isKeyboardView(view) || !keyboardShellInset) return;

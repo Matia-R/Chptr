@@ -8,14 +8,14 @@ import {
   type MutableRefObject,
 } from "react";
 
-import { Drawer, DrawerContent, DrawerTrigger } from "~/app/_components/drawer";
 import { Input } from "~/app/_components/input";
 import { cn } from "~/lib/utils";
 
-import { MOBILE_DRAWER_SHELL_CLASS } from "./constants";
-import { MobileDrawerEditBody } from "./mobile-drawer-edit-body";
-import { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
-import { useMobileDrawerKeyboardOffset } from "./use-mobile-drawer-keyboard";
+import {
+  MOBILE_DRAWER_FIELD_INPUT_CLASS,
+  MobileDrawerFieldView,
+} from "./mobile-drawer-field-view";
+import { MobileMenuDrawer } from "./mobile-menu-drawer";
 
 export type MobileFormDrawerProps = {
   open: boolean;
@@ -32,6 +32,10 @@ export type MobileFormDrawerProps = {
   inputRef?: MutableRefObject<HTMLInputElement | null>;
 };
 
+/**
+ * Standalone single-field mobile drawer (no view stack). Uses the same shell
+ * and field chrome as drill-down menus.
+ */
 export function MobileFormDrawer({
   open,
   onOpenChange,
@@ -47,8 +51,6 @@ export function MobileFormDrawer({
   inputRef,
 }: MobileFormDrawerProps) {
   const [draft, setDraft] = useState(initialValue);
-  const { keyboardOffset, drawerStyle } = useMobileDrawerKeyboardOffset(open);
-
   const snapshotRef = useRef(initialValue);
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const wasOpenRef = useRef(false);
@@ -72,14 +74,6 @@ export function MobileFormDrawer({
     },
     [inputRef],
   );
-
-  const focusInput = useCallback(() => {
-    if (disabled) return;
-
-    requestAnimationFrame(() => {
-      internalInputRef.current?.focus({ preventScroll: true });
-    });
-  }, [disabled]);
 
   const closeDrawer = useCallback(() => {
     onOpenChange(false);
@@ -116,60 +110,38 @@ export function MobileFormDrawer({
     [leave, onOpenChange],
   );
 
-  useEffect(() => {
-    if (!open) return;
-
-    focusInput();
-  }, [open, focusInput]);
-
   return (
-    <Drawer
+    <MobileMenuDrawer
       open={open}
       onOpenChange={handleOpenChange}
-      repositionInputs={false}
+      trigger={trigger}
     >
-      {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
-
-      <DrawerContent
-        bottomUnderlay={keyboardOffset > 0}
-        bottomUnderlayHeight={keyboardOffset}
-        style={drawerStyle}
-        className={cn(MOBILE_DRAWER_SHELL_CLASS)}
+      <MobileDrawerFieldView
+        title={title}
+        helperText={helperText}
+        backLabel="Cancel"
+        disabled={disabled}
+        bodyClassName={contentClassName}
+        onBack={() => leave(false)}
+        onDone={() => leave(true)}
       >
-        <MobileDrawerNavHeader
-          title={title}
+        <Input
+          ref={setInputRef}
+          id={inputId}
+          type="text"
+          value={draft}
           disabled={disabled}
-          backLabel="Cancel"
-          onBack={() => leave(false)}
-          onDone={() => leave(true)}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              leave(true);
+            }
+          }}
+          className={MOBILE_DRAWER_FIELD_INPUT_CLASS}
+          aria-label={inputLabel ?? title}
         />
-
-        <MobileDrawerEditBody
-          helperText={helperText}
-          className={contentClassName}
-        >
-          <Input
-            ref={setInputRef}
-            id={inputId}
-            type="text"
-            value={draft}
-            disabled={disabled}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                leave(true);
-              }
-            }}
-            className={cn(
-              "h-10 w-full rounded-lg border border-sidebar-border/70 bg-background/50 px-3 text-base shadow-inner",
-              "dark:border-white/[0.12] dark:bg-black/35",
-              "focus-visible:ring-1 focus-visible:ring-ring",
-            )}
-            aria-label={inputLabel ?? title}
-          />
-        </MobileDrawerEditBody>
-      </DrawerContent>
-    </Drawer>
+      </MobileDrawerFieldView>
+    </MobileMenuDrawer>
   );
 }
