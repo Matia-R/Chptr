@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Lock, User } from "lucide-react";
+import { AtSign, ChevronRight, Lock, User } from "lucide-react";
 
 import { Button } from "~/app/_components/button";
 import {
@@ -30,6 +30,7 @@ import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
 import { Skeleton } from "~/app/_components/skeleton";
 import {
   useAccountSettingsStore,
+  type AccountProfileField,
   type AccountSettingsView,
 } from "~/hooks/use-account-settings";
 import { useIsMobile } from "~/hooks/use-mobile";
@@ -37,13 +38,30 @@ import { useUserProfile } from "~/hooks/use-user-profile";
 import { cn } from "~/lib/utils";
 
 import { PasswordFields, ProfileFields } from "./account-settings-fields";
+import { AvatarField } from "./avatar-field";
+import { MobileProfileFieldEdit } from "./mobile-profile-field-edit";
 import {
   useAccountSettingsForm,
   type AccountSettingsProfile,
 } from "./use-account-settings-form";
 
-/** Both sub-screens hold text fields, so either can open the keyboard. */
-const KEYBOARD_VIEWS: readonly AccountSettingsView[] = ["profile", "password"];
+/** Field editors and password open the keyboard; the profile list does not. */
+const KEYBOARD_VIEWS: readonly AccountSettingsView[] = [
+  "first_name",
+  "last_name",
+  "username",
+  "password",
+];
+
+const PROFILE_FIELDS: readonly AccountProfileField[] = [
+  "first_name",
+  "last_name",
+  "username",
+];
+
+function isProfileField(view: AccountSettingsView): view is AccountProfileField {
+  return (PROFILE_FIELDS as readonly string[]).includes(view);
+}
 
 /** Lets the header's Save button submit the form it sits outside of. */
 const DIALOG_FORM_ID = "account-settings-form";
@@ -235,6 +253,12 @@ function AccountSettingsDrawerBody({
     setView,
     mainView: "main",
     keyboardView: KEYBOARD_VIEWS,
+    // Single-field editors size to content. Skip the publish URL floor and the
+    // full-viewport Vaul shell inset (this drawer already pins above the
+    // keyboard via useMobileDrawerKeyboardOffset).
+    keyboardMinContentPx: 0,
+    keyboardClearancePx: 24,
+    keyboardShellInset: false,
     measureDeps: [profile],
   });
 
@@ -246,19 +270,30 @@ function AccountSettingsDrawerBody({
     isBusy,
     saveDisabled,
     saveState,
-    usernameAvailabilityStatus,
   } = useAccountSettingsForm({
-      profile,
-      onSaved: stage.returnToMainView,
-    });
+    profile,
+    onSaved: () => {
+      // Avatar saves stay on Profile; password returns to the account root.
+      if (view === "password") {
+        stage.returnToMainView();
+      }
+    },
+  });
 
   const openSubView = React.useCallback(
     (next: AccountSettingsView) => {
       stage.measureMainStage();
+      if (isProfileField(next) || next === "password") {
+        stage.expandStageForKeyboardView();
+      }
       stage.goToView(next, 1);
     },
     [stage],
   );
+
+  const returnToProfile = React.useCallback(() => {
+    stage.returnToView("profile");
+  }, [stage]);
 
   const fullName = [profile.first_name, profile.last_name]
     .filter((part): part is string => Boolean(part?.trim()))
@@ -289,13 +324,68 @@ function AccountSettingsDrawerBody({
     </div>
   );
 
-  const renderSubView = (title: string, fields: React.ReactNode) => (
-    <form onSubmit={submit}>
+  const renderProfileView = () => (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
       <MobileDrawerNavHeader
-        title={title}
+        title="Profile"
         backLabel="Back"
         doneLabel={<SaveFeedbackLabel state={saveState} />}
-        // Back only locks during the request; Save matches the desktop rules.
+        disabled={isSaving}
+        // Save is only for avatar changes on this screen.
+        doneDisabled={saveDisabled || isBusy || !avatar.isDirty}
+        doneClassName={isBusy ? "disabled:opacity-100" : undefined}
+        onBack={stage.returnToMainView}
+        onDone={() => {
+          void submit();
+        }}
+      />
+      <div className="flex flex-col gap-6 px-4 pb-8 pt-2">
+        <AvatarField
+          draft={avatar}
+          firstName={profile.first_name ?? ""}
+          lastName={profile.last_name ?? ""}
+          defaultAvatarColor={profile.default_avatar_background_color}
+          disabled={isSaving}
+        />
+        <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={User}
+            label="First name"
+            trailing={<RowTrailing value={profile.first_name ?? undefined} />}
+            onClick={() => openSubView("first_name")}
+          />
+          <MobileActionButtonRow
+            icon={User}
+            label="Last name"
+            trailing={<RowTrailing value={profile.last_name ?? undefined} />}
+            onClick={() => openSubView("last_name")}
+          />
+          <MobileActionButtonRow
+            icon={AtSign}
+            label="Username"
+            trailing={
+              <RowTrailing
+                value={profile.username ? `@${profile.username}` : undefined}
+              />
+            }
+            onClick={() => openSubView("username")}
+          />
+        </MobileActionGroup>
+      </div>
+    </form>
+  );
+
+  const renderPasswordView = () => (
+    <form onSubmit={submit}>
+      <MobileDrawerNavHeader
+        title="Password"
+        backLabel="Back"
+        doneLabel={<SaveFeedbackLabel state={saveState} />}
         disabled={isSaving}
         doneDisabled={saveDisabled || isBusy}
         doneClassName={isBusy ? "disabled:opacity-100" : undefined}
@@ -304,7 +394,9 @@ function AccountSettingsDrawerBody({
           void submit();
         }}
       />
-      <MobileDrawerEditBody>{fields}</MobileDrawerEditBody>
+      <MobileDrawerEditBody>
+        <PasswordFields form={form} surface="drawer" />
+      </MobileDrawerEditBody>
     </form>
   );
 
@@ -318,24 +410,22 @@ function AccountSettingsDrawerBody({
       getMotionRef={stage.getMotionRef}
       renderView={(currentView) => {
         if (currentView === "profile") {
-          return renderSubView(
-            "Profile",
-            <ProfileFields
-              form={form}
-              surface="drawer"
-              avatar={avatar}
-              defaultAvatarColor={profile.default_avatar_background_color}
-              isSaving={isSaving}
-              usernameAvailabilityStatus={usernameAvailabilityStatus}
-            />,
+          return renderProfileView();
+        }
+
+        if (isProfileField(currentView)) {
+          return (
+            <MobileProfileFieldEdit
+              field={currentView}
+              profile={profile}
+              onBack={returnToProfile}
+              onSaved={returnToProfile}
+            />
           );
         }
 
         if (currentView === "password") {
-          return renderSubView(
-            "Password",
-            <PasswordFields form={form} surface="drawer" />,
-          );
+          return renderPasswordView();
         }
 
         return renderMainView();

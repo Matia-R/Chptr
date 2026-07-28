@@ -17,7 +17,7 @@ export type MobileDrawerViewStackProps<T extends string> = {
   stageMinHeight?: number;
   stageIsMeasured: boolean;
   stageRef: RefObject<HTMLDivElement | null>;
-  getMotionRef: (view: T) => RefObject<HTMLDivElement | null> | undefined;
+  getMotionRef: (view: T) => Ref<HTMLDivElement> | undefined;
   renderView: (view: T) => ReactNode;
   className?: string;
 };
@@ -48,7 +48,7 @@ export function MobileDrawerViewStack<T extends string>({
         <AnimatePresence initial={false} custom={direction}>
           <motion.div
             key={view}
-            ref={getMotionRef(view) as Ref<HTMLDivElement>}
+            ref={getMotionRef(view)}
             custom={direction}
             variants={mobileDrawerViewVariants}
             initial="enter"
