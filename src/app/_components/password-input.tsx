@@ -8,9 +8,10 @@ import { Input } from "./input"
 const PasswordInput = React.forwardRef<
     HTMLInputElement,
     Omit<React.ComponentProps<typeof Input>, "type">
->(({ className, ...props }, ref) => {
+>(({ className, id, ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false)
-    const inputId = React.useId()
+    const generatedId = React.useId()
+    const inputId = id ?? generatedId
 
     return (
         <div className="relative">
