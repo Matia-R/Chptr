@@ -92,16 +92,34 @@ export async function updateUserProfile(
  * files are harmless, so a failure here must not fail the profile update.
  */
 async function pruneOldAvatars(auth: AuthContext, keepPath: string | null) {
-  const { data: existing } = await auth.supabase.storage
-    .from(AVATAR_BUCKET)
-    .list(auth.userId)
+  try {
+    const { data: existing, error: listError } = await auth.supabase.storage
+      .from(AVATAR_BUCKET)
+      .list(auth.userId)
 
-  const stale = (existing ?? [])
-    .map((object) => `${auth.userId}/${object.name}`)
-    .filter((path) => path !== keepPath)
+    if (listError) {
+      console.error("[pruneOldAvatars] Failed to list avatars (best-effort):", listError)
+      return
+    }
 
-  if (stale.length > 0) {
-    await auth.supabase.storage.from(AVATAR_BUCKET).remove(stale)
+    const stale = (existing ?? [])
+      .map((object) => `${auth.userId}/${object.name}`)
+      .filter((path) => path !== keepPath)
+
+    if (stale.length === 0) return
+
+    const { error: removeError } = await auth.supabase.storage
+      .from(AVATAR_BUCKET)
+      .remove(stale)
+
+    if (removeError) {
+      console.error(
+        "[pruneOldAvatars] Failed to remove stale avatars (best-effort):",
+        removeError,
+      )
+    }
+  } catch (err) {
+    console.error("[pruneOldAvatars] Unexpected failure (best-effort):", err)
   }
 }
 

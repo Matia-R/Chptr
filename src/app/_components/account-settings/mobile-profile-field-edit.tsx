@@ -99,13 +99,15 @@ export function MobileProfileFieldEdit({
     !dirty ||
     isBusy ||
     usernameInvalid ||
-    (field === "username" && availability.isTaken);
+    (field === "username" &&
+      (availability.isTaken || availability.isChecking));
 
   const save = async () => {
     if (
       !dirty ||
       usernameInvalid ||
       availability.isTaken ||
+      availability.isChecking ||
       feedback.inFlight ||
       feedback.state === "saving"
     ) {

@@ -50,6 +50,7 @@ export function useAvatarDraft(currentUrl: string | null) {
   const clear = React.useCallback(() => {
     setError(null);
     setFile(null);
+    setPreviewUrl(null);
     setIsCleared(true);
   }, []);
 

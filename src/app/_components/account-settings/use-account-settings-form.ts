@@ -75,7 +75,7 @@ export function useAccountSettingsForm({
   const updateAvatar = api.user.updateAvatar.useMutation();
 
   const submit = form.handleSubmit(async (values) => {
-    if (usernameAvailability.isTaken) return;
+    if (usernameAvailability.isTaken || usernameAvailability.isChecking) return;
 
     const defaults = form.formState.defaultValues;
     const profileChanged =
@@ -130,6 +130,12 @@ export function useAccountSettingsForm({
           title: "Couldn't update profile",
           description: errorMessage(error),
         });
+        // Avatar already landed — sync cache and clear the draft so a retry
+        // only re-attempts profile fields.
+        if (avatarSaved) {
+          await utils.user.getCurrentUserProfile.invalidate();
+          avatar.reset();
+        }
         await feedback.settle("failed");
         return;
       }
@@ -186,6 +192,8 @@ export function useAccountSettingsForm({
   // "Saved" is on screen, without forcing disabled:opacity-50.
   const isBusy = isSaving || feedback.state === "saved";
   const isUsernameTaken = usernameAvailability.isTaken;
+  const isUsernameUnresolved =
+    usernameAvailability.isChecking || isUsernameTaken;
 
   return {
     form,
@@ -198,12 +206,13 @@ export function useAccountSettingsForm({
     /** Drives the Save control's spinner / checkmark. */
     saveState: feedback.state,
     /** Whether a click should commit — distinct from the visual disabled state. */
-    canSave: dirty && !isBusy && !isUsernameTaken,
+    canSave: dirty && !isBusy && !isUsernameUnresolved,
     /**
-     * Resting with nothing to save, or blocked because the username is taken.
-     * Busy/success stay undimmed via the caller's disabled:opacity-100.
+     * Resting with nothing to save, or blocked while username availability is
+     * unresolved (checking / taken). Busy/success stay undimmed via the
+     * caller's disabled:opacity-100.
      */
-    saveDisabled: (!dirty && !isBusy) || isUsernameTaken,
+    saveDisabled: (!dirty && !isBusy) || isUsernameUnresolved,
   };
 }
 

@@ -135,6 +135,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   );
 
   const closePopoverTimeoutRef = useRef<number | null>(null);
+  const feedbackResetTimeoutRef = useRef<number | null>(null);
 
   /** Only reset store when the route document changes — not when extra consumers mount (popover panel, drawer panel). */
   const prevDocumentIdForResetRef = useRef<string | undefined>(undefined);
@@ -260,7 +261,8 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const busy =
     publishMutation.isPending ||
     unpublishMutation.isPending ||
-    publishFeedback === "publishing";
+    publishFeedback === "publishing" ||
+    publishFeedback === "published";
 
   const publishButtonLabel =
     publishFeedback === "publishing"
@@ -307,6 +309,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       if (closePopoverTimeoutRef.current != null) {
         window.clearTimeout(closePopoverTimeoutRef.current);
       }
+      if (feedbackResetTimeoutRef.current != null) {
+        window.clearTimeout(feedbackResetTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -320,9 +325,21 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       return;
     }
 
+    if (
+      publishMutation.isPending ||
+      publishFeedback === "publishing" ||
+      publishFeedback === "published"
+    ) {
+      return;
+    }
+
     if (closePopoverTimeoutRef.current != null) {
       window.clearTimeout(closePopoverTimeoutRef.current);
       closePopoverTimeoutRef.current = null;
+    }
+    if (feedbackResetTimeoutRef.current != null) {
+      window.clearTimeout(feedbackResetTimeoutRef.current);
+      feedbackResetTimeoutRef.current = null;
     }
 
     const isFirstTimePublish = publication === null;
@@ -354,7 +371,8 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
       setPublishFeedback("published");
 
-      window.setTimeout(() => {
+      feedbackResetTimeoutRef.current = window.setTimeout(() => {
+        feedbackResetTimeoutRef.current = null;
         setPublishFeedback("idle");
       }, SAVE_FEEDBACK_RESULT_MS);
 
@@ -365,7 +383,8 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
-      window.setTimeout(() => {
+      feedbackResetTimeoutRef.current = window.setTimeout(() => {
+        feedbackResetTimeoutRef.current = null;
         setPublishFeedback("idle");
       }, SAVE_FEEDBACK_RESULT_MS);
     }
@@ -373,6 +392,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     documentId,
     editor,
     publication,
+    publishFeedback,
     publishMutation,
     slugOverride,
     title,
