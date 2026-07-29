@@ -26,6 +26,10 @@ export type MobileDrawerFieldViewProps = {
   onBack: () => void;
   onDone: () => void;
   helperText?: ReactNode;
+  helperTextId?: string;
+  /** Field status/error associated via `aria-describedby` (see EditBody). */
+  description?: ReactNode;
+  descriptionId?: string;
   backLabel?: string;
   doneLabel?: ReactNode;
   disabled?: boolean;
@@ -55,6 +59,9 @@ export function MobileDrawerFieldView({
   onBack,
   onDone,
   helperText,
+  helperTextId,
+  description,
+  descriptionId,
   backLabel = "Back",
   doneLabel = "Done",
   disabled = false,
@@ -109,7 +116,13 @@ export function MobileDrawerFieldView({
         onBack={handleBack}
         onDone={handleDone}
       />
-      <MobileDrawerEditBody helperText={helperText} className={bodyClassName}>
+      <MobileDrawerEditBody
+        helperText={helperText}
+        helperTextId={helperTextId}
+        description={description}
+        descriptionId={descriptionId}
+        className={bodyClassName}
+      >
         {children}
       </MobileDrawerEditBody>
     </>

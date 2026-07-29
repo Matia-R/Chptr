@@ -142,15 +142,30 @@ export function MobileProfileFieldEdit({
     ? usernameParse.error.issues[0]?.message
     : undefined;
 
+  const inputId = `account-settings-${field}`;
+  const helperTextId = `${inputId}-helper`;
+  const descriptionId = `${inputId}-description`;
+  const showAvailability =
+    field === "username" && availability.status !== "idle";
+  const description = schemaError ? (
+    <p className="text-[0.8rem] font-medium text-destructive">{schemaError}</p>
+  ) : showAvailability ? (
+    <UsernameAvailabilityFeedback status={availability.status} />
+  ) : undefined;
+  const describedBy = [
+    description ? descriptionId : null,
+    !description ? helperTextId : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <MobileDrawerFieldView
       title={copy.title}
-      helperText={
-        schemaError ||
-        (field === "username" && availability.status !== "idle")
-          ? undefined
-          : copy.helperText
-      }
+      helperText={description ? undefined : copy.helperText}
+      helperTextId={description ? undefined : helperTextId}
+      description={description}
+      descriptionId={description ? descriptionId : undefined}
       doneLabel={<SaveFeedbackLabel state={feedback.state} />}
       disabled={feedback.inFlight || feedback.state === "saving"}
       doneDisabled={saveDisabled}
@@ -162,7 +177,7 @@ export function MobileProfileFieldEdit({
       }}
     >
       <Input
-        id={`account-settings-${field}`}
+        id={inputId}
         autoComplete={copy.autoComplete}
         autoCapitalize={field === "username" ? "none" : undefined}
         spellCheck={field === "username" ? false : undefined}
@@ -170,15 +185,9 @@ export function MobileProfileFieldEdit({
         disabled={feedback.inFlight || feedback.state === "saving"}
         onChange={(event) => setDraft(event.target.value)}
         className={MOBILE_DRAWER_FIELD_INPUT_CLASS}
-        aria-invalid={Boolean(schemaError)}
+        aria-invalid={Boolean(schemaError) || availability.isTaken}
+        aria-describedby={describedBy || undefined}
       />
-      {schemaError ? (
-        <p className="text-[0.8rem] font-medium text-destructive">
-          {schemaError}
-        </p>
-      ) : field === "username" && availability.status !== "idle" ? (
-        <UsernameAvailabilityFeedback status={availability.status} />
-      ) : null}
     </MobileDrawerFieldView>
   );
 }

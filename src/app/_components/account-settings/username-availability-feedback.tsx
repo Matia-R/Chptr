@@ -19,14 +19,17 @@ const FADE_TRANSITION = {
 export function UsernameAvailabilityFeedback({
   status,
   className,
+  id,
 }: {
   status: UsernameAvailabilityStatus;
   className?: string;
+  id?: string;
 }) {
   if (status === "idle") return null;
 
   return (
     <span
+      id={id}
       className={cn(
         "inline-flex min-h-[1.25rem] items-center overflow-hidden",
         className,
