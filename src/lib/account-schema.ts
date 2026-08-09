@@ -4,8 +4,8 @@ import { z } from "zod";
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 72;
+export const MIN_PASSWORD_LENGTH = 8;
+export const MAX_PASSWORD_LENGTH = 72;
 
 /** Empty means "no username" — the profiles row stores `null` instead. */
 export const usernameSchema = z
@@ -31,53 +31,28 @@ export const profileSchema = z.object({
   username: usernameSchema,
 });
 
-export const passwordSchema = z
-  .object({
-    password: z
-      .string()
-      .min(MIN_PASSWORD_LENGTH, {
-        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-      })
-      .max(MAX_PASSWORD_LENGTH, {
-        message: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
-      }),
-    confirmPassword: z.string(),
+const newPasswordField = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, {
+    message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
   })
-  .refine((values) => values.password === values.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
+  .max(MAX_PASSWORD_LENGTH, {
+    message: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
   });
 
 /**
- * Every editable account field in one shape, so a single Save can cover the
- * whole surface. Blank password fields mean "leave the password unchanged".
+ * Signed-in password change. Passwords never leave the browser — this schema
+ * is validated client-side only before calling Supabase Auth.
  */
-export const accountSettingsSchema = profileSchema
-  .extend({
-    password: z.string(),
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, { message: "Current password is required" }),
+    password: newPasswordField,
     confirmPassword: z.string(),
+    /** Present only when Secure password change requires a reauth nonce. */
+    nonce: z.string().optional(),
   })
   .superRefine((values, ctx) => {
-    if (values.password.length === 0 && values.confirmPassword.length === 0) {
-      return;
-    }
-
-    if (values.password.length < MIN_PASSWORD_LENGTH) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["password"],
-        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-      });
-    }
-
-    if (values.password.length > MAX_PASSWORD_LENGTH) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["password"],
-        message: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
-      });
-    }
-
     if (values.password !== values.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -85,8 +60,22 @@ export const accountSettingsSchema = profileSchema
         message: "Passwords do not match",
       });
     }
+
+    if (
+      values.currentPassword.length > 0 &&
+      values.password === values.currentPassword
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: "New password must be different from your current password",
+      });
+    }
   });
 
+/** Profile fields only — password changes use `changePasswordSchema` separately. */
+export const accountSettingsSchema = profileSchema;
+
 export type ProfileValues = z.infer<typeof profileSchema>;
-export type PasswordValues = z.infer<typeof passwordSchema>;
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export type AccountSettingsValues = z.infer<typeof accountSettingsSchema>;

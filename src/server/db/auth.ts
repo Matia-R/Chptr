@@ -167,20 +167,6 @@ export async function updateUserAvatar(
   return data
 }
 
-export async function updateUserPassword(
-  auth: AuthContext,
-  password: string
-): Promise<void> {
-  const { error } = await auth.supabase.auth.updateUser({ password })
-
-  if (error) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: error.message,
-    })
-  }
-}
-
 /** Escapes `%`, `_`, and `\` so `ilike` does an exact case-insensitive match. */
 function escapeIlikeExact(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')

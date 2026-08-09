@@ -16,12 +16,10 @@ import {
   MobileActionGroup,
 } from "~/app/_components/mobile-action-rows";
 import {
-  MobileDrawerFieldView,
   MobileDrawerNavHeader,
   MobileDrawerScreenHeader,
   MobileDrawerViewStack,
   MobileMenuDrawer,
-  useMobileDrawerLeave,
   useMobileDrawerStage,
 } from "~/app/_components/mobile-drawer";
 import { PanelHeader } from "~/app/_components/panel-header";
@@ -36,8 +34,12 @@ import { useIsMobile } from "~/hooks/use-mobile";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { cn } from "~/lib/utils";
 
-import { PasswordFields, ProfileFields } from "./account-settings-fields";
+import { ProfileFields } from "./account-settings-fields";
 import { AvatarField } from "./avatar-field";
+import {
+  ChangePasswordSection,
+  MobileChangePassword,
+} from "./change-password-form";
 import { MobileProfileFieldEdit } from "./mobile-profile-field-edit";
 import {
   useAccountSettingsForm,
@@ -162,32 +164,30 @@ function AccountSettingsDialogBody({
         }
       />
 
-      <form
-        id={DIALOG_FORM_ID}
-        onSubmit={submit}
-        className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-6 py-6"
-      >
-        <DialogSection
-          title="Profile"
-          description="Your photo, name, and the handle used in your public document URLs."
-        >
-          <ProfileFields
-            form={form}
-            surface="dialog"
-            avatar={avatar}
-            defaultAvatarColor={profile.default_avatar_background_color}
-            isSaving={isSaving}
-            usernameAvailabilityStatus={usernameAvailabilityStatus}
-          />
-        </DialogSection>
+      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-6 py-6">
+        <form id={DIALOG_FORM_ID} onSubmit={submit}>
+          <DialogSection
+            title="Profile"
+            description="Your photo, name, and the handle used in your public document URLs."
+          >
+            <ProfileFields
+              form={form}
+              surface="dialog"
+              avatar={avatar}
+              defaultAvatarColor={profile.default_avatar_background_color}
+              isSaving={isSaving}
+              usernameAvailabilityStatus={usernameAvailabilityStatus}
+            />
+          </DialogSection>
+        </form>
 
         <DialogSection
-          title="Password"
-          description="Set a new password of at least 8 characters."
+          title="Change Password"
+          description="Confirm your current password, then choose a new one of at least 8 characters."
         >
-          <PasswordFields form={form} surface="dialog" />
+          <ChangePasswordSection />
         </DialogSection>
-      </form>
+      </div>
     </>
   );
 }
@@ -255,10 +255,7 @@ function AccountSettingsDrawerBody({
     measureDeps: [profile],
   });
 
-  const leave = useMobileDrawerLeave();
-
   const {
-    form,
     avatar,
     submit,
     isSaving,
@@ -267,12 +264,6 @@ function AccountSettingsDrawerBody({
     saveState,
   } = useAccountSettingsForm({
     profile,
-    onSaved: () => {
-      // Avatar saves stay on Profile; password returns to the account root.
-      if (view === "password") {
-        leave(stage.returnToMainView);
-      }
-    },
   });
 
   const openSubView = React.useCallback(
@@ -285,6 +276,10 @@ function AccountSettingsDrawerBody({
 
   const returnToProfile = React.useCallback(() => {
     stage.returnToView("profile");
+  }, [stage]);
+
+  const returnToMain = React.useCallback(() => {
+    stage.returnToMainView();
   }, [stage]);
 
   const fullName = [profile.first_name, profile.last_name]
@@ -372,23 +367,6 @@ function AccountSettingsDrawerBody({
     </form>
   );
 
-  const renderPasswordView = () => (
-    <MobileDrawerFieldView
-      title="Password"
-      doneLabel={<SaveFeedbackLabel state={saveState} />}
-      disabled={isSaving}
-      doneDisabled={saveDisabled || isBusy}
-      doneClassName={isBusy ? "disabled:opacity-100" : undefined}
-      dismissKeyboardOnDone={false}
-      onBack={stage.returnToMainView}
-      onDone={() => {
-        void submit();
-      }}
-    >
-      <PasswordFields form={form} surface="drawer" />
-    </MobileDrawerFieldView>
-  );
-
   return (
     <MobileDrawerViewStack
       view={view}
@@ -414,7 +392,12 @@ function AccountSettingsDrawerBody({
         }
 
         if (currentView === "password") {
-          return renderPasswordView();
+          return (
+            <MobileChangePassword
+              onBack={returnToMain}
+              onSaved={returnToMain}
+            />
+          );
         }
 
         return renderMainView();

@@ -7,8 +7,11 @@ import { Label } from "~/app/_components/label";
 import { PasswordInput } from "~/app/_components/password-input";
 import { cn } from "~/lib/utils";
 
+import { MIN_PASSWORD_LENGTH } from "~/lib/account-schema";
+
 import { AvatarField } from "./avatar-field";
 import type { AccountSettingsFormApi } from "./use-account-settings-form";
+import type { ChangePasswordFormApi } from "./use-change-password";
 import type { AvatarDraft } from "./use-avatar-draft";
 import type { UsernameAvailabilityStatus } from "./use-username-availability";
 import { UsernameAvailabilityFeedback } from "./username-availability-feedback";
@@ -146,16 +149,42 @@ export function ProfileFields({
   );
 }
 
-export function PasswordFields({ form, surface }: AccountSettingsFieldsProps) {
+export type ChangePasswordFieldsProps = {
+  form: ChangePasswordFormApi;
+  surface: AccountSettingsSurface;
+  reauthRequired?: boolean;
+  /** Shown after a successful update on surfaces that keep the form mounted. */
+  successMessage?: string | null;
+};
+
+export function ChangePasswordFields({
+  form,
+  surface,
+  reauthRequired = false,
+  successMessage,
+}: ChangePasswordFieldsProps) {
   const errors = form.formState.errors;
   const className = inputClassName(surface);
+  const rootError = errors.root?.message;
 
   return (
     <div className="space-y-4">
       <SettingsField
+        id="account-settings-current-password"
+        label="Current password"
+        error={errors.currentPassword?.message}
+      >
+        <PasswordInput
+          id="account-settings-current-password"
+          autoComplete="current-password"
+          className={className}
+          {...form.register("currentPassword")}
+        />
+      </SettingsField>
+      <SettingsField
         id="account-settings-password"
         label="New password"
-        description="Leave blank to keep your current password."
+        description={`At least ${MIN_PASSWORD_LENGTH} characters.`}
         error={errors.password?.message}
       >
         <PasswordInput
@@ -177,6 +206,31 @@ export function PasswordFields({ form, surface }: AccountSettingsFieldsProps) {
           {...form.register("confirmPassword")}
         />
       </SettingsField>
+      {reauthRequired ? (
+        <SettingsField
+          id="account-settings-password-nonce"
+          label="Verification code"
+          description="We sent a code to your email. Enter it to confirm this change."
+          error={errors.nonce?.message}
+        >
+          <Input
+            id="account-settings-password-nonce"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoCapitalize="none"
+            spellCheck={false}
+            className={className}
+            {...form.register("nonce")}
+          />
+        </SettingsField>
+      ) : null}
+      {rootError ? (
+        <p className="text-[0.8rem] font-medium text-destructive">{rootError}</p>
+      ) : successMessage ? (
+        <p className="text-[0.8rem] font-medium text-emerald-600 dark:text-emerald-400">
+          {successMessage}
+        </p>
+      ) : null}
     </div>
   );
 }

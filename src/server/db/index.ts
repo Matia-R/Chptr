@@ -4,7 +4,6 @@ export {
   getCurrentUserProfile,
   isUsernameAvailable,
   updateUserAvatar,
-  updateUserPassword,
   updateUserProfile,
   type UpdateUserProfileInput,
   type UserProfile,

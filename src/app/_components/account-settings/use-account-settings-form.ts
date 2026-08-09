@@ -32,8 +32,6 @@ function toFormValues(
     first_name: profile.first_name ?? "",
     last_name: profile.last_name ?? "",
     username: profile.username ?? "",
-    password: "",
-    confirmPassword: "",
   };
 }
 
@@ -41,11 +39,9 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "An unexpected error occurred";
 }
 
-
 /**
- * One form across every account field, so a single Save can commit the whole
- * surface. Profile, avatar, and password are separate mutations, so only the
- * groups that actually changed are sent.
+ * Profile + avatar form for account settings. Password changes use
+ * `useChangePassword` and never pass through this hook or tRPC.
  */
 export function useAccountSettingsForm({
   profile,
@@ -71,7 +67,6 @@ export function useAccountSettingsForm({
   );
 
   const updateProfile = api.user.updateProfile.useMutation();
-  const updatePassword = api.user.updatePassword.useMutation();
   const updateAvatar = api.user.updateAvatar.useMutation();
 
   const submit = form.handleSubmit(async (values) => {
@@ -82,15 +77,12 @@ export function useAccountSettingsForm({
       values.first_name !== (defaults?.first_name ?? "") ||
       values.last_name !== (defaults?.last_name ?? "") ||
       values.username !== (defaults?.username ?? "");
-    const passwordChanged = values.password.length > 0;
     const avatarChanged = avatar.isDirty;
 
-    if (!profileChanged && !passwordChanged && !avatarChanged) return;
+    if (!profileChanged && !avatarChanged) return;
 
     feedback.start();
 
-    // Reflects what is actually persisted, so a partial failure still resets
-    // the fields that did save.
     let savedProfile = {
       first_name: values.first_name,
       last_name: values.last_name,
@@ -130,8 +122,6 @@ export function useAccountSettingsForm({
           title: "Couldn't update profile",
           description: errorMessage(error),
         });
-        // Avatar already landed — sync cache and clear the draft so a retry
-        // only re-attempts profile fields.
         if (avatarSaved) {
           await utils.user.getCurrentUserProfile.invalidate();
           avatar.reset();
@@ -141,42 +131,15 @@ export function useAccountSettingsForm({
       }
     }
 
-    // Awaited so the refetched profile carries the new avatar URL before the
-    // draft stops overriding it, which would otherwise flash the old image.
     if (profileChanged || avatarSaved) {
       await utils.user.getCurrentUserProfile.invalidate();
     }
 
-    if (passwordChanged) {
-      try {
-        await updatePassword.mutateAsync({
-          password: values.password,
-          confirmPassword: values.confirmPassword,
-        });
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Couldn't update password",
-          description: errorMessage(error),
-        });
-        avatar.reset();
-        form.reset({
-          ...savedProfile,
-          password: values.password,
-          confirmPassword: values.confirmPassword,
-        });
-        await feedback.settle("failed");
-        return;
-      }
-    }
-
     avatar.reset();
-    form.reset({ ...savedProfile, password: "", confirmPassword: "" });
+    form.reset(savedProfile);
 
     await feedback.settle("saved");
 
-    // Deferred so the "Saved" state is visible before a surface that navigates
-    // away on success (the mobile drawer) leaves the screen.
     if (onSaved) feedback.runAfterResult(onSaved, SAVE_FEEDBACK_SETTLE_MS);
   });
 
@@ -186,10 +149,7 @@ export function useAccountSettingsForm({
     feedback.state === "saving" ||
     form.formState.isSubmitting ||
     updateProfile.isPending ||
-    updatePassword.isPending ||
     updateAvatar.isPending;
-  // Includes the success beat so the control stays non-interactive while
-  // "Saved" is on screen, without forcing disabled:opacity-50.
   const isBusy = isSaving || feedback.state === "saved";
   const isUsernameTaken = usernameAvailability.isTaken;
   const isUsernameUnresolved =
@@ -203,15 +163,8 @@ export function useAccountSettingsForm({
     isBusy,
     isUsernameTaken,
     usernameAvailabilityStatus: usernameAvailability.status,
-    /** Drives the Save control's spinner / checkmark. */
     saveState: feedback.state,
-    /** Whether a click should commit — distinct from the visual disabled state. */
     canSave: dirty && !isBusy && !isUsernameUnresolved,
-    /**
-     * Resting with nothing to save, or blocked while username availability is
-     * unresolved (checking / taken). Busy/success stay undimmed via the
-     * caller's disabled:opacity-100.
-     */
     saveDisabled: (!dirty && !isBusy) || isUsernameUnresolved,
   };
 }

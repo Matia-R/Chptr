@@ -4,14 +4,10 @@ import {
     getCurrentUserProfile,
     isUsernameAvailable,
     updateUserAvatar,
-    updateUserPassword,
     updateUserProfile,
 } from "~/server/db";
-import { passwordSchema, profileSchema } from "~/lib/account-schema";
+import { profileSchema } from "~/lib/account-schema";
 import { avatarPathSchema } from "~/lib/avatar-schema";
-
-/** Credential changes are sensitive: 10 attempts per minute per user. */
-const credentialRateLimit = rateLimitMiddleware(10, 60_000);
 
 /** Username checks are cheap but spam-prone. */
 const usernameCheckRateLimit = rateLimitMiddleware(30, 60_000);
@@ -57,15 +53,5 @@ export const userRouter = createTRPCRouter({
                 { supabase: ctx.supabase, userId: ctx.user.id },
                 input.path,
             );
-        }),
-    updatePassword: protectedProcedure
-        .use(credentialRateLimit)
-        .input(passwordSchema)
-        .mutation(async ({ ctx, input }) => {
-            await updateUserPassword(
-                { supabase: ctx.supabase, userId: ctx.user.id },
-                input.password,
-            );
-            return { success: true };
         }),
 });
