@@ -6,7 +6,6 @@ import { AtSign, ChevronRight, Lock, User } from "lucide-react";
 import { Button } from "~/app/_components/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -45,6 +44,7 @@ import {
   useAccountSettingsForm,
   type AccountSettingsProfile,
 } from "./use-account-settings-form";
+import { useChangePassword } from "./use-change-password";
 
 /** Field editors and password open the keyboard; the profile list does not. */
 const KEYBOARD_VIEWS: readonly AccountSettingsView[] = [
@@ -64,11 +64,29 @@ function isProfileField(view: AccountSettingsView): view is AccountProfileField 
   return (PROFILE_FIELDS as readonly string[]).includes(view);
 }
 
-/** Lets the header's Save button submit the form it sits outside of. */
-const DIALOG_FORM_ID = "account-settings-form";
+type DialogSectionId = "profile" | "password";
+
+const DIALOG_SECTIONS: readonly {
+  id: DialogSectionId;
+  label: string;
+  icon: typeof User;
+}[] = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "password", label: "Password", icon: Lock },
+];
+
+const PROFILE_FORM_ID = "account-settings-profile-form";
+const PASSWORD_FORM_ID = "account-settings-password-form";
+
+/** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
+const DIALOG_SHELL_CLASS =
+  "flex h-[min(90vh,34rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-white/20 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-sidebar";
 
 const DIALOG_HEADER_CLASS =
-  "shrink-0 border-b border-sidebar-border/70 px-6 pb-5 pt-6 dark:border-white/10";
+  "shrink-0 border-b border-sidebar-border/70 py-5 pl-6 pr-12 dark:border-white/10";
+
+const DIALOG_FOOTER_CLASS =
+  "flex shrink-0 items-center justify-end gap-2 border-t border-sidebar-border/70 px-6 py-4 dark:border-white/10";
 
 function LoadingFields({ rows }: { rows: number }) {
   return (
@@ -103,7 +121,7 @@ function DialogSection({
   return (
     <section>
       <div className="mb-4 space-y-0.5">
-        <h3 className="text-sm font-semibold text-sidebar-foreground">
+        <h3 className="text-base font-semibold tracking-tight text-sidebar-foreground">
           {title}
         </h3>
         <p className="text-xs text-muted-foreground">{description}</p>
@@ -113,21 +131,73 @@ function DialogSection({
   );
 }
 
+function AccountSettingsDialogNav({
+  section,
+  onSectionChange,
+}: {
+  section: DialogSectionId;
+  onSectionChange: (section: DialogSectionId) => void;
+}) {
+  return (
+    <nav
+      aria-label="Account sections"
+      className="flex w-44 shrink-0 flex-col gap-1 border-r border-sidebar-border/70 p-3 dark:border-white/10"
+    >
+      {DIALOG_SECTIONS.map(({ id, label, icon: Icon }) => {
+        const isActive = section === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onSectionChange(id)}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+              "outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              isActive
+                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+            )}
+            aria-current={isActive ? "page" : undefined}
+          >
+            <Icon className="size-4 shrink-0" aria-hidden />
+            {label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function AccountSettingsDialogBody({
   profile,
 }: {
   profile: AccountSettingsProfile;
 }) {
-  const {
-    form,
-    avatar,
-    submit,
-    isSaving,
-    isBusy,
-    saveDisabled,
-    saveState,
-    usernameAvailabilityStatus,
-  } = useAccountSettingsForm({ profile });
+  const [section, setSection] = React.useState<DialogSectionId>("profile");
+
+  const profileForm = useAccountSettingsForm({ profile });
+  const passwordForm = useChangePassword();
+
+  const active =
+    section === "profile"
+      ? {
+          formId: PROFILE_FORM_ID,
+          saveDisabled: profileForm.saveDisabled,
+          isBusy: profileForm.isBusy,
+          saveState: profileForm.saveState,
+          idleLabel: "Save Profile",
+          savingLabel: "Saving…",
+          savedLabel: "Saved",
+        }
+      : {
+          formId: PASSWORD_FORM_ID,
+          saveDisabled: passwordForm.saveDisabled,
+          isBusy: passwordForm.isBusy,
+          saveState: passwordForm.saveState,
+          idleLabel: "Update Password",
+          savingLabel: "Updating…",
+          savedLabel: "Updated",
+        };
 
   return (
     <>
@@ -135,58 +205,80 @@ function AccountSettingsDialogBody({
         titleAs={DialogTitle}
         title="Account"
         className={DIALOG_HEADER_CLASS}
-        action={
-          <div className="flex items-center gap-2">
-            <DialogClose asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button
-              type="submit"
-              form={DIALOG_FORM_ID}
-              size="sm"
-              className={cn(
-                "transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
-                // Busy/success stay undimmed so the feedback reads at full contrast.
-                isBusy && "disabled:opacity-100",
-              )}
-              disabled={saveDisabled || isBusy}
-            >
-              <SaveFeedbackLabel state={saveState} />
-            </Button>
-          </div>
-        }
       />
 
-      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-6 py-6">
-        <form id={DIALOG_FORM_ID} onSubmit={submit}>
-          <DialogSection
-            title="Profile"
-            description="Your photo, name, and the handle used in your public document URLs."
-          >
-            <ProfileFields
-              form={form}
-              surface="dialog"
-              avatar={avatar}
-              defaultAvatarColor={profile.default_avatar_background_color}
-              isSaving={isSaving}
-              usernameAvailabilityStatus={usernameAvailabilityStatus}
-            />
-          </DialogSection>
-        </form>
+      <div className="flex min-h-0 flex-1">
+        <AccountSettingsDialogNav
+          section={section}
+          onSectionChange={setSection}
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
+          {/* Keep both mounted so in-progress edits survive section switches. */}
+          <div hidden={section !== "profile"}>
+            <form
+              id={PROFILE_FORM_ID}
+              onSubmit={profileForm.submit}
+              className="space-y-4"
+            >
+              <DialogSection
+                title="Profile"
+                description="Your photo, name, and the handle used in your public document URLs."
+              >
+                <ProfileFields
+                  form={profileForm.form}
+                  surface="dialog"
+                  avatar={profileForm.avatar}
+                  defaultAvatarColor={profile.default_avatar_background_color}
+                  isSaving={profileForm.isSaving}
+                  usernameAvailabilityStatus={
+                    profileForm.usernameAvailabilityStatus
+                  }
+                />
+              </DialogSection>
+            </form>
+          </div>
+          <div hidden={section !== "password"}>
+            <DialogSection
+              title="Password"
+              description="Confirm your current password, then choose a new one of at least 8 characters."
+            >
+              <ChangePasswordSection
+                form={passwordForm.form}
+                formId={PASSWORD_FORM_ID}
+                onSubmit={passwordForm.submit}
+                reauthRequired={passwordForm.reauthRequired}
+                successMessage={
+                  passwordForm.saveState === "saved"
+                    ? "Password updated"
+                    : null
+                }
+              />
+            </DialogSection>
+          </div>
+        </div>
+      </div>
 
-        <DialogSection
-          title="Change Password"
-          description="Confirm your current password, then choose a new one of at least 8 characters."
+      <div className={DIALOG_FOOTER_CLASS}>
+        <Button
+          type="submit"
+          form={active.formId}
+          size="sm"
+          className={cn(
+            "active:scale-[0.98]",
+            // Animate only during save feedback — not when section switches
+            // flip enabled/disabled or the idle label.
+            active.isBusy &&
+              "transition-[transform,background-color,color,opacity] duration-200 ease-out disabled:opacity-100",
+          )}
+          disabled={active.saveDisabled}
         >
-          <ChangePasswordSection />
-        </DialogSection>
+          <SaveFeedbackLabel
+            state={active.saveState}
+            idleLabel={active.idleLabel}
+            savingLabel={active.savingLabel}
+            savedLabel={active.savedLabel}
+          />
+        </Button>
       </div>
     </>
   );
@@ -203,10 +295,7 @@ function AccountSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex max-h-[min(90vh,52rem)] flex-col gap-0 overflow-hidden border-white/20 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-sidebar"
-      >
+      <DialogContent className={DIALOG_SHELL_CLASS}>
         <DialogDescription className="sr-only">
           Manage your profile and password.
         </DialogDescription>
@@ -220,7 +309,9 @@ function AccountSettingsDialog({
               title="Account"
               className={DIALOG_HEADER_CLASS}
             />
-            {isLoading ? <LoadingFields rows={3} /> : <UnavailableBody />}
+            <div className="min-h-0 flex-1">
+              {isLoading ? <LoadingFields rows={3} /> : <UnavailableBody />}
+            </div>
           </>
         )}
       </DialogContent>

@@ -49,7 +49,9 @@ export function SaveFeedbackLabel({
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
-          key={`${state}:${label}`}
+          // Key by state only so idle label swaps (e.g. section changes) update
+          // instantly; animate only idle → saving → saved/failed.
+          key={state}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}

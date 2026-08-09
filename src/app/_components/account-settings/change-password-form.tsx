@@ -1,45 +1,41 @@
 "use client";
 
-import { Button } from "~/app/_components/button";
+import type { FormEventHandler } from "react";
+
 import {
   MobileDrawerFieldView,
   useMobileDrawerLeave,
 } from "~/app/_components/mobile-drawer";
 import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
-import { cn } from "~/lib/utils";
 
 import { ChangePasswordFields } from "./account-settings-fields";
-import { useChangePassword } from "./use-change-password";
+import {
+  useChangePassword,
+  type ChangePasswordFormApi,
+} from "./use-change-password";
 
-/** Desktop Change Password section with its own submit control. */
-export function ChangePasswordSection() {
-  const { form, submit, isBusy, saveDisabled, saveState, reauthRequired } =
-    useChangePassword();
-
+/** Desktop password fields — submit is owned by the dialog footer. */
+export function ChangePasswordSection({
+  form,
+  formId,
+  onSubmit,
+  reauthRequired,
+  successMessage,
+}: {
+  form: ChangePasswordFormApi;
+  formId: string;
+  onSubmit: FormEventHandler<HTMLFormElement>;
+  reauthRequired: boolean;
+  successMessage?: string | null;
+}) {
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form id={formId} onSubmit={onSubmit} className="space-y-4">
       <ChangePasswordFields
         form={form}
         surface="dialog"
         reauthRequired={reauthRequired}
-        successMessage={saveState === "saved" ? "Password updated" : null}
+        successMessage={successMessage}
       />
-      <Button
-        type="submit"
-        size="sm"
-        className={cn(
-          "transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
-          isBusy && "disabled:opacity-100",
-        )}
-        disabled={saveDisabled}
-      >
-        <SaveFeedbackLabel
-          state={saveState}
-          idleLabel="Update Password"
-          savingLabel="Updating…"
-          savedLabel="Updated"
-        />
-      </Button>
     </form>
   );
 }
