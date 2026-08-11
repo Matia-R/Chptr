@@ -60,11 +60,13 @@ export function MobileProfileFieldEdit({
   profile,
   onBack,
   onSaved,
+  onSavingChange,
 }: {
   field: AccountProfileField;
   profile: AccountSettingsProfile;
   onBack: () => void;
   onSaved: () => void;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const copy = FIELD_COPY[field];
   const initialValue = profileFieldValue(profile, field);
@@ -95,6 +97,13 @@ export function MobileProfileFieldEdit({
     feedback.inFlight ||
     feedback.state === "saving" ||
     feedback.state === "saved";
+  const isSaving = feedback.inFlight || feedback.state === "saving";
+
+  React.useEffect(() => {
+    onSavingChange?.(isSaving);
+    return () => onSavingChange?.(false);
+  }, [isSaving, onSavingChange]);
+
   const saveDisabled =
     !dirty ||
     isBusy ||

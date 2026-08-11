@@ -172,13 +172,21 @@ function AccountSettingsDialogNav({
 
 function AccountSettingsDialogBody({
   profile,
+  onSavingChange,
 }: {
   profile: AccountSettingsProfile;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const [section, setSection] = React.useState<DialogSectionId>("profile");
 
   const profileForm = useAccountSettingsForm({ profile });
   const passwordForm = useChangePassword();
+  const isSaving = profileForm.isSaving || passwordForm.isSaving;
+
+  React.useEffect(() => {
+    onSavingChange?.(isSaving);
+    return () => onSavingChange?.(false);
+  }, [isSaving, onSavingChange]);
 
   const active =
     section === "profile"
@@ -288,16 +296,40 @@ function AccountSettingsDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: profile, isLoading } = useUserProfile();
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!next && isSaving) return;
+      onOpenChange(next);
+    },
+    [isSaving, onOpenChange],
+  );
+
+  const preventDismissWhileSaving = React.useCallback(
+    (event: Event) => {
+      if (isSaving) event.preventDefault();
+    },
+    [isSaving],
+  );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={DIALOG_SHELL_CLASS}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className={DIALOG_SHELL_CLASS}
+        onEscapeKeyDown={preventDismissWhileSaving}
+        onPointerDownOutside={preventDismissWhileSaving}
+        onInteractOutside={preventDismissWhileSaving}
+      >
         <DialogDescription className="sr-only">
           Manage your profile and password.
         </DialogDescription>
 
         {profile ? (
-          <AccountSettingsDialogBody profile={profile} />
+          <AccountSettingsDialogBody
+            profile={profile}
+            onSavingChange={setIsSaving}
+          />
         ) : (
           <>
             <PanelHeader
@@ -328,8 +360,10 @@ function RowTrailing({ value }: { value?: string }) {
 
 function AccountSettingsDrawerBody({
   profile,
+  onSavingChange,
 }: {
   profile: AccountSettingsProfile;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const view = useAccountSettingsStore((state) => state.view);
   const setView = useAccountSettingsStore((state) => state.setView);
@@ -346,6 +380,13 @@ function AccountSettingsDrawerBody({
     useAccountSettingsForm({
       profile,
     });
+  const [childSaving, setChildSaving] = React.useState(false);
+  const dismissLocked = isSaving || childSaving;
+
+  React.useEffect(() => {
+    onSavingChange?.(dismissLocked);
+    return () => onSavingChange?.(false);
+  }, [dismissLocked, onSavingChange]);
 
   const openSubView = React.useCallback(
     (next: AccountSettingsView) => {
@@ -468,6 +509,7 @@ function AccountSettingsDrawerBody({
               profile={profile}
               onBack={returnToProfile}
               onSaved={returnToProfile}
+              onSavingChange={setChildSaving}
             />
           );
         }
@@ -477,6 +519,7 @@ function AccountSettingsDrawerBody({
             <MobileChangePassword
               onBack={returnToMain}
               onSaved={returnToMain}
+              onSavingChange={setChildSaving}
             />
           );
         }
@@ -495,11 +538,27 @@ function AccountSettingsDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: profile, isLoading } = useUserProfile();
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!next && isSaving) return;
+      onOpenChange(next);
+    },
+    [isSaving, onOpenChange],
+  );
 
   return (
-    <MobileMenuDrawer open={open} onOpenChange={onOpenChange}>
+    <MobileMenuDrawer
+      open={open}
+      onOpenChange={handleOpenChange}
+      dismissible={!isSaving}
+    >
       {profile ? (
-        <AccountSettingsDrawerBody profile={profile} />
+        <AccountSettingsDrawerBody
+          profile={profile}
+          onSavingChange={setIsSaving}
+        />
       ) : (
         <div className="pb-6">
           <MobileDrawerScreenHeader

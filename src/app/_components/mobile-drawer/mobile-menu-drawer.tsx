@@ -15,6 +15,11 @@ export type MobileMenuDrawerProps = {
   /** Optional trigger; omit when the drawer is opened from external state. */
   trigger?: ReactNode;
   className?: string;
+  /**
+   * When false, blocks swipe-to-dismiss and outside taps (Vaul `dismissible`).
+   * Default true.
+   */
+  dismissible?: boolean;
 };
 
 /**
@@ -29,11 +34,17 @@ export function MobileMenuDrawer({
   children,
   trigger,
   className,
+  dismissible = true,
 }: MobileMenuDrawerProps) {
   const { keyboardOffset, drawerStyle } = useMobileDrawerKeyboardOffset(open);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      repositionInputs={false}
+      dismissible={dismissible}
+    >
       {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
 
       <DrawerContent

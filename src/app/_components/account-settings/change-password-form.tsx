@@ -1,6 +1,7 @@
 "use client";
 
 import type { FormEventHandler } from "react";
+import * as React from "react";
 
 import {
   MobileDrawerFieldView,
@@ -44,9 +45,11 @@ export function ChangePasswordSection({
 export function MobileChangePassword({
   onBack,
   onSaved,
+  onSavingChange,
 }: {
   onBack: () => void;
   onSaved: () => void;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const leave = useMobileDrawerLeave();
   const {
@@ -60,6 +63,11 @@ export function MobileChangePassword({
   } = useChangePassword({
     onSaved: () => leave(onSaved),
   });
+
+  React.useEffect(() => {
+    onSavingChange?.(isSaving);
+    return () => onSavingChange?.(false);
+  }, [isSaving, onSavingChange]);
 
   return (
     <MobileDrawerFieldView
