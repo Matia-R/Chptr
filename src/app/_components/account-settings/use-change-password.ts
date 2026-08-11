@@ -43,10 +43,11 @@ export function useChangePassword({ onSaved }: { onSaved?: () => void } = {}) {
 
     feedback.start();
 
+    const trimmedNonce = values.nonce?.trim();
     const result = await changePasswordWithSupabase({
       currentPassword: values.currentPassword,
       password: values.password,
-      nonce: reauthRequired ? values.nonce?.trim() || undefined : undefined,
+      nonce: reauthRequired && trimmedNonce ? trimmedNonce : undefined,
     });
 
     if (result.status === "reauthentication_required") {

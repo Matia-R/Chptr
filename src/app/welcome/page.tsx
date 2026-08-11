@@ -13,7 +13,7 @@ export default async function WelcomePage() {
         const welcomeName = firstNameTrim.length > 0 ? firstNameTrim : "there";
 
         return <WelcomeClient userName={welcomeName} />;
-    } catch (error) {
+    } catch {
         // If user is not authenticated, redirect to login
         redirect('/login')
     }
