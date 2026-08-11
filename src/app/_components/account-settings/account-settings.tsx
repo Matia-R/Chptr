@@ -83,7 +83,7 @@ const PASSWORD_FORM_ID = "account-settings-password-form";
 
 /** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
 const DIALOG_SHELL_CLASS =
-  "flex h-[min(81vh,30.6rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl dark:bg-sidebar";
+  "flex h-[min(85vh,32.1rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl dark:bg-sidebar";
 
 const DIALOG_HEADER_CLASS = "shrink-0 py-5 pl-6 pr-12";
 
@@ -217,10 +217,7 @@ function AccountSettingsDialogBody({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-3">
           {/* Keep both mounted so in-progress edits survive section switches. */}
           <div hidden={section !== "profile"}>
-            <form
-              id={PROFILE_FORM_ID}
-              onSubmit={profileForm.submit}
-            >
+            <form id={PROFILE_FORM_ID} onSubmit={profileForm.submit}>
               <DialogSection
                 title="Profile"
                 description="Your photo, name, and the handle used in your public document URLs."
