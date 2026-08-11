@@ -31,6 +31,7 @@ import {
 } from "~/hooks/use-account-settings";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useUserProfile } from "~/hooks/use-user-profile";
+import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 
 import { ProfileFields } from "./account-settings-fields";
@@ -60,7 +61,9 @@ const PROFILE_FIELDS: readonly AccountProfileField[] = [
   "username",
 ];
 
-function isProfileField(view: AccountSettingsView): view is AccountProfileField {
+function isProfileField(
+  view: AccountSettingsView,
+): view is AccountProfileField {
   return (PROFILE_FIELDS as readonly string[]).includes(view);
 }
 
@@ -80,13 +83,12 @@ const PASSWORD_FORM_ID = "account-settings-password-form";
 
 /** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
 const DIALOG_SHELL_CLASS =
-  "flex h-[min(90vh,34rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-white/20 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-sidebar";
+  "flex h-[min(85vh,32.1rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl dark:bg-sidebar";
 
-const DIALOG_HEADER_CLASS =
-  "shrink-0 border-b border-sidebar-border/70 py-5 pl-6 pr-12 dark:border-white/10";
+const DIALOG_HEADER_CLASS = "shrink-0 py-5 pl-6 pr-12";
 
 const DIALOG_FOOTER_CLASS =
-  "flex shrink-0 items-center justify-end gap-2 border-t border-sidebar-border/70 px-6 py-4 dark:border-white/10";
+  "flex shrink-0 items-center justify-end gap-2 px-6 py-4";
 
 function LoadingFields({ rows }: { rows: number }) {
   return (
@@ -119,8 +121,8 @@ function DialogSection({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <div className="mb-4 space-y-0.5">
+    <section className={formSpacing.stack}>
+      <div className={formSpacing.tight}>
         <h3 className="text-base font-semibold tracking-tight text-sidebar-foreground">
           {title}
         </h3>
@@ -141,7 +143,7 @@ function AccountSettingsDialogNav({
   return (
     <nav
       aria-label="Account sections"
-      className="flex w-44 shrink-0 flex-col gap-1 border-r border-sidebar-border/70 p-3 dark:border-white/10"
+      className="flex w-44 shrink-0 flex-col gap-1 p-3"
     >
       {DIALOG_SECTIONS.map(({ id, label, icon: Icon }) => {
         const isActive = section === id;
@@ -212,14 +214,10 @@ function AccountSettingsDialogBody({
           section={section}
           onSectionChange={setSection}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-3">
           {/* Keep both mounted so in-progress edits survive section switches. */}
           <div hidden={section !== "profile"}>
-            <form
-              id={PROFILE_FORM_ID}
-              onSubmit={profileForm.submit}
-              className="space-y-4"
-            >
+            <form id={PROFILE_FORM_ID} onSubmit={profileForm.submit}>
               <DialogSection
                 title="Profile"
                 description="Your photo, name, and the handle used in your public document URLs."
@@ -248,9 +246,7 @@ function AccountSettingsDialogBody({
                 onSubmit={passwordForm.submit}
                 reauthRequired={passwordForm.reauthRequired}
                 successMessage={
-                  passwordForm.saveState === "saved"
-                    ? "Password updated"
-                    : null
+                  passwordForm.saveState === "saved" ? "Password updated" : null
                 }
               />
             </DialogSection>
@@ -346,16 +342,10 @@ function AccountSettingsDrawerBody({
     measureDeps: [profile],
   });
 
-  const {
-    avatar,
-    submit,
-    isSaving,
-    isBusy,
-    saveDisabled,
-    saveState,
-  } = useAccountSettingsForm({
-    profile,
-  });
+  const { avatar, submit, isSaving, isBusy, saveDisabled, saveState } =
+    useAccountSettingsForm({
+      profile,
+    });
 
   const openSubView = React.useCallback(
     (next: AccountSettingsView) => {

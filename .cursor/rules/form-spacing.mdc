@@ -1,0 +1,47 @@
+---
+description: Form spacing hierarchy — small/medium/large rhythm for settings, modals, and auth forms
+globs: src/app/**/*.{ts,tsx},src/app/_components/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Form spacing
+
+Import tokens from `~/lib/form-spacing` (`formSpacing.tight` / `.stack` / `.section`). Do not invent one-off `space-y-*` values for form layout.
+
+## Scale
+
+| Level | Token | Use for |
+|---|---|---|
+| Small | `formSpacing.tight` (`space-y-1.5`) | Title→description, label→input, input→helper/error, avatar→upload copy |
+| Medium | `formSpacing.stack` (`space-y-5`) | Related controls in the same section (name→username, password fields) |
+| Large | `formSpacing.section` (`space-y-8`) | Distinct sections (photo vs profile info) and content→actions |
+
+Horizontal siblings in a row use the matching `*Gap` token (`tightGap` / `stackGap` / `sectionGap`).
+
+## Grouping
+
+Think in logical groups, not identical gaps between every control:
+
+```tsx
+<div className={formSpacing.section}>
+  <AvatarField /> {/* internal: tight */}
+  <div className={formSpacing.stack}>
+    <NameFields />
+    <UsernameField />
+  </div>
+</div>
+```
+
+Section chrome (title + description) uses `tight` between those lines, then `stack` before the fields in that section.
+
+## Avoid
+
+- Cards, boxed groups, or heavy dividers used only to create hierarchy
+- Flat `space-y-4` (or any single value) across an entire form
+- Mixing raw Tailwind spacing with the tokens in the same form
+
+## Primitives
+
+- `FormItem` already uses the tight scale for label→control→message
+- Account settings `SettingsField` / `DialogSection` follow the same tokens
+- New settings pages, dialogs, and auth forms should compose the same way

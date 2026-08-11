@@ -29,7 +29,7 @@ export function ChangePasswordSection({
   successMessage?: string | null;
 }) {
   return (
-    <form id={formId} onSubmit={onSubmit} className="space-y-4">
+    <form id={formId} onSubmit={onSubmit}>
       <ChangePasswordFields
         form={form}
         surface="dialog"

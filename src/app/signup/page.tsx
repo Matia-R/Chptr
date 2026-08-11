@@ -17,6 +17,8 @@ import {
 } from "../_components/form";
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
+import { formSpacing } from "~/lib/form-spacing";
+import { cn } from "~/lib/utils";
 
 const formSchema = z
   .object({
@@ -84,127 +86,128 @@ export default function SignUpPage() {
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="w-full max-w-sm space-y-6"
+          className={cn("w-full max-w-sm", formSpacing.section)}
         >
-          <div className="mb-6 w-full items-start text-left">
+          <div className="w-full items-start text-left">
             <h1 className="text-2xl font-bold">Signup</h1>
           </div>
-          <FormField
-            control={form.control}
-            name="firstName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  First Name
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="First Name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="lastName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Last Name
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="Last Name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Username (optional)
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Username"
-                    autoComplete="username"
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      setAuthError(null);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Email
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="Email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Password
-                </FormLabel>
-                <FormControl>
-                  <PasswordInput placeholder="Password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Confirm Password
-                </FormLabel>
-                <FormControl>
-                  <PasswordInput placeholder="Confirm Password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {authError ? (
-            <div className="text-sm text-red-600">{authError}</div>
-          ) : null}
-
-          <Button
-            type="submit"
-            className="w-full py-2 text-sm font-medium"
-            disabled={isLoading}
-          >
-            Submit
-          </Button>
-
-          <div className="mt-6 w-full items-start text-left text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
-              Login
-            </Link>
+          <div className={formSpacing.stack}>
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    First Name
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="First Name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Last Name
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Last Name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Username (optional)
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Username"
+                      autoComplete="username"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        setAuthError(null);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Email
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Password
+                  </FormLabel>
+                  <FormControl>
+                    <PasswordInput placeholder="Password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Confirm Password
+                  </FormLabel>
+                  <FormControl>
+                    <PasswordInput placeholder="Confirm Password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {authError ? (
+              <div className="text-sm text-red-600">{authError}</div>
+            ) : null}
+          </div>
+          <div className={formSpacing.stack}>
+            <Button
+              type="submit"
+              className="w-full py-2 text-sm font-medium"
+              disabled={isLoading}
+            >
+              Submit
+            </Button>
+            <div className="w-full items-start text-left text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline">
+                Login
+              </Link>
+            </div>
           </div>
         </form>
       </Form>

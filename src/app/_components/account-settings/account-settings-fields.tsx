@@ -5,9 +5,9 @@ import * as React from "react";
 import { Input } from "~/app/_components/input";
 import { Label } from "~/app/_components/label";
 import { PasswordInput } from "~/app/_components/password-input";
-import { cn } from "~/lib/utils";
-
 import { MIN_PASSWORD_LENGTH } from "~/lib/account-schema";
+import { formSpacing } from "~/lib/form-spacing";
+import { cn } from "~/lib/utils";
 
 import { AvatarField } from "./avatar-field";
 import type { AccountSettingsFormApi } from "./use-account-settings-form";
@@ -45,7 +45,7 @@ function SettingsField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className={formSpacing.tight}>
       <Label htmlFor={id} className={cn(error && "text-destructive")}>
         {label}
       </Label>
@@ -89,7 +89,7 @@ export function ProfileFields({
   const lastName = form.watch("last_name");
 
   return (
-    <div className="space-y-4">
+    <div className={formSpacing.section}>
       <AvatarField
         draft={avatar}
         firstName={firstName}
@@ -97,54 +97,62 @@ export function ProfileFields({
         defaultAvatarColor={defaultAvatarColor}
         disabled={isSaving}
       />
-      <div className={cn(surface === "dialog" && "grid grid-cols-2 gap-4")}>
-        <SettingsField
-          id="account-settings-first-name"
-          label="First name"
-          error={errors.first_name?.message}
+      <div className={formSpacing.stack}>
+        <div
+          className={cn(
+            surface === "dialog" && "grid grid-cols-2",
+            surface === "dialog" && formSpacing.stackGap,
+            surface === "drawer" && formSpacing.stack,
+          )}
         >
-          <Input
+          <SettingsField
             id="account-settings-first-name"
-            autoComplete="given-name"
-            className={className}
-            {...form.register("first_name")}
-          />
-        </SettingsField>
+            label="First name"
+            error={errors.first_name?.message}
+          >
+            <Input
+              id="account-settings-first-name"
+              autoComplete="given-name"
+              className={className}
+              {...form.register("first_name")}
+            />
+          </SettingsField>
+          <SettingsField
+            id="account-settings-last-name"
+            label="Last name"
+            error={errors.last_name?.message}
+          >
+            <Input
+              id="account-settings-last-name"
+              autoComplete="family-name"
+              className={className}
+              {...form.register("last_name")}
+            />
+          </SettingsField>
+        </div>
         <SettingsField
-          id="account-settings-last-name"
-          label="Last name"
-          error={errors.last_name?.message}
+          id="account-settings-username"
+          label="Username"
+          description="Optional. Published documents live at /username/document."
+          error={errors.username?.message}
+          status={
+            usernameAvailabilityStatus === "idle" ? null : (
+              <UsernameAvailabilityFeedback
+                status={usernameAvailabilityStatus}
+              />
+            )
+          }
         >
           <Input
-            id="account-settings-last-name"
-            autoComplete="family-name"
+            id="account-settings-username"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
             className={className}
-            {...form.register("last_name")}
+            {...form.register("username")}
           />
         </SettingsField>
       </div>
-      <SettingsField
-        id="account-settings-username"
-        label="Username"
-        description="Optional. Published documents live at /username/document."
-        error={errors.username?.message}
-        status={
-          usernameAvailabilityStatus === "idle" ? null : (
-            <UsernameAvailabilityFeedback
-              status={usernameAvailabilityStatus}
-            />
-          )
-        }
-      >
-        <Input
-          id="account-settings-username"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          className={className}
-          {...form.register("username")}
-        />
-      </SettingsField>
     </div>
   );
 }
@@ -168,7 +176,7 @@ export function ChangePasswordFields({
   const rootError = errors.root?.message;
 
   return (
-    <div className="space-y-4">
+    <div className={formSpacing.stack}>
       <SettingsField
         id="account-settings-current-password"
         label="Current password"

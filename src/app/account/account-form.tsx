@@ -17,6 +17,8 @@ import {
   FormMessage,
 } from "../_components/form";
 import { Input } from "../_components/input";
+import { formSpacing } from "~/lib/form-spacing";
+import { cn } from "~/lib/utils";
 
 const formSchema = z.object({
   email: z
@@ -80,77 +82,81 @@ export default function AccountForm({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="w-full max-w-sm space-y-6"
+          className={cn("w-full max-w-sm", formSpacing.section)}
         >
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Email
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="Email" {...field} />
-                </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  Your email address.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Username (optional)
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="Username" {...field} />
-                </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  If set, your public docs use <span className="font-mono">/[username]/…</span>.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="first_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  First name
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="First name" {...field} />
-                </FormControl>
-                <FormDescription className="text-sm text-gray-500">
-                  Used for public URLs when username is not set (with last name).
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="last_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="block text-sm font-medium">
-                  Last name
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="Last name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className={formSpacing.stack}>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Email
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Email" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-sm text-gray-500">
+                    Your email address.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Username (optional)
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Username" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-sm text-gray-500">
+                    If set, your public docs use{" "}
+                    <span className="font-mono">/[username]/…</span>.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="first_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    First name
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="First name" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-sm text-gray-500">
+                    Used for public URLs when username is not set (with last
+                    name).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="last_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="block text-sm font-medium">
+                    Last name
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Last name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <Button type="submit" className="w-full py-2 text-sm font-medium">
             Update Profile
           </Button>
