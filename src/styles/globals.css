@@ -40,7 +40,10 @@ body {
     --destructive: 359 86% 66%;
     --destructive-foreground: 359 86% 66%;
     --border: 220 13% 87%;
-    --input: 220 13% 87%;
+    /* Quiet resting outline — definition without weight */
+    --input: 220 10% 90%;
+    /* One soft step off the page/modal surface */
+    --input-background: 30 14% 98.5%;
     --ring: 0 0% 3.9%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -78,7 +81,10 @@ body {
     --destructive: 359 86% 66%;
     --destructive-foreground: 359 86% 66%;
     --border: 0 0% 25%;
-    --input: 0 0% 25%;
+    /* Soft edge against the modal/sidebar surface */
+    --input: 0 0% 22%;
+    /* Slightly recessed vs sidebar (14%) / app (10%) */
+    --input-background: 0 0% 11.5%;
     --ring: 0 0% 83.1%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;

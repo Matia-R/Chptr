@@ -14,10 +14,9 @@ import { MobileDrawerNavHeader } from "./mobile-drawer-nav-header";
 import { useMobileDrawerLeave } from "./use-mobile-drawer-leave";
 import { focusMobileDrawerInput } from "./utils";
 
+/** Size/touch overrides only — surface styles come from `Input` / `formControlClassName`. */
 export const MOBILE_DRAWER_FIELD_INPUT_CLASS = cn(
-  "h-10 w-full rounded-lg border border-sidebar-border/70 bg-background/50 px-3 text-base shadow-inner",
-  "dark:border-white/[0.12] dark:bg-black/35",
-  "focus-visible:ring-1 focus-visible:ring-ring",
+  "h-10 w-full rounded-lg px-3 text-base",
 );
 
 export type MobileDrawerFieldViewProps = {

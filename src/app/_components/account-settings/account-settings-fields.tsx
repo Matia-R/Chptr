@@ -19,14 +19,9 @@ import { UsernameAvailabilityFeedback } from "./username-availability-feedback";
 /** Desktop stacks every group; mobile shows one drilled-into screen at a time. */
 export type AccountSettingsSurface = "dialog" | "drawer";
 
-const DRAWER_INPUT_CLASS = cn(
-  "h-10 w-full rounded-lg border border-sidebar-border/70 bg-background/50 px-3 text-base shadow-inner",
-  "dark:border-white/[0.12] dark:bg-black/35",
-  "focus-visible:ring-1 focus-visible:ring-ring",
-);
-
+/** Mobile uses taller touch targets; surface styling comes from `Input`. */
 function inputClassName(surface: AccountSettingsSurface) {
-  return surface === "drawer" ? DRAWER_INPUT_CLASS : undefined;
+  return surface === "drawer" ? "h-10 rounded-lg text-base" : undefined;
 }
 
 function SettingsField({
