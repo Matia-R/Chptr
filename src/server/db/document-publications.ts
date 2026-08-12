@@ -76,6 +76,116 @@ type PublicationSlugRow = {
   slug: string
 }
 
+type PublicationSlugWithDocumentRow = PublicationSlugRow & {
+  document_id: string
+}
+
+type PublicationRedirectTargetRow = {
+  to_owner_username: string
+  to_slug: string
+}
+
+type PublicationRedirectFromRow = {
+  from_owner_username: string
+  from_slug: string
+}
+
+/**
+ * Records a path-exact redirect and collapses any existing redirects that
+ * pointed at the old path so old URLs resolve in one hop to the latest path.
+ */
+async function recordPublicationPathRedirect(
+  supabase: AuthContext['supabase'],
+  input: {
+    fromOwnerUsername: string
+    fromSlug: string
+    toOwnerUsername: string
+    toSlug: string
+    documentId: string
+    creatorId: string
+  }
+): Promise<void> {
+  const fromU = normalizePublicationUsername(input.fromOwnerUsername)
+  const toU = normalizePublicationUsername(input.toOwnerUsername)
+  const fromS = input.fromSlug.trim().toLowerCase()
+  const toS = input.toSlug.trim().toLowerCase()
+
+  if (fromU === toU && fromS === toS) return
+  if (!isValidOwnerPathSegment(fromU) || !isValidOwnerPathSegment(toU)) return
+  if (!isValidPublicationSlug(fromS) || !isValidPublicationSlug(toS)) return
+
+  const now = new Date().toISOString()
+
+  // Would-be identity after collapse: delete instead of updating.
+  const { error: identityDeleteError } = await supabase
+    .from('document_publication_redirects')
+    .delete()
+    .eq('to_owner_username', fromU)
+    .eq('to_slug', fromS)
+    .eq('from_owner_username', toU)
+    .eq('from_slug', toS)
+
+  if (identityDeleteError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: identityDeleteError.message,
+    })
+  }
+
+  const { error: collapseError } = await supabase
+    .from('document_publication_redirects')
+    .update({
+      to_owner_username: toU,
+      to_slug: toS,
+      updated_at: now,
+    })
+    .eq('to_owner_username', fromU)
+    .eq('to_slug', fromS)
+
+  if (collapseError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: collapseError.message,
+    })
+  }
+
+  // Destination path must not redirect away (avoids loops).
+  const { error: destDeleteError } = await supabase
+    .from('document_publication_redirects')
+    .delete()
+    .eq('from_owner_username', toU)
+    .eq('from_slug', toS)
+
+  if (destDeleteError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: destDeleteError.message,
+    })
+  }
+
+  const { error: upsertError } = await supabase
+    .from('document_publication_redirects')
+    .upsert(
+      {
+        from_owner_username: fromU,
+        from_slug: fromS,
+        to_owner_username: toU,
+        to_slug: toS,
+        document_id: input.documentId,
+        creator_id: input.creatorId,
+        updated_at: now,
+      },
+      { onConflict: 'from_owner_username,from_slug' }
+    )
+
+  if (upsertError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: upsertError.message,
+    })
+  }
+}
+
 async function allocateSlug(
   supabase: AuthContext['supabase'],
   ownerUsername: string,
@@ -105,16 +215,73 @@ async function allocateSlug(
     }
 
     const data = slugRowRaw as PublicationIdRow | null
-
-    if (!data || data.document_id === documentId) {
-      return candidate
+    if (data && data.document_id !== documentId) {
+      continue
     }
+
+    // Redirect targets reserve old paths so another doc can't claim them.
+    const { data: redirectRowRaw, error: redirectLookupError } = await supabase
+      .from('document_publication_redirects')
+      .select('document_id')
+      .eq('from_owner_username', ownerUsername)
+      .eq('from_slug', candidate)
+      .maybeSingle()
+
+    if (redirectLookupError) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Slug redirect check failed: ${redirectLookupError.message}`,
+      })
+    }
+
+    const redirectRow = redirectRowRaw as PublicationIdRow | null
+    if (redirectRow && redirectRow.document_id !== documentId) {
+      continue
+    }
+
+    return candidate
   }
 
   throw new TRPCError({
     code: 'BAD_REQUEST',
     message: 'Could not allocate a unique slug; try a different title.',
   })
+}
+
+/**
+ * Path-exact publication redirect. Checked before live publication lookup so
+ * vacated usernames keep resolving even if another user later claims the path.
+ */
+export async function getPublicationRedirectByUsernameSlug(
+  ownerUsername: string,
+  slug: string,
+  supabase: AuthContext['supabase']
+): Promise<{ toOwnerUsername: string; toSlug: string } | null> {
+  const u = normalizePublicationUsername(ownerUsername)
+  const s = slug.trim().toLowerCase()
+  if (!isValidOwnerPathSegment(u) || !isValidPublicationSlug(s)) return null
+
+  const redirectResult = await supabase
+    .from('document_publication_redirects')
+    .select('to_owner_username, to_slug')
+    .eq('from_owner_username', u)
+    .eq('from_slug', s)
+    .maybeSingle()
+
+  if (redirectResult.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: redirectResult.error.message,
+    })
+  }
+
+  const row = redirectResult.data as PublicationRedirectTargetRow | null
+  if (!row) return null
+
+  return {
+    toOwnerUsername: row.to_owner_username,
+    toSlug: row.to_slug,
+  }
 }
 
 export async function getPublicationByUsernameSlug(
@@ -183,6 +350,19 @@ export const getPublicationWithAuthorByUsernameSlug = cache(
       publication,
       authorProfile: profileResult.data as PublishedAuthorProfileRow | null,
     }
+  }
+)
+
+/**
+ * Cached redirect lookup for public `/[username]/[slug]` (shared by page + metadata).
+ */
+export const getCachedPublicationRedirectByUsernameSlug = cache(
+  async (
+    ownerUsername: string,
+    slug: string
+  ): Promise<{ toOwnerUsername: string; toSlug: string } | null> => {
+    const supabase = await createClient()
+    return getPublicationRedirectByUsernameSlug(ownerUsername, slug, supabase)
   }
 )
 
@@ -471,7 +651,29 @@ export async function publishDocument(
     priorPub &&
     (priorPub.slug !== finalSlug || priorPub.owner_username !== ownerUsername)
   ) {
+    await recordPublicationPathRedirect(supabase, {
+      fromOwnerUsername: priorPub.owner_username,
+      fromSlug: priorPub.slug,
+      toOwnerUsername: ownerUsername,
+      toSlug: finalSlug,
+      documentId: input.documentId,
+      creatorId: doc.creator_id,
+    })
     revalidatePath(`/${priorPub.owner_username}/${priorPub.slug}`)
+  }
+
+  // Live publication path must not also be a redirect source.
+  const { error: liveRedirectDeleteError } = await supabase
+    .from('document_publication_redirects')
+    .delete()
+    .eq('from_owner_username', ownerUsername)
+    .eq('from_slug', finalSlug)
+
+  if (liveRedirectDeleteError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: liveRedirectDeleteError.message,
+    })
   }
 
   const path = `/${ownerUsername}/${finalSlug}`
@@ -516,6 +718,20 @@ export async function unpublishDocument(documentId: string, auth: AuthContext) {
 
   const existing = existingResult.data as PublicationSlugRow | null
 
+  const redirectsResult = await supabase
+    .from('document_publication_redirects')
+    .select('from_owner_username, from_slug')
+    .eq('document_id', documentId)
+
+  if (redirectsResult.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: redirectsResult.error.message,
+    })
+  }
+
+  const redirects = (redirectsResult.data ?? []) as PublicationRedirectFromRow[]
+
   const { error: delError } = await supabase
     .from('document_publications')
     .delete()
@@ -528,8 +744,23 @@ export async function unpublishDocument(documentId: string, auth: AuthContext) {
     })
   }
 
+  const { error: redirectDelError } = await supabase
+    .from('document_publication_redirects')
+    .delete()
+    .eq('document_id', documentId)
+
+  if (redirectDelError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: redirectDelError.message,
+    })
+  }
+
   if (existing) {
     revalidatePath(`/${existing.owner_username}/${existing.slug}`)
+  }
+  for (const row of redirects) {
+    revalidatePath(`/${row.from_owner_username}/${row.from_slug}`)
   }
 
   return { success: true as const }
@@ -538,7 +769,8 @@ export async function unpublishDocument(documentId: string, auth: AuthContext) {
 /**
  * Rewrites `document_publications.owner_username` for every publication owned by
  * this user so public URLs track the current profile path segment (username or
- * name fallback). Called after profile updates that change that segment.
+ * name fallback). Writes path-exact redirects from old URLs and collapses
+ * redirect chains. Called after profile updates that change that segment.
  */
 export async function syncPublicationOwnerUsernameForCreator(
   auth: AuthContext,
@@ -552,7 +784,7 @@ export async function syncPublicationOwnerUsernameForCreator(
 
   const existingResult = await supabase
     .from('document_publications')
-    .select('owner_username, slug')
+    .select('document_id, owner_username, slug')
     .eq('creator_id', userId)
 
   if (existingResult.error) {
@@ -562,12 +794,41 @@ export async function syncPublicationOwnerUsernameForCreator(
     })
   }
 
-  const existing = (existingResult.data ?? []) as PublicationSlugRow[]
+  const existing = (existingResult.data ?? []) as PublicationSlugWithDocumentRow[]
   const stale = existing.filter(
     (row) => row.owner_username !== nextOwnerUsername
   )
   if (stale.length === 0) {
     return
+  }
+
+  for (const row of stale) {
+    const { data: blockingRedirectRaw, error: blockingRedirectError } =
+      await supabase
+        .from('document_publication_redirects')
+        .select('document_id')
+        .eq('from_owner_username', nextOwnerUsername)
+        .eq('from_slug', row.slug)
+        .maybeSingle()
+
+    if (blockingRedirectError) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: blockingRedirectError.message,
+      })
+    }
+
+    const blockingRedirect = blockingRedirectRaw as PublicationIdRow | null
+    if (
+      blockingRedirect &&
+      blockingRedirect.document_id !== row.document_id
+    ) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message:
+          'That username conflicts with a reserved published URL. Unpublish or rename the conflicting document, then try again.',
+      })
+    }
   }
 
   const { error: updateError } = await supabase
@@ -594,6 +855,14 @@ export async function syncPublicationOwnerUsernameForCreator(
   }
 
   for (const row of stale) {
+    await recordPublicationPathRedirect(supabase, {
+      fromOwnerUsername: row.owner_username,
+      fromSlug: row.slug,
+      toOwnerUsername: nextOwnerUsername,
+      toSlug: row.slug,
+      documentId: row.document_id,
+      creatorId: userId,
+    })
     revalidatePath(`/${row.owner_username}/${row.slug}`)
     revalidatePath(`/${nextOwnerUsername}/${row.slug}`)
   }

@@ -26,6 +26,8 @@ export {
   authorDisplayLabel,
   getPublicationByUsernameSlug,
   getPublicationWithAuthorByUsernameSlug,
+  getCachedPublicationRedirectByUsernameSlug,
+  getPublicationRedirectByUsernameSlug,
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,

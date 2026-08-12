@@ -12,3 +12,4 @@ Older tables in your project may have been created before this repo’s filename
 | File | Purpose |
 |------|--------|
 | `document_publications.sql` | Public published docs: `/[owner segment]/[slug]`, RLS |
+| `document_publication_redirects.sql` | Path redirects after username/slug changes; redirect-before-publication lookup |
