@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "~/lib/utils";
 
 /**
  * Shared by the avatar picker, the upload helper, and the tRPC user router.
@@ -55,7 +56,7 @@ export function validateAvatarFile(file: File): string | null {
  */
 export function buildAvatarPath(userId: string, file: File): string {
   const extension = EXTENSION_BY_TYPE[file.type] ?? "png";
-  return `${userId}/${crypto.randomUUID()}.${extension}`;
+  return `${userId}/${randomUUID()}.${extension}`;
 }
 
 /**

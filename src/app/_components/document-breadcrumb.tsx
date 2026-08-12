@@ -15,7 +15,11 @@ import {
   PopoverTrigger,
 } from "~/app/_components/popover";
 import { Input } from "~/app/_components/input";
-import { MobileFormDrawer } from "~/app/_components/mobile-drawer";
+import {
+  focusMobileDrawerInput,
+  MobileFormDrawer,
+  runWithMobileDrawerOpenSync,
+} from "~/app/_components/mobile-drawer";
 import { useIsMobile } from "~/hooks/use-mobile";
 
 export function DocumentBreadcrumb() {
@@ -156,7 +160,12 @@ export function DocumentBreadcrumb() {
   const openTitleEditor = React.useCallback(() => {
     setEditingName(document?.document?.name ?? "Untitled");
     if (isMobile) {
-      setDrawerOpen(true);
+      runWithMobileDrawerOpenSync(() => {
+        setDrawerOpen(true);
+      });
+      // Controlled open can't recover the gesture after the fact — focus here
+      // (FieldView layout-effect also runs during the sync mount).
+      focusMobileDrawerInput(titleInputRef.current);
     } else {
       setPopoverOpen(true);
     }

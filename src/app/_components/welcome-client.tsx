@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { useCallback } from "react";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { randomUUID } from "~/lib/utils";
 
 interface WelcomeClientProps {
   userName: string;
@@ -14,7 +15,7 @@ export function WelcomeClient({ userName }: WelcomeClientProps) {
 
   // Instant document creation - navigate immediately with a new UUID
   const handleGetStarted = useCallback(() => {
-    const newId = crypto.randomUUID();
+    const newId = randomUUID();
     markDocumentAsNew(newId);
     router.push(`/documents/${newId}`);
   }, [router]);

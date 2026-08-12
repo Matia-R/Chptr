@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  useEffect,
+  useLayoutEffect,
   useRef,
   type FormEvent,
   type ReactNode,
@@ -75,20 +75,19 @@ export function MobileDrawerFieldView({
   const rootRef = useRef<HTMLElement | null>(null);
   const leave = useMobileDrawerLeave();
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect/rAF): iOS Safari only opens the keyboard when
+  // focus runs in the same turn as the user gesture. Pair with flushSync when
+  // mounting this view (see goToView / runWithMobileDrawerOpenSync).
+  useLayoutEffect(() => {
     if (!autoFocus) return;
 
-    const frame = requestAnimationFrame(() => {
-      const input = rootRef.current?.querySelector("input, textarea");
-      if (
-        input instanceof HTMLInputElement ||
-        input instanceof HTMLTextAreaElement
-      ) {
-        focusMobileDrawerInput(input);
-      }
-    });
-
-    return () => cancelAnimationFrame(frame);
+    const input = rootRef.current?.querySelector("input, textarea");
+    if (
+      input instanceof HTMLInputElement ||
+      input instanceof HTMLTextAreaElement
+    ) {
+      focusMobileDrawerInput(input);
+    }
   }, [autoFocus]);
 
   const handleBack = () => {

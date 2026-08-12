@@ -17,6 +17,7 @@ import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { useTheme } from "next-themes";
+import { randomUUID } from "~/lib/utils";
 
 export function CommandMenu() {
   const [search, setSearch] = useState("");
@@ -30,7 +31,7 @@ export function CommandMenu() {
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
-    const newId = crypto.randomUUID();
+    const newId = randomUUID();
     markDocumentAsNew(newId);
     router.push(`/documents/${newId}`);
     closeAll();
