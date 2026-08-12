@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebrtcProvider } from "y-webrtc";
 import { api } from "~/trpc/react";
+import { randomUUID } from "~/lib/utils";
 
 interface UseCollaborativeDocCrdtOptions {
   documentId: string;
@@ -22,7 +23,7 @@ interface UseCollaborativeDocCrdtResult {
 /* -------------------------------- Helpers -------------------------------- */
 
 function generateClientId(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 function base64ToUint8Array(base64: string): Uint8Array {

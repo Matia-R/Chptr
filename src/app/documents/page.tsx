@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { useCallback } from "react";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { randomUUID } from "~/lib/utils";
 
 export default function DocumentsPage() {
   const router = useRouter();
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
-    const newId = crypto.randomUUID();
+    const newId = randomUUID();
     markDocumentAsNew(newId);
     router.push(`/documents/${newId}`);
   }, [router]);

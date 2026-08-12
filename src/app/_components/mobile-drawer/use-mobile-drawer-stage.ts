@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 
 import {
   MOBILE_DRAWER_KEYBOARD_CLEARANCE_PX,
@@ -75,10 +76,21 @@ export function useMobileDrawerStage<T extends string>({
 
   const goToView = useCallback(
     (next: T, nextDirection: number) => {
-      setDirection(nextDirection);
-      setView(next);
+      const apply = () => {
+        setDirection(nextDirection);
+        setView(next);
+      };
+
+      // Keyboard fields must mount inside the tap so FieldView's layout-effect
+      // focus can open the iOS software keyboard.
+      if (isKeyboardView(next)) {
+        flushSync(apply);
+        return;
+      }
+
+      apply();
     },
-    [setView],
+    [isKeyboardView, setView],
   );
 
   const measureMainStage = useCallback(() => {

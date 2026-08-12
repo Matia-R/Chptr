@@ -26,5 +26,6 @@ export {
   applyMobileDrawerKeyboardInset,
   focusMobileDrawerInput,
   resetMobileDrawerKeyboardStyles,
+  runWithMobileDrawerOpenSync,
   waitForMobileDrawerKeyboardDismiss,
 } from "./utils";

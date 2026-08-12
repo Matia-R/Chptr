@@ -1,4 +1,15 @@
+import { flushSync } from "react-dom";
+
 import { MOBILE_DRAWER_KEYBOARD_SHELL_EXTRA_PX } from "./constants";
+
+/**
+ * Run state updates that mount a keyboard field inside the current user
+ * gesture. Required for iOS Safari to open the software keyboard — deferred
+ * focus (useEffect / rAF / animation complete) will not.
+ */
+export function runWithMobileDrawerOpenSync(update: () => void) {
+  flushSync(update);
+}
 
 /** Clear Vaul inline styles applied while the keyboard was open. */
 export function resetMobileDrawerKeyboardStyles() {

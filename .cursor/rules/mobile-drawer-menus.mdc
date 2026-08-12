@@ -32,7 +32,10 @@ Standalone single-field edit (no stack): `MobileFormDrawer`.
 
 - **Back** from a field screen: always dismiss via `MobileDrawerFieldView` (default) or `useMobileDrawerLeave()` so the previous view does not resize against a shifting visual viewport.
 - **Async save then navigate**: `dismissKeyboardOnDone={false}` on `MobileDrawerFieldView`, then `leave(onSaved)` after success (`useMobileDrawerLeave`).
-- **Autofocus**: built into `MobileDrawerFieldView` (first `input`/`textarea`). Prefer that over manual focus + timeouts.
+- **Autofocus / iOS keyboard**: Safari only opens the keyboard when focus runs in the **same user-gesture turn** as the tap. The kit handles this when you:
+  - Drill into a `keyboardView` via `stage.goToView` (flushSync + `MobileDrawerFieldView` layout-effect focus), or
+  - Open a controlled field drawer with `runWithMobileDrawerOpenSync(() => setOpen(true))` then `focusMobileDrawerInput(ref.current)` (see `document-breadcrumb.tsx`).
+  Do **not** rely on `useEffect`, `requestAnimationFrame`, or animation-complete handlers to open the keyboard.
 
 ## Do not
 
@@ -49,6 +52,11 @@ mainMeasureRef.current ?? stageRef.current;
 
 // ❌ Navigate back while keyboard is up without wait/blur
 onBack={stage.returnToView("profile")};
+
+// ❌ Deferred focus — focuses the input on device but does not open the keyboard
+useEffect(() => {
+  requestAnimationFrame(() => inputRef.current?.focus());
+}, [open]);
 ```
 
 ```tsx
@@ -59,6 +67,10 @@ useMobileDrawerStage({ view, setView, mainView: "main", keyboardView: KEYBOARD_V
 <MobileDrawerFieldView title="…" onBack={() => stage.returnToView("profile")} onDone={…}>
   <Input className={MOBILE_DRAWER_FIELD_INPUT_CLASS} />
 </MobileDrawerFieldView>
+
+// ✅ Controlled single-field open (standalone drawer)
+runWithMobileDrawerOpenSync(() => setOpen(true));
+focusMobileDrawerInput(inputRef.current);
 ```
 
 ## Wiring checklist

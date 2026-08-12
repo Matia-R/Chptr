@@ -24,6 +24,7 @@ import { MobileActionGroup } from "./mobile-action-rows";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { randomUUID } from "~/lib/utils";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[];
@@ -86,7 +87,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
   // Instant document creation with optimistic sidebar update
   const handleCreateDocument = React.useCallback(() => {
-    const newId = crypto.randomUUID();
+    const newId = randomUUID();
 
     // Mark as new for the document page
     markDocumentAsNew(newId);
