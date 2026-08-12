@@ -133,6 +133,8 @@ export function MobileProfileFieldEdit({
         username: field === "username" ? trimmed : (profile.username ?? ""),
       });
       await utils.user.getCurrentUserProfile.invalidate();
+      await utils.document.getPublicationByDocumentId.invalidate();
+      await utils.document.getPublicationOwnerPathSegment.invalidate();
       await feedback.settle("saved");
       feedback.runAfterResult(() => {
         leave(onSaved);

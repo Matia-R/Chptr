@@ -534,3 +534,68 @@ export async function unpublishDocument(documentId: string, auth: AuthContext) {
 
   return { success: true as const }
 }
+
+/**
+ * Rewrites `document_publications.owner_username` for every publication owned by
+ * this user so public URLs track the current profile path segment (username or
+ * name fallback). Called after profile updates that change that segment.
+ */
+export async function syncPublicationOwnerUsernameForCreator(
+  auth: AuthContext,
+  nextOwnerUsername: string
+): Promise<void> {
+  if (!isValidOwnerPathSegment(nextOwnerUsername)) {
+    return
+  }
+
+  const { supabase, userId } = auth
+
+  const existingResult = await supabase
+    .from('document_publications')
+    .select('owner_username, slug')
+    .eq('creator_id', userId)
+
+  if (existingResult.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: existingResult.error.message,
+    })
+  }
+
+  const existing = (existingResult.data ?? []) as PublicationSlugRow[]
+  const stale = existing.filter(
+    (row) => row.owner_username !== nextOwnerUsername
+  )
+  if (stale.length === 0) {
+    return
+  }
+
+  const { error: updateError } = await supabase
+    .from('document_publications')
+    .update({
+      owner_username: nextOwnerUsername,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('creator_id', userId)
+    .neq('owner_username', nextOwnerUsername)
+
+  if (updateError) {
+    if (updateError.code === '23505') {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message:
+          'That username conflicts with an existing published URL. Unpublish or rename the conflicting document, then try again.',
+      })
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: updateError.message,
+    })
+  }
+
+  for (const row of stale) {
+    revalidatePath(`/${row.owner_username}/${row.slug}`)
+    revalidatePath(`/${nextOwnerUsername}/${row.slug}`)
+  }
+}
+

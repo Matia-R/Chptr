@@ -1,5 +1,10 @@
 import { TRPCError } from '@trpc/server'
 import { AVATAR_BUCKET } from '~/lib/avatar-schema'
+import {
+  isValidOwnerPathSegment,
+  publicationOwnerPathSegment,
+} from '~/lib/slug'
+import { syncPublicationOwnerUsernameForCreator } from './document-publications'
 import { createClient, type AuthContext } from './shared'
 
 export type UserProfile = {
@@ -59,6 +64,23 @@ export async function updateUserProfile(
   auth: AuthContext,
   input: UpdateUserProfileInput
 ): Promise<UserProfile> {
+  const previousResult = await auth.supabase
+    .from('profiles')
+    .select('username, first_name, last_name')
+    .eq('id', auth.userId)
+    .maybeSingle<{
+      username: string | null
+      first_name: string | null
+      last_name: string | null
+    }>()
+
+  if (previousResult.error) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to load profile before update',
+    })
+  }
+
   const { data, error } = await auth.supabase
     .from('profiles')
     .upsert({
@@ -82,6 +104,24 @@ export async function updateUserProfile(
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to update profile',
     })
+  }
+
+  const previousSegment = publicationOwnerPathSegment({
+    username: previousResult.data?.username,
+    first_name: previousResult.data?.first_name,
+    last_name: previousResult.data?.last_name,
+  })
+  const nextSegment = publicationOwnerPathSegment({
+    username: data.username,
+    first_name: data.first_name,
+    last_name: data.last_name,
+  })
+
+  if (
+    previousSegment !== nextSegment &&
+    isValidOwnerPathSegment(nextSegment)
+  ) {
+    await syncPublicationOwnerUsernameForCreator(auth, nextSegment)
   }
 
   return data

@@ -133,6 +133,10 @@ export function useAccountSettingsForm({
 
     if (profileChanged || avatarSaved) {
       await utils.user.getCurrentUserProfile.invalidate();
+      if (profileChanged) {
+        await utils.document.getPublicationByDocumentId.invalidate();
+        await utils.document.getPublicationOwnerPathSegment.invalidate();
+      }
     }
 
     avatar.reset();
