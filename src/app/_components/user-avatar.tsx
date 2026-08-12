@@ -61,17 +61,19 @@ export function UserAvatar({
     })();
 
   return (
-    <Avatar className={cn("h-8 w-8 rounded-full", className)}>
-      {src ? (
-        <AvatarImage src={src} alt={altText} />
-      ) : (
-        <AvatarFallback
-          className={avatarFallbackClassName}
-          style={avatarFallbackStyle}
-        >
-          {initials}
-        </AvatarFallback>
-      )}
+    // Remount when the image is cleared/replaced so Radix resets
+    // `imageLoadingStatus` — otherwise Fallback stays hidden after a load.
+    <Avatar
+      key={src || "fallback"}
+      className={cn("h-8 w-8 rounded-full", className)}
+    >
+      {src ? <AvatarImage src={src} alt={altText} /> : null}
+      <AvatarFallback
+        className={avatarFallbackClassName}
+        style={avatarFallbackStyle}
+      >
+        {initials}
+      </AvatarFallback>
     </Avatar>
   );
 }

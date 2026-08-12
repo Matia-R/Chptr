@@ -13,6 +13,7 @@ import {
   useFormContext,
 } from "react-hook-form"
 
+import { formSpacing } from "~/lib/form-spacing"
 import { cn } from "~/lib/utils"
 import { Label } from "~/app/_components/label"
 
@@ -81,7 +82,7 @@ const FormItem = React.forwardRef<
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div ref={ref} className={cn("space-y-2", className)} {...props} />
+      <div ref={ref} className={cn(formSpacing.tight, className)} {...props} />
     </FormItemContext.Provider>
   )
 })

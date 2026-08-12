@@ -12,10 +12,13 @@ export const MOBILE_DRAWER_TITLE_CLASS =
 export const MOBILE_DRAWER_SHELL_CLASS =
   "h-auto max-h-none overflow-hidden p-0";
 
-/** Default extra stage height for keyboard / accessory clearance. */
-export const MOBILE_DRAWER_KEYBOARD_CLEARANCE_PX = 72;
+/** Default extra stage height above measured keyboard-view content. */
+export const MOBILE_DRAWER_KEYBOARD_CLEARANCE_PX = 24;
 
-/** Additional drawer shell height above the visual viewport when the keyboard is open. */
+/**
+ * Legacy: grow the Vaul shell to the visual viewport while the keyboard is open.
+ * Prefer `MobileMenuDrawer` + content-measured stages instead.
+ */
 export const MOBILE_DRAWER_KEYBOARD_SHELL_EXTRA_PX = 56;
 
 export const mobileDrawerViewVariants = {

@@ -1,5 +1,13 @@
 export type { AuthContext } from './shared'
-export { getCurrentUser, getCurrentUserProfile } from './auth'
+export {
+  getCurrentUser,
+  getCurrentUserProfile,
+  isUsernameAvailable,
+  updateUserAvatar,
+  updateUserProfile,
+  type UpdateUserProfileInput,
+  type UserProfile,
+} from './auth'
 export {
   createDocument,
   getDocumentById,
@@ -18,6 +26,8 @@ export {
   authorDisplayLabel,
   getPublicationByUsernameSlug,
   getPublicationWithAuthorByUsernameSlug,
+  getCachedPublicationRedirectByUsernameSlug,
+  getPublicationRedirectByUsernameSlug,
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,

@@ -1,0 +1,74 @@
+---
+description: Mobile drill-down drawer menus — use the shared kit; do not reinvent sizing/keyboard behavior
+globs: src/app/_components/mobile-drawer/**/*.{ts,tsx},src/app/_components/account-settings/**/*.{ts,tsx},src/app/_components/document-actions.tsx,src/app/_components/document-breadcrumb.tsx,src/app/_components/editor/document-publish-panels.tsx
+alwaysApply: false
+---
+
+# Mobile drawer menus
+
+Build mobile drill-down menus with `~/app/_components/mobile-drawer`. Defaults already match Account + Document Actions. Prefer composing these primitives over custom Vaul height/keyboard logic.
+
+## Recipe (new menu)
+
+1. **Shell** — `MobileMenuDrawer` (keyboard offset + content-sized shell). Do not hand-wire `useMobileDrawerKeyboardOffset` + `MOBILE_DRAWER_SHELL_CLASS` unless you have a special case.
+2. **Stage** — `useMobileDrawerStage` + `MobileDrawerViewStack`. Pass `mainView`, `keyboardView` (string or stable array of input screens), and `measureDeps` when main content changes.
+3. **Root list** — `MobileDrawerScreenHeader` + `MobileActionGroup` / `MobileActionButtonRow`.
+4. **Intermediate list** (optional, e.g. Profile) — `MobileDrawerNavHeader` + rows. Stage auto-grows/shrinks from measured content.
+5. **Field / keyboard screen** — `MobileDrawerFieldView` + inputs using `MOBILE_DRAWER_FIELD_INPUT_CLASS`.
+
+Standalone single-field edit (no stack): `MobileFormDrawer`.
+
+## Stage views
+
+| Kind | Examples | Stage behavior |
+|---|---|---|
+| Main | Account root, Publish root | Measured as baseline |
+| Intermediate | Profile list | Remeasured; taller than main is fine |
+| Keyboard | First name, Edit URL, Password | Sized to **content + small clearance**; not main/intermediate height |
+
+`keyboardView` must list every screen with text inputs. Intermediate lists without inputs are **not** keyboard views.
+
+## Keyboard / leave (required)
+
+- **Back** from a field screen: always dismiss via `MobileDrawerFieldView` (default) or `useMobileDrawerLeave()` so the previous view does not resize against a shifting visual viewport.
+- **Async save then navigate**: `dismissKeyboardOnDone={false}` on `MobileDrawerFieldView`, then `leave(onSaved)` after success (`useMobileDrawerLeave`).
+- **Autofocus**: built into `MobileDrawerFieldView` (first `input`/`textarea`). Prefer that over manual focus + timeouts.
+
+## Do not
+
+```tsx
+// ❌ Full-viewport Vaul height while keyboard is open (fills the screen)
+applyMobileDrawerKeyboardInset();
+keyboardShellInset: true;
+
+// ❌ Predictive tall floor for simple fields
+keyboardMinContentPx: 268;
+
+// ❌ Measure main via stageRef while on an intermediate view (poisons height)
+mainMeasureRef.current ?? stageRef.current;
+
+// ❌ Navigate back while keyboard is up without wait/blur
+onBack={stage.returnToView("profile")};
+```
+
+```tsx
+// ✅ Defaults — content-measured, shell inset off
+useMobileDrawerStage({ view, setView, mainView: "main", keyboardView: KEYBOARD_VIEWS });
+
+// ✅ Keyboard-safe back
+<MobileDrawerFieldView title="…" onBack={() => stage.returnToView("profile")} onDone={…}>
+  <Input className={MOBILE_DRAWER_FIELD_INPUT_CLASS} />
+</MobileDrawerFieldView>
+```
+
+## Wiring checklist
+
+- Open subviews with `stage.measureMainStage()` then `stage.goToView(next, 1)`.
+- Back to root: `stage.returnToMainView`. Back to intermediate: `stage.returnToView("profile")`.
+- Feature code owns: row labels/icons, field schemas, mutations, save feedback. Kit owns: sizing, transitions, focus, keyboard dismiss.
+
+## Reference implementations
+
+- Multi-level + fields: `account-settings/account-settings.tsx`, `mobile-profile-field-edit.tsx`
+- Main → keyboard field: `document-actions.tsx` + `editor/document-publish-panels.tsx`
+- Standalone field: `document-breadcrumb.tsx` → `MobileFormDrawer`

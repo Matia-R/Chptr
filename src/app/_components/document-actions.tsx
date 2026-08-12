@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import { MoreVertical } from "lucide-react";
 import { Button } from "./button";
-import { Drawer, DrawerContent, DrawerTrigger } from "./drawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,8 +12,8 @@ import {
 } from "./dropdown-menu";
 import { Skeleton } from "./skeleton";
 import {
-  MOBILE_DRAWER_SHELL_CLASS,
   MobileDrawerScreenHeader,
+  MobileMenuDrawer,
 } from "~/app/_components/mobile-drawer";
 import {
   DocumentPublishMobileDrawer,
@@ -140,24 +139,21 @@ export function DocumentActions() {
 
   if (isMobile) {
     return (
-      <Drawer
+      <MobileMenuDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        repositionInputs={false}
+        trigger={triggerButton}
       >
-        <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent className={MOBILE_DRAWER_SHELL_CLASS}>
-          {publishCtx ? (
-            <DocumentPublishMobileDrawer statusRow={mobileDrawerStatusRow} />
-          ) : (
-            <MobileDrawerScreenHeader
-              title="Publish"
-              description="Publish and manage this article"
-              subtitle={<span>No changes yet</span>}
-            />
-          )}
-        </DrawerContent>
-      </Drawer>
+        {publishCtx ? (
+          <DocumentPublishMobileDrawer statusRow={mobileDrawerStatusRow} />
+        ) : (
+          <MobileDrawerScreenHeader
+            title="Publish"
+            description="Publish and manage this article"
+            subtitle={<span>No changes yet</span>}
+          />
+        )}
+      </MobileMenuDrawer>
     );
   }
 

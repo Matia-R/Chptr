@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { PublishedDocumentTitleSection } from "~/app/_components/published-document-title-section";
 import { sanitizePublishedHtml } from "~/lib/published-html";
 import {
   authorDisplayLabel,
+  getCachedPublicationRedirectByUsernameSlug,
   getPublicationWithAuthorByUsernameSlug,
 } from "~/server/db/document-publications";
 
@@ -14,10 +15,22 @@ type PageProps = {
   params: Promise<{ username: string; slug: string }>;
 };
 
+async function resolveRedirectOrContinue(username: string, slug: string) {
+  const redirect = await getCachedPublicationRedirectByUsernameSlug(
+    username,
+    slug
+  );
+  if (redirect) {
+    permanentRedirect(`/${redirect.toOwnerUsername}/${redirect.toSlug}`);
+  }
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { username, slug } = await params;
+  await resolveRedirectOrContinue(username, slug);
+
   const data = await getPublicationWithAuthorByUsernameSlug(username, slug);
 
   if (!data) {
@@ -49,6 +62,8 @@ export async function generateMetadata({
 
 export default async function PublishedDocumentPage({ params }: PageProps) {
   const { username, slug } = await params;
+  await resolveRedirectOrContinue(username, slug);
+
   const data = await getPublicationWithAuthorByUsernameSlug(username, slug);
 
   if (!data) {

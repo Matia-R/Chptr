@@ -14,7 +14,6 @@ export async function updateProfile(formData: FormData) {
   if (userError || !user) throw new Error("Not authenticated");
 
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
   const username = ((formData.get("username") as string) ?? "").trim();
   const first_name = (formData.get("first_name") as string) ?? "";
   const last_name = (formData.get("last_name") as string) ?? "";
@@ -24,11 +23,6 @@ export async function updateProfile(formData: FormData) {
   try {
     if (email !== user.email) {
       const { error } = await supabase.auth.updateUser({ email });
-      if (error) throw error;
-    }
-
-    if (password) {
-      const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
     }
 

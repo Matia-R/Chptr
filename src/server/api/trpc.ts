@@ -165,6 +165,8 @@ export function rateLimitMiddleware(maxRequests: number, windowMs: number) {
         message: "Rate limit exceeded. Try again later.",
       });
     }
-    return next({ ctx });
+    // Pass the context through untouched so chained procedures keep their
+    // narrowed types (e.g. protectedProcedure's non-null `user`).
+    return next();
   });
 }
