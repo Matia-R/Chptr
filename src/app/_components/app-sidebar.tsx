@@ -20,11 +20,17 @@ import {
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
 import { NavUser } from "./nav-user";
-import { MobileActionGroup } from "./mobile-action-rows";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
-import { randomUUID } from "~/lib/utils";
+import { cn, randomUUID } from "~/lib/utils";
+
+const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
+  "h-12 rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/45",
+  "dark:border-white/10 dark:bg-[hsl(0_0%_22%_/_.95)]",
+  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+  "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
+);
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[];
@@ -114,23 +120,25 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     setOpen(true);
   }, [dismissMobileNav, setOpen]);
 
-  const account = footerLoading ? (
-    <NavUser isLoading />
-  ) : userProfile ? (
-    <NavUser
-      user={{
-        first_name: userProfile.first_name,
-        last_name: userProfile.last_name,
-        username: userProfile.username,
-        email: userEmail ?? "",
-        avatar_url: userProfile.avatar_url,
-        default_avatar_background_color:
-          userProfile.default_avatar_background_color,
-      }}
-    />
-  ) : (
-    <NavUser isLoading={false} />
-  );
+  const renderAccount = (triggerClassName?: string) =>
+    footerLoading ? (
+      <NavUser isLoading triggerClassName={triggerClassName} />
+    ) : userProfile ? (
+      <NavUser
+        user={{
+          first_name: userProfile.first_name,
+          last_name: userProfile.last_name,
+          username: userProfile.username,
+          email: userEmail ?? "",
+          avatar_url: userProfile.avatar_url,
+          default_avatar_background_color:
+            userProfile.default_avatar_background_color,
+        }}
+        triggerClassName={triggerClassName}
+      />
+    ) : (
+      <NavUser isLoading={false} triggerClassName={triggerClassName} />
+    );
 
   const mobileDocumentList = (
     <div className="flex flex-col">
@@ -202,20 +210,10 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           }}
         >
           {/* Header — match document layout header height (h-12) */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-4">
+          <div className="flex h-12 shrink-0 items-center px-4">
             <div className="font-lora text-2xl font-medium leading-none">
               Chptr
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              aria-label="Close navigation"
-              onClick={dismissMobileNav}
-            >
-              <PanelLeftClose />
-              <span className="sr-only">Close navigation</span>
-            </Button>
           </div>
 
           {/* Home + Search toolbar */}
@@ -269,9 +267,26 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             </div>
           </section>
 
-          {/* Account — pinned bottom group */}
-          <div className="shrink-0 px-4 pb-3 pt-3">
-            <MobileActionGroup className="p-1">{account}</MobileActionGroup>
+          {/* Utility bar */}
+          <div className="shrink-0 border-t border-sidebar-border p-4">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                {renderAccount(MOBILE_UTILITY_CONTROL_CLASSNAME)}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  MOBILE_UTILITY_CONTROL_CLASSNAME,
+                  "size-12 shrink-0",
+                )}
+                aria-label="Close navigation"
+                onClick={dismissMobileNav}
+              >
+                <PanelLeftClose />
+                <span className="sr-only">Close navigation</span>
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
@@ -343,7 +358,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           </div>
 
           <div className="flex-none">
-            <SidebarFooter>{account}</SidebarFooter>
+            <SidebarFooter>{renderAccount()}</SidebarFooter>
           </div>
         </div>
       )}

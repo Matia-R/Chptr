@@ -33,10 +33,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
 import { useAccountSettingsStore } from "~/hooks/use-account-settings";
+import { cn } from "~/lib/utils";
 
 export function NavUser({
   user,
   isLoading,
+  triggerClassName,
 }: {
   user?: {
     first_name: string | null;
@@ -47,6 +49,7 @@ export function NavUser({
     default_avatar_background_color: string;
   };
   isLoading?: boolean;
+  triggerClassName?: string;
 }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
@@ -77,7 +80,7 @@ export function NavUser({
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg">
+          <SidebarMenuButton size="lg" className={triggerClassName}>
             <Skeleton className="h-8 w-8 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm">
               <Skeleton className="h-4 w-24" />
@@ -93,7 +96,12 @@ export function NavUser({
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <div className="px-4 py-2 text-sm text-muted-foreground">
+          <div
+            className={cn(
+              "px-4 py-2 text-sm text-muted-foreground",
+              triggerClassName,
+            )}
+          >
             User not found
           </div>
         </SidebarMenuItem>
@@ -120,7 +128,10 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className={cn(
+                "focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+                triggerClassName,
+              )}
             >
               <UserAvatar
                 first_name={user.first_name}
