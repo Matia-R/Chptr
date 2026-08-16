@@ -31,6 +31,45 @@ type DocumentPublishStore = {
   resetForNavigation: () => void;
 };
 
+/**
+ * Publish UI timers are module-scoped so they survive panel unmount.
+ * `useDocumentPublish` is mounted in the header, popover, and drawer; closing
+ * a panel must not cancel the idle reset or the label stays on "Published".
+ */
+let feedbackResetTimeoutId: number | null = null;
+let closePanelsTimeoutId: number | null = null;
+
+export function clearPublishUiTimeouts() {
+  if (feedbackResetTimeoutId != null) {
+    window.clearTimeout(feedbackResetTimeoutId);
+    feedbackResetTimeoutId = null;
+  }
+  if (closePanelsTimeoutId != null) {
+    window.clearTimeout(closePanelsTimeoutId);
+    closePanelsTimeoutId = null;
+  }
+}
+
+export function schedulePublishFeedbackReset(delayMs: number) {
+  if (feedbackResetTimeoutId != null) {
+    window.clearTimeout(feedbackResetTimeoutId);
+  }
+  feedbackResetTimeoutId = window.setTimeout(() => {
+    feedbackResetTimeoutId = null;
+    useDocumentPublishStore.getState().setPublishFeedback("idle");
+  }, delayMs);
+}
+
+export function scheduleClosePublishPanels(delayMs: number) {
+  if (closePanelsTimeoutId != null) {
+    window.clearTimeout(closePanelsTimeoutId);
+  }
+  closePanelsTimeoutId = window.setTimeout(() => {
+    closePanelsTimeoutId = null;
+    useDocumentPublishStore.getState().closeBothPanels();
+  }, delayMs);
+}
+
 export const useDocumentPublishStore = create<DocumentPublishStore>((set) => ({
   popoverOpen: false,
   mobileDrawerOpen: false,
@@ -57,7 +96,8 @@ export const useDocumentPublishStore = create<DocumentPublishStore>((set) => ({
       mobileDrawerOpen: false,
       mobileDrawerView: "main",
     }),
-  resetForNavigation: () =>
+  resetForNavigation: () => {
+    clearPublishUiTimeouts();
     set({
       popoverOpen: false,
       mobileDrawerOpen: false,
@@ -65,5 +105,6 @@ export const useDocumentPublishStore = create<DocumentPublishStore>((set) => ({
       slugOverride: "",
       publishFeedback: "idle",
       freezeFirstPublishActions: false,
-    }),
+    });
+  },
 }));

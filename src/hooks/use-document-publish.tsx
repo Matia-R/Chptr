@@ -35,6 +35,9 @@ import { api, type RouterOutputs } from "~/trpc/react";
 import { useDocumentEditorStore } from "~/app/_components/editor/document-editor-store";
 import type { AppBlockNoteEditor } from "~/app/_components/editor/editor-types";
 import {
+  clearPublishUiTimeouts,
+  scheduleClosePublishPanels,
+  schedulePublishFeedbackReset,
   useDocumentPublishStore,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
@@ -129,13 +132,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const onAuxiliaryOpenStore = useDocumentPublishStore(
     (s) => s.onAuxiliaryOpen,
   );
-  const closeBothPanels = useDocumentPublishStore((s) => s.closeBothPanels);
   const resetForNavigation = useDocumentPublishStore(
     (s) => s.resetForNavigation,
   );
-
-  const closePopoverTimeoutRef = useRef<number | null>(null);
-  const feedbackResetTimeoutRef = useRef<number | null>(null);
 
   /** Only reset store when the route document changes — not when extra consumers mount (popover panel, drawer panel). */
   const prevDocumentIdForResetRef = useRef<string | undefined>(undefined);
@@ -304,17 +303,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     prevAnyPublishPanelOpen.current = anyPublishPanelOpen;
   }, [anyPublishPanelOpen, setSlugOverride]);
 
-  useEffect(() => {
-    return () => {
-      if (closePopoverTimeoutRef.current != null) {
-        window.clearTimeout(closePopoverTimeoutRef.current);
-      }
-      if (feedbackResetTimeoutRef.current != null) {
-        window.clearTimeout(feedbackResetTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handlePublish = useCallback(async () => {
     if (!editor || !documentId) {
       toast({
@@ -333,14 +321,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       return;
     }
 
-    if (closePopoverTimeoutRef.current != null) {
-      window.clearTimeout(closePopoverTimeoutRef.current);
-      closePopoverTimeoutRef.current = null;
-    }
-    if (feedbackResetTimeoutRef.current != null) {
-      window.clearTimeout(feedbackResetTimeoutRef.current);
-      feedbackResetTimeoutRef.current = null;
-    }
+    clearPublishUiTimeouts();
 
     const isFirstTimePublish = publication === null;
     if (isFirstTimePublish) {
@@ -371,22 +352,13 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
       setPublishFeedback("published");
 
-      feedbackResetTimeoutRef.current = window.setTimeout(() => {
-        feedbackResetTimeoutRef.current = null;
-        setPublishFeedback("idle");
-      }, SAVE_FEEDBACK_RESULT_MS);
-
-      closePopoverTimeoutRef.current = window.setTimeout(() => {
-        closeBothPanels();
-      }, SAVE_FEEDBACK_SETTLE_MS);
+      schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
+      scheduleClosePublishPanels(SAVE_FEEDBACK_SETTLE_MS);
     } catch {
       setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
-      feedbackResetTimeoutRef.current = window.setTimeout(() => {
-        feedbackResetTimeoutRef.current = null;
-        setPublishFeedback("idle");
-      }, SAVE_FEEDBACK_RESULT_MS);
+      schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
     }
   }, [
     documentId,
@@ -397,7 +369,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     slugOverride,
     title,
     toast,
-    closeBothPanels,
     setFreezeFirstPublishActions,
     setPublishFeedback,
   ]);

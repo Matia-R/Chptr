@@ -205,7 +205,7 @@ function MobilePublishMainView({
           <MobileActionGroup>
             <MobileActionLinkRow
               icon={ExternalLink}
-              label="View article"
+              label="View page"
               href={`/${pub.owner_username}/${pub.slug}`}
             />
             <MobileActionButtonRow
@@ -419,7 +419,7 @@ export function DocumentPublishPopoverPanel() {
                 rel="noopener noreferrer"
                 className="inline-flex shrink-0 items-center gap-1.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
-                View article
+                View page
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
               </Link>
             </div>
