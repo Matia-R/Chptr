@@ -20,6 +20,11 @@ import {
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
 import { NavUser } from "./nav-user";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
@@ -32,11 +37,30 @@ const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
   "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
 );
 
+/**
+ * Desktop sidebar spacing — semantic, not optical.
+ * Unrelated sections (Brand, Search, Documents) all use Tailwind `6`.
+ * Heading-to-content is medium; peer rows are smallest.
+ */
+const DESKTOP_SIDEBAR = {
+  /** Search defines this content width; Documents header matches it. */
+  inset: "px-2",
+  /** Brand → Search (unrelated sections). */
+  sectionGap: "gap-6",
+  /** Search → Documents (unrelated sections). */
+  sectionStart: "pt-6",
+  /** Documents heading → document list. */
+  headingToContent: "pt-2",
+} as const;
+
+/** Interactive surface; gap is recovered from the previous 40px row. */
+const DESKTOP_DOC_ROW_HEIGHT = 36;
+const DESKTOP_DOC_ROW_GAP = 4;
+const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
+
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[];
 }
-
-const DESKTOP_DOC_ROW_HEIGHT = 48;
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
@@ -168,13 +192,17 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       style={
         {
           "--index": index,
-          transform: "translateY(calc(var(--index) * var(--row-height)))",
+          transform: "translateY(calc(var(--index) * var(--row-stride)))",
         } as React.CSSProperties
       }
     >
-      <SidebarMenuButton asChild>
+      <SidebarMenuButton
+        asChild
+        isActive={pathname === `/documents/${doc.id}`}
+        className="h-9"
+      >
         <Link href={`/documents/${doc.id}`} prefetch={true}>
-          {doc.name}
+          <span className="truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -291,71 +319,89 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         </div>
       ) : (
         <div className="flex h-full flex-col">
-          <div className="flex-none">
-            <SidebarHeader className="pb-0">
-              <div className="px-1 font-lora text-2xl font-medium">Chptr</div>
-              <div className="py-6">
-                <div className="space-y-2">
-                  <Button
-                    className="h-9 w-full justify-between gap-2 px-2"
-                    variant="ghost"
-                    onClick={() => setOpen(true)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Search className="size-4" />
-                      <span className="text-sm">Search</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">⌘K</span>
-                  </Button>
-                  <Button
-                    className="h-9 w-full justify-start gap-2 px-2"
-                    variant="ghost"
-                    asChild
-                  >
-                    <Link href="/documents">
-                      <Home className="size-4" />
-                      <span className="text-sm">Home</span>
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </SidebarHeader>
-            <SidebarHeader className="pt-0">
-              <div className="flex items-center justify-between px-2 text-sm font-semibold">
-                <span>Documents</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  aria-label="Create new document"
-                  onClick={handleCreateDocument}
-                >
-                  <Plus className="size-4" />
-                </Button>
-              </div>
-            </SidebarHeader>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {documentScroll(
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarMenu
-                    className="relative gap-0"
-                    style={
-                      {
-                        "--item-count": documents?.documents?.length ?? 0,
-                        "--row-height": `${DESKTOP_DOC_ROW_HEIGHT}px`,
-                        height: "calc(var(--item-count) * var(--row-height))",
-                      } as React.CSSProperties
-                    }
-                  >
-                    {desktopDocumentList}
-                  </SidebarMenu>
-                </SidebarGroup>
-              </SidebarContent>,
+          <SidebarHeader
+            className={cn(
+              "pb-0",
+              DESKTOP_SIDEBAR.inset,
+              DESKTOP_SIDEBAR.sectionGap,
             )}
-          </div>
+          >
+            <div className="px-1 font-lora text-2xl font-medium">Chptr</div>
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                "h-9 w-full justify-between px-2.5 font-normal",
+                "cursor-pointer bg-sidebar-accent/45 text-sidebar-foreground",
+                "transition-[color,background-color,transform]",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "active:scale-[0.99] active:bg-sidebar-accent",
+              )}
+              onClick={() => setOpen(true)}
+            >
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <Search className="size-4 shrink-0" aria-hidden />
+                <span>Search</span>
+              </span>
+              <kbd className="shrink-0 text-xs font-normal text-muted-foreground">
+                ⌘K
+              </kbd>
+            </Button>
+          </SidebarHeader>
+
+          <section
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              DESKTOP_SIDEBAR.inset,
+              DESKTOP_SIDEBAR.sectionStart,
+            )}
+          >
+            <div className="flex h-8 shrink-0 items-center justify-between">
+              <span className="text-sm font-semibold">Documents</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    aria-label="New document"
+                    onClick={handleCreateDocument}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New document</TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden",
+                DESKTOP_SIDEBAR.headingToContent,
+              )}
+            >
+              {documentScroll(
+                <SidebarContent className="gap-0 overflow-hidden p-0">
+                  <SidebarGroup className="p-0">
+                    <SidebarMenu
+                      className="relative gap-0"
+                      style={
+                        {
+                          "--item-count": documents?.documents?.length ?? 0,
+                          "--row-stride": `${DESKTOP_DOC_ROW_STRIDE}px`,
+                          height:
+                            "calc(var(--item-count) * var(--row-stride))",
+                        } as React.CSSProperties
+                      }
+                    >
+                      {desktopDocumentList}
+                    </SidebarMenu>
+                  </SidebarGroup>
+                </SidebarContent>,
+              )}
+            </div>
+          </section>
 
           <div className="flex-none">
             <SidebarFooter>{renderAccount()}</SidebarFooter>
