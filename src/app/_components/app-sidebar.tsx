@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Home, PanelLeftClose, Plus, Search } from "lucide-react";
+import { PanelLeftClose, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -37,6 +37,14 @@ const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
   "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
 );
 
+/** Quieter resting fill than `iconSubtle`; hover/press stay a bit stronger. */
+const MOBILE_ICON_ACTION_CLASSNAME = cn(
+  "size-8 shrink-0",
+  "bg-foreground/[0.04]",
+  "hover:bg-foreground/[0.12]",
+  "active:bg-foreground/[0.16]",
+);
+
 /**
  * Desktop sidebar spacing — semantic, not optical.
  * Unrelated sections (Brand, Search, Documents) all use Tailwind `6`.
@@ -68,7 +76,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
-  const isHomeActive = pathname === "/documents";
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -238,51 +245,34 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           }}
         >
           {/* Header — match document layout header height (h-12) */}
-          <div className="flex h-12 shrink-0 items-center px-4">
+          <div className="relative flex h-12 shrink-0 items-center px-4">
             <div className="font-lora text-2xl font-medium leading-none">
               Chptr
             </div>
-          </div>
-
-          {/* Home + Search toolbar */}
-          <div className="shrink-0 px-4 pb-4 pt-6">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="iconSubtle"
-                asChild
-                className="h-8 gap-2 rounded-full px-3 font-normal"
-              >
-                <Link
-                  href="/documents"
-                  onClick={dismissMobileNav}
-                  aria-current={isHomeActive ? "page" : undefined}
-                >
-                  <Home className="size-4 shrink-0" aria-hidden />
-                  <span className="text-sm">Home</span>
-                </Link>
-              </Button>
-              <Button
-                variant="iconSubtle"
-                size="icon"
-                className="size-8 shrink-0"
-                aria-label="Search"
-                onClick={openSearch}
-              >
-                <Search className="size-4" />
-              </Button>
-            </div>
+            <Button
+              variant="iconSubtle"
+              size="icon"
+              className={cn(
+                "absolute right-4 top-1/2 -translate-y-1/2",
+                MOBILE_ICON_ACTION_CLASSNAME,
+              )}
+              aria-label="Search"
+              onClick={openSearch}
+            >
+              <Search className="size-4" />
+            </Button>
           </div>
 
           {/* Documents — collection header + new document */}
-          <section className="flex min-h-0 flex-1 flex-col px-4">
-            <div className="flex shrink-0 items-center justify-between pb-3 pt-4">
+          <section className="flex min-h-0 flex-1 flex-col px-4 pt-5">
+            <div className="flex h-8 shrink-0 items-center justify-between">
               <span className="text-sm font-semibold text-sidebar-foreground">
                 Documents
               </span>
               <Button
                 variant="iconSubtle"
                 size="icon"
-                className="size-8 shrink-0"
+                className={MOBILE_ICON_ACTION_CLASSNAME}
                 aria-label="Create new document"
                 onClick={handleCreateDocument}
               >
@@ -290,7 +280,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden pt-1">
+            <div className="min-h-0 flex-1 overflow-hidden pt-2">
               {documentScroll(mobileDocumentList)}
             </div>
           </section>
