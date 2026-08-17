@@ -132,6 +132,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const onAuxiliaryOpenStore = useDocumentPublishStore(
     (s) => s.onAuxiliaryOpen,
   );
+  const closeBothPanels = useDocumentPublishStore((s) => s.closeBothPanels);
   const resetForNavigation = useDocumentPublishStore(
     (s) => s.resetForNavigation,
   );
