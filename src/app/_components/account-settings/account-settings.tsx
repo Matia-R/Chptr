@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { AtSign, ChevronRight, Lock, User } from "lucide-react";
+import { AtSign, ChevronRight, Lock, LogOut, Moon, Sun, User } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 
 import { Button } from "~/app/_components/button";
 import {
@@ -33,6 +36,7 @@ import { useIsMobile } from "~/hooks/use-mobile";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
+import { createClient } from "~/utils/supabase/client";
 
 import { ProfileFields } from "./account-settings-fields";
 import { AvatarField } from "./avatar-field";
@@ -382,6 +386,9 @@ function AccountSettingsDrawerBody({
     });
   const [childSaving, setChildSaving] = React.useState(false);
   const dismissLocked = isSaving || childSaving;
+  const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   React.useEffect(() => {
     onSavingChange?.(dismissLocked);
@@ -408,13 +415,20 @@ function AccountSettingsDrawerBody({
     .filter((part): part is string => Boolean(part?.trim()))
     .join(" ");
 
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    queryClient.clear();
+    router.push("/login");
+  };
+
   const renderMainView = () => (
     <div className="pb-6">
       <MobileDrawerScreenHeader
         title="Account"
         description="Manage your profile and password."
       />
-      <div className="px-4">
+      <div className={cn("px-4", formSpacing.stack)}>
         <MobileActionGroup>
           <MobileActionButtonRow
             icon={User}
@@ -427,6 +441,22 @@ function AccountSettingsDrawerBody({
             label="Password"
             trailing={<RowTrailing />}
             onClick={() => openSubView("password")}
+          />
+        </MobileActionGroup>
+        <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={theme === "dark" ? Sun : Moon}
+            label={theme === "dark" ? "Light mode" : "Dark mode"}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          />
+        </MobileActionGroup>
+        <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={LogOut}
+            label="Log out"
+            onClick={() => {
+              void handleSignOut();
+            }}
           />
         </MobileActionGroup>
       </div>

@@ -2,11 +2,9 @@
 
 import {
   BadgeCheck,
-  // Bell,
+  ChevronRight,
   ChevronsUpDown,
-  // CreditCard,
   LogOut,
-  // Sparkles,
   Moon,
   Sun,
 } from "lucide-react";
@@ -115,16 +113,52 @@ export function NavUser({
       ? user.email
       : null;
 
+  const trigger = (
+    <>
+      <UserAvatar
+        first_name={user.first_name}
+        last_name={user.last_name}
+        avatar_url={user.avatar_url}
+        default_avatar_background_color={
+          user.default_avatar_background_color
+        }
+        alt={`${user.first_name} ${user.last_name}`}
+      />
+      <div className="grid flex-1 text-left text-sm leading-tight">
+        <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
+        {subtitle ? (
+          <span className="truncate text-xs text-muted-foreground">
+            {subtitle}
+          </span>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            className={cn(
+              "focus-visible:ring-1 focus-visible:ring-ring",
+              triggerClassName,
+            )}
+            onClick={handleOpenAccountSettings}
+          >
+            {trigger}
+            <ChevronRight className="ml-auto size-4" />
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        {/*
-         * Desktop stays non-modal: a modal menu + the account Dialog corrupt
-         * Radix's shared body pointer-events bookkeeping. Mobile uses a Vaul
-         * drawer instead, and needs modal so the menu sits above the nav sheet
-         * and actually receives hover/clicks.
-         */}
-        <DropdownMenu modal={isMobile}>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -133,29 +167,13 @@ export function NavUser({
                 triggerClassName,
               )}
             >
-              <UserAvatar
-                first_name={user.first_name}
-                last_name={user.last_name}
-                avatar_url={user.avatar_url}
-                default_avatar_background_color={
-                  user.default_avatar_background_color
-                }
-                alt={`${user.first_name} ${user.last_name}`}
-              />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
-                {subtitle ? (
-                  <span className="truncate text-xs text-muted-foreground">
-                    {subtitle}
-                  </span>
-                ) : null}
-              </div>
+              {trigger}
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg bg-sidebar"
-            side={isMobile ? "bottom" : "right"}
+            side="right"
             align="end"
             sideOffset={4}
           >

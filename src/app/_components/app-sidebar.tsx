@@ -206,7 +206,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       <SidebarMenuButton
         asChild
         isActive={pathname === `/documents/${doc.id}`}
-        className="h-9"
+        className="h-9 data-[active=true]:font-normal"
       >
         <Link href={`/documents/${doc.id}`} prefetch={true}>
           <span className="truncate">{doc.name}</span>
@@ -322,7 +322,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               variant="ghost"
               className={cn(
                 "h-9 w-full justify-between px-2.5 font-normal",
-                "cursor-pointer bg-sidebar-accent/45 text-sidebar-foreground",
+                "cursor-pointer bg-sidebar-accent/50 text-sidebar-foreground",
                 "transition-[color,background-color,transform]",
                 "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 "active:scale-[0.99] active:bg-sidebar-accent",
