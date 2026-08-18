@@ -60,8 +60,8 @@ function getMobilePublishActionRow(
           ? "Failed to publish"
           : options.showPublishedPopoverActions
             ? options.hasChangesToPublish
-              ? "Publish changes"
-              : "Up to date"
+              ? "Update"
+              : "Published"
             : (options.firstPublishLabel ?? "Publish");
 
   const icon: LucideIcon =
@@ -205,7 +205,7 @@ function MobilePublishMainView({
           <MobileActionGroup>
             <MobileActionLinkRow
               icon={ExternalLink}
-              label="View article"
+              label="View page"
               href={`/${pub.owner_username}/${pub.slug}`}
             />
             <MobileActionButtonRow
@@ -419,7 +419,7 @@ export function DocumentPublishPopoverPanel() {
                 rel="noopener noreferrer"
                 className="inline-flex shrink-0 items-center gap-1.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
-                View article
+                View page
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
               </Link>
             </div>
@@ -453,7 +453,7 @@ export function DocumentPublishPopoverPanel() {
             type="button"
             className={cn(
               "min-w-0 flex-1 transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
-              // Keep full contrast while pending/feedback plays; idle "Up to date" stays dimmed.
+              // Keep full contrast while pending/feedback plays; idle "Published" stays dimmed.
               (busy || publishFeedback !== "idle") && "disabled:opacity-100",
             )}
             disabled={
@@ -468,9 +468,7 @@ export function DocumentPublishPopoverPanel() {
           >
             <SaveFeedbackLabel
               state={publishFeedbackToSaveState(publishFeedback)}
-              idleLabel={
-                hasChangesToPublish ? "Publish changes" : "Up to date"
-              }
+              idleLabel={hasChangesToPublish ? "Update" : "Published"}
               savingLabel="Publishing..."
               savedLabel="Published"
               failedLabel="Failed to publish"

@@ -35,6 +35,9 @@ import { api, type RouterOutputs } from "~/trpc/react";
 import { useDocumentEditorStore } from "~/app/_components/editor/document-editor-store";
 import type { AppBlockNoteEditor } from "~/app/_components/editor/editor-types";
 import {
+  clearPublishUiTimeouts,
+  scheduleClosePublishPanels,
+  schedulePublishFeedbackReset,
   useDocumentPublishStore,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
@@ -133,9 +136,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const resetForNavigation = useDocumentPublishStore(
     (s) => s.resetForNavigation,
   );
-
-  const closePopoverTimeoutRef = useRef<number | null>(null);
-  const feedbackResetTimeoutRef = useRef<number | null>(null);
 
   /** Only reset store when the route document changes — not when extra consumers mount (popover panel, drawer panel). */
   const prevDocumentIdForResetRef = useRef<string | undefined>(undefined);
@@ -254,9 +254,11 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     (publication === null || hasUnpublishedChanges || hasPendingSlugChange);
   const primaryTriggerLabel = publicationLoading
     ? "Loading…"
-    : hasChangesToPublish
-      ? "Publish changes"
-      : "Up to date";
+    : !publication
+      ? "Publish"
+      : hasChangesToPublish
+        ? "Update"
+        : "Published";
 
   const busy =
     publishMutation.isPending ||
@@ -304,17 +306,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     prevAnyPublishPanelOpen.current = anyPublishPanelOpen;
   }, [anyPublishPanelOpen, setSlugOverride]);
 
-  useEffect(() => {
-    return () => {
-      if (closePopoverTimeoutRef.current != null) {
-        window.clearTimeout(closePopoverTimeoutRef.current);
-      }
-      if (feedbackResetTimeoutRef.current != null) {
-        window.clearTimeout(feedbackResetTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handlePublish = useCallback(async () => {
     if (!editor || !documentId) {
       toast({
@@ -333,14 +324,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       return;
     }
 
-    if (closePopoverTimeoutRef.current != null) {
-      window.clearTimeout(closePopoverTimeoutRef.current);
-      closePopoverTimeoutRef.current = null;
-    }
-    if (feedbackResetTimeoutRef.current != null) {
-      window.clearTimeout(feedbackResetTimeoutRef.current);
-      feedbackResetTimeoutRef.current = null;
-    }
+    clearPublishUiTimeouts();
 
     const isFirstTimePublish = publication === null;
     if (isFirstTimePublish) {
@@ -371,22 +355,13 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
       setPublishFeedback("published");
 
-      feedbackResetTimeoutRef.current = window.setTimeout(() => {
-        feedbackResetTimeoutRef.current = null;
-        setPublishFeedback("idle");
-      }, SAVE_FEEDBACK_RESULT_MS);
-
-      closePopoverTimeoutRef.current = window.setTimeout(() => {
-        closeBothPanels();
-      }, SAVE_FEEDBACK_SETTLE_MS);
+      schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
+      scheduleClosePublishPanels(SAVE_FEEDBACK_SETTLE_MS);
     } catch {
       setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
-      feedbackResetTimeoutRef.current = window.setTimeout(() => {
-        feedbackResetTimeoutRef.current = null;
-        setPublishFeedback("idle");
-      }, SAVE_FEEDBACK_RESULT_MS);
+      schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
     }
   }, [
     documentId,
@@ -397,7 +372,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     slugOverride,
     title,
     toast,
-    closeBothPanels,
     setFreezeFirstPublishActions,
     setPublishFeedback,
   ]);
@@ -451,10 +425,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                     "focus-within:ring-1 focus-within:ring-ring",
                   )
                 : cn(
-                    "min-h-9 rounded-md border border-input shadow-sm",
-                    "bg-transparent dark:border-sidebar-border dark:bg-background",
-                    "dark:shadow-[inset_0_1px_0_0_hsl(0_0%_100%_/_0.06)]",
-                    "focus-within:ring-1 focus-within:ring-ring",
+                    "min-h-9 rounded-md border border-input",
+                    "dark:border-sidebar-border",
+                    "focus-within:border-foreground/40 focus-within:ring-1 focus-within:ring-foreground/10",
                   ),
             )}
           >
@@ -480,7 +453,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               spellCheck={false}
               enterKeyHint="done"
               className={cn(
-                "min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
+                "min-w-0 flex-1 border-0 bg-[hsl(var(--input-background))] px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
                 isDrawerMobileSurface ? "h-10 text-base" : "h-9",
                 showInlineRevert ? "rounded-none" : "rounded-r-md",
               )}
@@ -503,7 +476,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                 size="icon"
                 disabled={busy}
                 title="Revert URL slug"
-                className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input text-muted-foreground transition-colors hover:text-foreground dark:border-sidebar-border"
+                className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input bg-[hsl(var(--input-background))] text-muted-foreground transition-colors hover:text-foreground dark:border-sidebar-border"
                 onClick={revertSlugStore}
               >
                 <Undo2 className="h-4 w-4" aria-hidden />

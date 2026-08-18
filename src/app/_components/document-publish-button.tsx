@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronDown, Globe, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "~/app/_components/button";
 import {
   Popover,
@@ -11,7 +12,26 @@ import {
   DocumentPublishPopoverPanel,
   useDocumentPublish,
 } from "~/app/_components/editor/document-publish";
+import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
+import { Skeleton } from "~/app/_components/skeleton";
 import { cn } from "~/lib/utils";
+
+/** Resting labels only — wrapper width must not include transitional copy. */
+const RESTING_TRIGGER_LABELS = ["Publish", "Published", "Update"] as const;
+
+function getTriggerLabel(options: {
+  publishFeedback: string;
+  publishButtonLabel: string;
+  showPublishedPopoverActions: boolean;
+}): string {
+  if (options.publishFeedback === "publishing") {
+    return options.showPublishedPopoverActions ? "Updating" : "Publishing";
+  }
+  if (options.publishButtonLabel === "Publishing...") {
+    return "Publishing";
+  }
+  return options.publishButtonLabel;
+}
 
 export function DocumentPublishButton() {
   const ctx = useDocumentPublish();
@@ -24,72 +44,128 @@ export function DocumentPublishButton() {
     setPopoverOpen,
     onAuxiliaryOpenChange,
     publishButtonLabel,
-    publishButtonIcon,
     hasChangesToPublish,
-    busy,
-    publicationLoading,
     publication,
     publishFeedback,
-    handlePublish,
+    showPublishedPopoverActions,
+    busy,
+    publicationLoading,
   } = ctx;
+
+  const triggerLabel = getTriggerLabel({
+    publishFeedback,
+    publishButtonLabel,
+    showPublishedPopoverActions,
+  });
+  const isProgress =
+    triggerLabel === "Updating" || triggerLabel === "Publishing";
+  const TriggerIcon =
+    triggerLabel === "Published"
+      ? Check
+      : triggerLabel === "Update"
+        ? RefreshCw
+        : Globe;
+
+  const widthSizer = (
+    <span
+      className="invisible inline-flex h-8 items-center gap-1 px-2 py-1 text-sm font-medium"
+      aria-hidden
+    >
+      <span className="size-3.5 shrink-0" />
+      <span className="grid justify-items-start">
+        {RESTING_TRIGGER_LABELS.map((label) => (
+          <span
+            key={label}
+            className="col-start-1 row-start-1 whitespace-nowrap"
+          >
+            {label}
+          </span>
+        ))}
+      </span>
+      <ChevronDown className="size-3.5 shrink-0" />
+    </span>
+  );
+
+  if (publicationLoading) {
+    return (
+      <div
+        className="pointer-events-none relative mr-2 inline-flex shrink-0"
+        aria-busy="true"
+        aria-label="Loading publishing status"
+      >
+        {widthSizer}
+        <span className="absolute right-0 top-1/2 inline-flex h-8 -translate-y-1/2 items-center gap-1 px-2 py-1">
+          <Skeleton className="size-3.5 shrink-0 rounded" />
+          <span className="relative inline-grid">
+            <span className="invisible col-start-1 row-start-1 whitespace-nowrap text-sm font-medium">
+              Published
+            </span>
+            <Skeleton className="col-start-1 row-start-1 h-3.5 self-center" />
+          </span>
+          <ChevronDown
+            className="size-3.5 text-muted-foreground/40"
+            aria-hidden
+          />
+        </span>
+      </div>
+    );
+  }
 
   return (
     <Popover
       open={popoverOpen}
       onOpenChange={(next) => {
+        if (busy && next) return;
         setPopoverOpen(next);
         onAuxiliaryOpenChange(next);
       }}
     >
-      <div
-        className="inline-flex max-w-full shrink-0 items-stretch overflow-hidden rounded-sm border border-input bg-background transition-shadow duration-200 ease-out"
-        title={
-          !editor
-            ? "Loading editor…"
-            : publication
-              ? "Published — publish from the left or open options on the right"
-              : "Publish to web — publish from the left or open options on the right"
-        }
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          className={cn(
-            "h-auto min-h-0 w-[130px] justify-start rounded-none py-1 pl-2 pr-2 text-sm shadow-none",
-            "shrink-0 whitespace-nowrap",
-            "transition-all duration-200 ease-out active:scale-[0.98]",
-            !hasChangesToPublish &&
-              publication &&
-              publishFeedback === "idle" &&
-              "text-muted-foreground",
-          )}
-          disabled={
-            !editor ||
-            busy ||
-            publicationLoading ||
-            (!hasChangesToPublish && publishFeedback === "idle")
-          }
-          onClick={() => {
-            void handlePublish();
-          }}
-        >
-          <span className="inline-flex items-center gap-1.5 transition-all duration-150">
-            {publishButtonIcon}
-            <span>{publishButtonLabel}</span>
-          </span>
-        </Button>
+      <div className="pointer-events-none relative mr-2 inline-flex shrink-0">
+        {widthSizer}
+
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="ghost"
             className={cn(
-              "h-auto min-h-0 shrink-0 rounded-none border-l border-input py-1 pl-1 pr-1.5 text-sm shadow-none",
-              "transition-colors duration-150",
+              "pointer-events-auto absolute right-0 top-1/2 h-8 -translate-y-1/2 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
+              "whitespace-nowrap",
+              "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
+              "hover:bg-accent hover:text-accent-foreground",
+              "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+              "[&_svg]:size-3.5",
+              (busy || publishFeedback !== "idle") && "disabled:opacity-100",
+              !editor &&
+                !busy &&
+                publishFeedback === "idle" &&
+                "opacity-50 disabled:opacity-50",
+              !hasChangesToPublish &&
+                publication &&
+                publishFeedback === "idle" &&
+                "text-muted-foreground",
             )}
-            disabled={!editor || publishFeedback === "publishing"}
-            aria-label="Open publish options"
+            disabled={!editor || busy}
           >
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={triggerLabel}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
+                className="inline-flex items-center gap-1"
+              >
+                <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+                  {isProgress ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <TriggerIcon aria-hidden />
+                  )}
+                </span>
+                <span className="whitespace-nowrap">{triggerLabel}</span>
+              </motion.span>
+            </AnimatePresence>
+            <ChevronDown aria-hidden />
           </Button>
         </PopoverTrigger>
       </div>

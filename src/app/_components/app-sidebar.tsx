@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Home, PanelLeftClose, Plus, Search } from "lucide-react";
+import { PanelLeftClose, Plus, Search } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -20,17 +20,51 @@ import {
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
 import { NavUser } from "./nav-user";
-import { MobileActionGroup } from "./mobile-action-rows";
+import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
-import { randomUUID } from "~/lib/utils";
+import { cn, randomUUID } from "~/lib/utils";
+
+const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
+  "h-12 rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/45",
+  "dark:border-white/10 dark:bg-[hsl(0_0%_22%_/_.95)]",
+  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+  "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
+);
+
+/** Quieter resting fill than `iconSubtle`; hover/press stay a bit stronger. */
+const MOBILE_ICON_ACTION_CLASSNAME = cn(
+  "size-8 shrink-0",
+  "bg-foreground/[0.04]",
+  "hover:bg-foreground/[0.12]",
+  "active:bg-foreground/[0.16]",
+);
+
+/**
+ * Desktop sidebar spacing — semantic, not optical.
+ * Unrelated sections (Brand, Search, Documents) all use Tailwind `6`.
+ * Heading-to-content is medium; peer rows are smallest.
+ */
+const DESKTOP_SIDEBAR = {
+  /** Search defines this content width; Documents header matches it. */
+  inset: "px-2",
+  /** Brand → Search (unrelated sections). */
+  sectionGap: "gap-6",
+  /** Search → Documents (unrelated sections). */
+  sectionStart: "pt-6",
+  /** Documents heading → document list. */
+  headingToContent: "pt-2",
+} as const;
+
+/** Interactive surface; gap is recovered from the previous 40px row. */
+const DESKTOP_DOC_ROW_HEIGHT = 36;
+const DESKTOP_DOC_ROW_GAP = 4;
+const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   initialDocuments: { id: string; name: string }[];
 }
-
-const DESKTOP_DOC_ROW_HEIGHT = 48;
 
 export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const router = useRouter();
@@ -38,7 +72,6 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
-  const isHomeActive = pathname === "/documents";
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -114,23 +147,25 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
     setOpen(true);
   }, [dismissMobileNav, setOpen]);
 
-  const account = footerLoading ? (
-    <NavUser isLoading />
-  ) : userProfile ? (
-    <NavUser
-      user={{
-        first_name: userProfile.first_name,
-        last_name: userProfile.last_name,
-        username: userProfile.username,
-        email: userEmail ?? "",
-        avatar_url: userProfile.avatar_url,
-        default_avatar_background_color:
-          userProfile.default_avatar_background_color,
-      }}
-    />
-  ) : (
-    <NavUser isLoading={false} />
-  );
+  const renderAccount = (triggerClassName?: string) =>
+    footerLoading ? (
+      <NavUser isLoading triggerClassName={triggerClassName} />
+    ) : userProfile ? (
+      <NavUser
+        user={{
+          first_name: userProfile.first_name,
+          last_name: userProfile.last_name,
+          username: userProfile.username,
+          email: userEmail ?? "",
+          avatar_url: userProfile.avatar_url,
+          default_avatar_background_color:
+            userProfile.default_avatar_background_color,
+        }}
+        triggerClassName={triggerClassName}
+      />
+    ) : (
+      <NavUser isLoading={false} triggerClassName={triggerClassName} />
+    );
 
   const mobileDocumentList = (
     <div className="flex flex-col">
@@ -160,13 +195,17 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
       style={
         {
           "--index": index,
-          transform: "translateY(calc(var(--index) * var(--row-height)))",
+          transform: "translateY(calc(var(--index) * var(--row-stride)))",
         } as React.CSSProperties
       }
     >
-      <SidebarMenuButton asChild>
+      <SidebarMenuButton
+        asChild
+        isActive={pathname === `/documents/${doc.id}`}
+        className="h-9 data-[active=true]:font-normal"
+      >
         <Link href={`/documents/${doc.id}`} prefetch={true}>
-          {doc.name}
+          <span className="truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -202,61 +241,34 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           }}
         >
           {/* Header — match document layout header height (h-12) */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-4">
+          <div className="relative flex h-12 shrink-0 items-center px-4">
             <div className="font-lora text-2xl font-medium leading-none">
               Chptr
             </div>
             <Button
-              variant="ghost"
+              variant="iconSubtle"
               size="icon"
-              className="h-7 w-7 shrink-0"
-              aria-label="Close navigation"
-              onClick={dismissMobileNav}
+              className={cn(
+                "absolute right-4 top-1/2 -translate-y-1/2",
+                MOBILE_ICON_ACTION_CLASSNAME,
+              )}
+              aria-label="Search"
+              onClick={openSearch}
             >
-              <PanelLeftClose />
-              <span className="sr-only">Close navigation</span>
+              <Search className="size-4" />
             </Button>
           </div>
 
-          {/* Home + Search toolbar */}
-          <div className="shrink-0 px-4 pb-4 pt-6">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="iconSubtle"
-                asChild
-                className="h-8 gap-2 rounded-full px-3 font-normal"
-              >
-                <Link
-                  href="/documents"
-                  onClick={dismissMobileNav}
-                  aria-current={isHomeActive ? "page" : undefined}
-                >
-                  <Home className="size-4 shrink-0" aria-hidden />
-                  <span className="text-sm">Home</span>
-                </Link>
-              </Button>
-              <Button
-                variant="iconSubtle"
-                size="icon"
-                className="size-8 shrink-0"
-                aria-label="Search"
-                onClick={openSearch}
-              >
-                <Search className="size-4" />
-              </Button>
-            </div>
-          </div>
-
           {/* Documents — collection header + new document */}
-          <section className="flex min-h-0 flex-1 flex-col px-4">
-            <div className="flex shrink-0 items-center justify-between pb-3 pt-4">
+          <section className="flex min-h-0 flex-1 flex-col px-4 pt-5">
+            <div className="flex h-8 shrink-0 items-center justify-between">
               <span className="text-sm font-semibold text-sidebar-foreground">
                 Documents
               </span>
               <Button
                 variant="iconSubtle"
                 size="icon"
-                className="size-8 shrink-0"
+                className={MOBILE_ICON_ACTION_CLASSNAME}
                 aria-label="Create new document"
                 onClick={handleCreateDocument}
               >
@@ -264,86 +276,118 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden pt-1">
+            <div className="min-h-0 flex-1 overflow-hidden pt-2">
               {documentScroll(mobileDocumentList)}
             </div>
           </section>
 
-          {/* Account — pinned bottom group */}
-          <div className="shrink-0 px-4 pb-3 pt-3">
-            <MobileActionGroup className="p-1">{account}</MobileActionGroup>
+          {/* Utility bar */}
+          <div className="shrink-0 border-t border-sidebar-border p-4">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                {renderAccount(MOBILE_UTILITY_CONTROL_CLASSNAME)}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  MOBILE_UTILITY_CONTROL_CLASSNAME,
+                  "size-12 shrink-0",
+                )}
+                aria-label="Close navigation"
+                onClick={dismissMobileNav}
+              >
+                <PanelLeftClose />
+                <span className="sr-only">Close navigation</span>
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
         <div className="flex h-full flex-col">
-          <div className="flex-none">
-            <SidebarHeader className="pb-0">
-              <div className="px-1 font-lora text-2xl font-medium">Chptr</div>
-              <div className="py-6">
-                <div className="space-y-2">
-                  <Button
-                    className="h-9 w-full justify-between gap-2 px-2"
-                    variant="ghost"
-                    onClick={() => setOpen(true)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Search className="size-4" />
-                      <span className="text-sm">Search</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">⌘K</span>
-                  </Button>
-                  <Button
-                    className="h-9 w-full justify-start gap-2 px-2"
-                    variant="ghost"
-                    asChild
-                  >
-                    <Link href="/documents">
-                      <Home className="size-4" />
-                      <span className="text-sm">Home</span>
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </SidebarHeader>
-            <SidebarHeader className="pt-0">
-              <div className="flex items-center justify-between px-2 text-sm font-semibold">
-                <span>Documents</span>
+          <SidebarHeader
+            className={cn(
+              "pb-0",
+              DESKTOP_SIDEBAR.inset,
+              DESKTOP_SIDEBAR.sectionGap,
+            )}
+          >
+            <div className="px-1 font-lora text-2xl font-medium">Chptr</div>
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                "h-9 w-full justify-between px-2.5 font-normal",
+                "cursor-pointer bg-sidebar-accent/50 text-sidebar-foreground",
+                "transition-[color,background-color,transform]",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "active:scale-[0.99] active:bg-sidebar-accent",
+              )}
+              onClick={() => setOpen(true)}
+            >
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <Search className="size-4 shrink-0" aria-hidden />
+                <span>Search</span>
+              </span>
+              <kbd className="shrink-0 text-xs font-normal text-muted-foreground">
+                ⌘K
+              </kbd>
+            </Button>
+          </SidebarHeader>
+
+          <section
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              DESKTOP_SIDEBAR.inset,
+              DESKTOP_SIDEBAR.sectionStart,
+            )}
+          >
+            <div className="flex h-8 shrink-0 items-center justify-between">
+              <span className="text-sm font-semibold">Documents</span>
+              <HoverTooltip content="New document" side="right">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-8"
-                  aria-label="Create new document"
+                  className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  aria-label="New document"
                   onClick={handleCreateDocument}
                 >
                   <Plus className="size-4" />
                 </Button>
-              </div>
-            </SidebarHeader>
-          </div>
+              </HoverTooltip>
+            </div>
 
-          <div className="flex-1 overflow-hidden">
-            {documentScroll(
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarMenu
-                    className="relative gap-0"
-                    style={
-                      {
-                        "--item-count": documents?.documents?.length ?? 0,
-                        "--row-height": `${DESKTOP_DOC_ROW_HEIGHT}px`,
-                        height: "calc(var(--item-count) * var(--row-height))",
-                      } as React.CSSProperties
-                    }
-                  >
-                    {desktopDocumentList}
-                  </SidebarMenu>
-                </SidebarGroup>
-              </SidebarContent>,
-            )}
-          </div>
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden",
+                DESKTOP_SIDEBAR.headingToContent,
+              )}
+            >
+              {documentScroll(
+                <SidebarContent className="gap-0 overflow-hidden p-0">
+                  <SidebarGroup className="p-0">
+                    <SidebarMenu
+                      className="relative gap-0"
+                      style={
+                        {
+                          "--item-count": documents?.documents?.length ?? 0,
+                          "--row-stride": `${DESKTOP_DOC_ROW_STRIDE}px`,
+                          height:
+                            "calc(var(--item-count) * var(--row-stride))",
+                        } as React.CSSProperties
+                      }
+                    >
+                      {desktopDocumentList}
+                    </SidebarMenu>
+                  </SidebarGroup>
+                </SidebarContent>,
+              )}
+            </div>
+          </section>
 
           <div className="flex-none">
-            <SidebarFooter>{account}</SidebarFooter>
+            <SidebarFooter>{renderAccount()}</SidebarFooter>
           </div>
         </div>
       )}

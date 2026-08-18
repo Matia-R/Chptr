@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Command,
   CommandInput,
   CommandList,
   CommandEmpty,
@@ -62,50 +61,48 @@ export function CommandMenu() {
   return (
     <CommandDialog open={isOpen} onOpenChange={setOpen}>
       <DialogTitle className="sr-only">Command Menu</DialogTitle>
-      <Command>
-        <CommandInput
-          value={search}
-          onValueChange={setSearch}
-          placeholder="Type a command or search..."
-        />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Notes">
-            {displayedDocs.map((doc) => (
-              <CommandItem
-                key={doc.id}
-                value={doc.name + "_" + doc.id}
-                onSelect={() => {
-                  router.push(`/documents/${doc.id}`);
-                  closeAll();
-                }}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                {doc.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandGroup heading="Quick Actions">
-            <CommandItem value="new-note" onSelect={handleCreateDocument}>
-              <FilePlus className="mr-2 h-4 w-4" />
-              New note
-            </CommandItem>
+      <CommandInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder="Search or type a command..."
+      />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Documents">
+          {displayedDocs.map((doc) => (
             <CommandItem
-              value="toggle-theme"
+              key={doc.id}
+              value={doc.name + "_" + doc.id}
               onSelect={() => {
-                setTheme(theme === "dark" ? "light" : "dark");
+                router.push(`/documents/${doc.id}`);
                 closeAll();
               }}
             >
-              <SunMoon className="mr-2 h-4 w-4" />
-              Toggle theme
-              <span className="ml-auto text-xs text-muted-foreground">
-                Current: {theme}
-              </span>
+              <FileText aria-hidden />
+              {doc.name}
             </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </Command>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Quick Actions">
+          <CommandItem value="new-document" onSelect={handleCreateDocument}>
+            <FilePlus aria-hidden />
+            New document
+          </CommandItem>
+          <CommandItem
+            value="toggle-theme"
+            onSelect={() => {
+              setTheme(theme === "dark" ? "light" : "dark");
+              closeAll();
+            }}
+          >
+            <SunMoon aria-hidden />
+            Toggle theme
+            <span className="ml-auto text-xs text-muted-foreground">
+              Current: {theme}
+            </span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
     </CommandDialog>
   );
 }

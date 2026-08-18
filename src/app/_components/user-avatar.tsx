@@ -1,6 +1,9 @@
 "use client";
 
+import * as React from "react";
+
 import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/avatar";
+import { Skeleton } from "~/app/_components/skeleton";
 import {
   getAvatarColorHex,
   getAvatarColorTailwindClass,
@@ -23,6 +26,8 @@ export type UserAvatarProps = {
   className?: string;
 };
 
+type ImageLoadingStatus = "idle" | "loading" | "loaded" | "error";
+
 export function UserAvatar({
   first_name,
   last_name,
@@ -33,6 +38,33 @@ export function UserAvatar({
   className,
 }: UserAvatarProps) {
   const src = avatar_url?.trim() ?? "";
+  // Remount when the image is cleared/replaced so loading status resets.
+  return (
+    <UserAvatarInner
+      key={src || "fallback"}
+      first_name={first_name}
+      last_name={last_name}
+      src={src}
+      default_avatar_background_color={default_avatar_background_color}
+      initials={initialsProp}
+      alt={alt}
+      className={className}
+    />
+  );
+}
+
+function UserAvatarInner({
+  first_name,
+  last_name,
+  src,
+  default_avatar_background_color,
+  initials: initialsProp,
+  alt,
+  className,
+}: Omit<UserAvatarProps, "avatar_url"> & { src: string }) {
+  const [imageStatus, setImageStatus] = React.useState<ImageLoadingStatus>(
+    src ? "loading" : "idle",
+  );
 
   const initials =
     initialsProp ??
@@ -60,20 +92,33 @@ export function UserAvatar({
       return t.length > 0 ? t : "User";
     })();
 
+  const isImagePending =
+    Boolean(src) && imageStatus !== "loaded" && imageStatus !== "error";
+  const showFallback = !src || imageStatus === "error";
+
   return (
-    // Remount when the image is cleared/replaced so Radix resets
-    // `imageLoadingStatus` — otherwise Fallback stays hidden after a load.
-    <Avatar
-      key={src || "fallback"}
-      className={cn("h-8 w-8 rounded-full", className)}
-    >
-      {src ? <AvatarImage src={src} alt={altText} /> : null}
-      <AvatarFallback
-        className={avatarFallbackClassName}
-        style={avatarFallbackStyle}
-      >
-        {initials}
-      </AvatarFallback>
+    <Avatar className={cn("h-8 w-8 rounded-full", className)}>
+      {src ? (
+        <AvatarImage
+          src={src}
+          alt={altText}
+          onLoadingStatusChange={setImageStatus}
+        />
+      ) : null}
+      {isImagePending ? (
+        <Skeleton
+          aria-hidden
+          className="absolute inset-0 h-full w-full rounded-full"
+        />
+      ) : null}
+      {showFallback ? (
+        <AvatarFallback
+          className={avatarFallbackClassName}
+          style={avatarFallbackStyle}
+        >
+          {initials}
+        </AvatarFallback>
+      ) : null}
     </Avatar>
   );
 }

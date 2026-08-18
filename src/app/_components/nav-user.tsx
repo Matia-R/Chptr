@@ -2,11 +2,9 @@
 
 import {
   BadgeCheck,
-  // Bell,
+  ChevronRight,
   ChevronsUpDown,
-  // CreditCard,
   LogOut,
-  // Sparkles,
   Moon,
   Sun,
 } from "lucide-react";
@@ -33,10 +31,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
 import { useAccountSettingsStore } from "~/hooks/use-account-settings";
+import { cn } from "~/lib/utils";
 
 export function NavUser({
   user,
   isLoading,
+  triggerClassName,
 }: {
   user?: {
     first_name: string | null;
@@ -47,6 +47,7 @@ export function NavUser({
     default_avatar_background_color: string;
   };
   isLoading?: boolean;
+  triggerClassName?: string;
 }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
@@ -77,7 +78,7 @@ export function NavUser({
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg">
+          <SidebarMenuButton size="lg" className={triggerClassName}>
             <Skeleton className="h-8 w-8 rounded-full" />
             <div className="grid flex-1 gap-1 text-left text-sm">
               <Skeleton className="h-4 w-24" />
@@ -93,7 +94,12 @@ export function NavUser({
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <div className="px-4 py-2 text-sm text-muted-foreground">
+          <div
+            className={cn(
+              "px-4 py-2 text-sm text-muted-foreground",
+              triggerClassName,
+            )}
+          >
             User not found
           </div>
         </SidebarMenuItem>
@@ -107,44 +113,67 @@ export function NavUser({
       ? user.email
       : null;
 
+  const trigger = (
+    <>
+      <UserAvatar
+        first_name={user.first_name}
+        last_name={user.last_name}
+        avatar_url={user.avatar_url}
+        default_avatar_background_color={
+          user.default_avatar_background_color
+        }
+        alt={`${user.first_name} ${user.last_name}`}
+      />
+      <div className="grid flex-1 text-left text-sm leading-tight">
+        <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
+        {subtitle ? (
+          <span className="truncate text-xs text-muted-foreground">
+            {subtitle}
+          </span>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            className={cn(
+              "focus-visible:ring-1 focus-visible:ring-ring",
+              triggerClassName,
+            )}
+            onClick={handleOpenAccountSettings}
+          >
+            {trigger}
+            <ChevronRight className="ml-auto size-4" />
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        {/*
-         * Desktop stays non-modal: a modal menu + the account Dialog corrupt
-         * Radix's shared body pointer-events bookkeeping. Mobile uses a Vaul
-         * drawer instead, and needs modal so the menu sits above the nav sheet
-         * and actually receives hover/clicks.
-         */}
-        <DropdownMenu modal={isMobile}>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className={cn(
+                "focus-visible:ring-1 focus-visible:ring-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+                triggerClassName,
+              )}
             >
-              <UserAvatar
-                first_name={user.first_name}
-                last_name={user.last_name}
-                avatar_url={user.avatar_url}
-                default_avatar_background_color={
-                  user.default_avatar_background_color
-                }
-                alt={`${user.first_name} ${user.last_name}`}
-              />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
-                {subtitle ? (
-                  <span className="truncate text-xs text-muted-foreground">
-                    {subtitle}
-                  </span>
-                ) : null}
-              </div>
+              {trigger}
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg bg-sidebar"
-            side={isMobile ? "bottom" : "right"}
+            side="right"
             align="end"
             sideOffset={4}
           >
@@ -176,7 +205,7 @@ export function NavUser({
                 Upgrade to Pro
               </DropdownMenuItem>
             </DropdownMenuGroup> */}
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="dark:bg-white/10" />
             <DropdownMenuGroup>
               <DropdownMenuItem
                 className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
@@ -186,7 +215,7 @@ export function NavUser({
                 Account
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="dark:bg-white/10" />
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
