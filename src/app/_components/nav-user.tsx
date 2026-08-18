@@ -205,7 +205,7 @@ export function NavUser({
                 Upgrade to Pro
               </DropdownMenuItem>
             </DropdownMenuGroup> */}
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="dark:bg-white/10" />
             <DropdownMenuGroup>
               <DropdownMenuItem
                 className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
@@ -215,7 +215,7 @@ export function NavUser({
                 Account
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="dark:bg-white/10" />
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"

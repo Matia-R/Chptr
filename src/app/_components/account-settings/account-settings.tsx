@@ -87,7 +87,7 @@ const PASSWORD_FORM_ID = "account-settings-password-form";
 
 /** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
 const DIALOG_SHELL_CLASS =
-  "flex h-[min(85vh,32.1rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl dark:bg-sidebar";
+  "flex h-[min(85vh,32.1rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-sidebar p-0 shadow-2xl";
 
 const DIALOG_HEADER_CLASS = "shrink-0 py-5 pl-6 pr-12";
 

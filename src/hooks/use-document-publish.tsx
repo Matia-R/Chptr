@@ -425,10 +425,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                     "focus-within:ring-1 focus-within:ring-ring",
                   )
                 : cn(
-                    "min-h-9 rounded-md border border-input shadow-sm",
-                    "bg-transparent dark:border-sidebar-border dark:bg-background",
-                    "dark:shadow-[inset_0_1px_0_0_hsl(0_0%_100%_/_0.06)]",
-                    "focus-within:ring-1 focus-within:ring-ring",
+                    "min-h-9 rounded-md border border-input",
+                    "dark:border-sidebar-border",
+                    "focus-within:border-foreground/40 focus-within:ring-1 focus-within:ring-foreground/10",
                   ),
             )}
           >
@@ -454,7 +453,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               spellCheck={false}
               enterKeyHint="done"
               className={cn(
-                "min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
+                "min-w-0 flex-1 border-0 bg-[hsl(var(--input-background))] px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
                 isDrawerMobileSurface ? "h-10 text-base" : "h-9",
                 showInlineRevert ? "rounded-none" : "rounded-r-md",
               )}
@@ -477,7 +476,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                 size="icon"
                 disabled={busy}
                 title="Revert URL slug"
-                className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input text-muted-foreground transition-colors hover:text-foreground dark:border-sidebar-border"
+                className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input bg-[hsl(var(--input-background))] text-muted-foreground transition-colors hover:text-foreground dark:border-sidebar-border"
                 onClick={revertSlugStore}
               >
                 <Undo2 className="h-4 w-4" aria-hidden />
