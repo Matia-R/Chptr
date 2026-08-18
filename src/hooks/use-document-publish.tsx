@@ -254,9 +254,11 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     (publication === null || hasUnpublishedChanges || hasPendingSlugChange);
   const primaryTriggerLabel = publicationLoading
     ? "Loading…"
-    : hasChangesToPublish
-      ? "Publish changes"
-      : "Up to date";
+    : !publication
+      ? "Publish"
+      : hasChangesToPublish
+        ? "Update"
+        : "Published";
 
   const busy =
     publishMutation.isPending ||

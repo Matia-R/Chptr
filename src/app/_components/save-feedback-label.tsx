@@ -6,7 +6,7 @@ import { Check, Loader2 } from "lucide-react";
 import type { SaveFeedbackState } from "~/hooks/use-save-feedback";
 import { cn } from "~/lib/utils";
 
-const CONTENT_TRANSITION = {
+export const SAVE_FEEDBACK_CONTENT_TRANSITION = {
   duration: 0.18,
   ease: [0.22, 1, 0.36, 1] as const,
 };
@@ -55,7 +55,7 @@ export function SaveFeedbackLabel({
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          transition={CONTENT_TRANSITION}
+          transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
           className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
         >
           {state === "saving" ? (

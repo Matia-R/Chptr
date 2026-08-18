@@ -60,8 +60,8 @@ function getMobilePublishActionRow(
           ? "Failed to publish"
           : options.showPublishedPopoverActions
             ? options.hasChangesToPublish
-              ? "Publish changes"
-              : "Up to date"
+              ? "Update"
+              : "Published"
             : (options.firstPublishLabel ?? "Publish");
 
   const icon: LucideIcon =
@@ -453,7 +453,7 @@ export function DocumentPublishPopoverPanel() {
             type="button"
             className={cn(
               "min-w-0 flex-1 transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]",
-              // Keep full contrast while pending/feedback plays; idle "Up to date" stays dimmed.
+              // Keep full contrast while pending/feedback plays; idle "Published" stays dimmed.
               (busy || publishFeedback !== "idle") && "disabled:opacity-100",
             )}
             disabled={
@@ -468,9 +468,7 @@ export function DocumentPublishPopoverPanel() {
           >
             <SaveFeedbackLabel
               state={publishFeedbackToSaveState(publishFeedback)}
-              idleLabel={
-                hasChangesToPublish ? "Publish changes" : "Up to date"
-              }
+              idleLabel={hasChangesToPublish ? "Update" : "Published"}
               savingLabel="Publishing..."
               savedLabel="Published"
               failedLabel="Failed to publish"
