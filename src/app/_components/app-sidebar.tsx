@@ -26,19 +26,21 @@ import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { cn, randomUUID } from "~/lib/utils";
 
-const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
-  "h-12 rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/45",
+const MOBILE_UTILITY_SURFACE_CLASSNAME = cn(
+  "border border-sidebar-border/70 bg-sidebar-accent/45",
   "dark:border-white/10 dark:bg-[hsl(0_0%_22%_/_.95)]",
   "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
   "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
 );
 
-/** Quieter resting fill than `iconSubtle`; hover/press stay a bit stronger. */
+const MOBILE_UTILITY_CONTROL_CLASSNAME = cn(
+  "h-12 rounded-[10px]",
+  MOBILE_UTILITY_SURFACE_CLASSNAME,
+);
+
 const MOBILE_ICON_ACTION_CLASSNAME = cn(
-  "size-8 shrink-0",
-  "bg-foreground/[0.04]",
-  "hover:bg-foreground/[0.12]",
-  "active:bg-foreground/[0.16]",
+  "size-10 shrink-0 rounded-full",
+  MOBILE_UTILITY_SURFACE_CLASSNAME,
 );
 
 /**
@@ -235,7 +237,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         <div
           className="flex h-full min-h-0 flex-col"
           style={{
-            paddingTop: "env(safe-area-inset-top)",
+            paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)",
             paddingBottom: "env(safe-area-inset-bottom)",
             paddingLeft: "env(safe-area-inset-left)",
           }}
@@ -246,7 +248,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
               Chptr
             </div>
             <Button
-              variant="iconSubtle"
+              variant="ghost"
               size="icon"
               className={cn(
                 "absolute right-4 top-1/2 -translate-y-1/2",
@@ -261,12 +263,12 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
           {/* Documents — collection header + new document */}
           <section className="flex min-h-0 flex-1 flex-col px-4 pt-5">
-            <div className="flex h-8 shrink-0 items-center justify-between">
+            <div className="flex h-10 shrink-0 items-center justify-between">
               <span className="text-sm font-semibold text-sidebar-foreground">
                 Documents
               </span>
               <Button
-                variant="iconSubtle"
+                variant="ghost"
                 size="icon"
                 className={MOBILE_ICON_ACTION_CLASSNAME}
                 aria-label="Create new document"
