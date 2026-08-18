@@ -13,6 +13,7 @@ import {
   useDocumentPublish,
 } from "~/app/_components/editor/document-publish";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
+import { Skeleton } from "~/app/_components/skeleton";
 import { cn } from "~/lib/utils";
 
 /** Resting labels only — wrapper width must not include transitional copy. */
@@ -48,6 +49,7 @@ export function DocumentPublishButton() {
     publishFeedback,
     showPublishedPopoverActions,
     busy,
+    publicationLoading,
   } = ctx;
 
   const triggerLabel = getTriggerLabel({
@@ -64,6 +66,51 @@ export function DocumentPublishButton() {
         ? RefreshCw
         : Globe;
 
+  const widthSizer = (
+    <span
+      className="invisible inline-flex h-8 items-center gap-1 px-2 py-1 text-sm font-medium"
+      aria-hidden
+    >
+      <span className="size-3.5 shrink-0" />
+      <span className="grid justify-items-start">
+        {RESTING_TRIGGER_LABELS.map((label) => (
+          <span
+            key={label}
+            className="col-start-1 row-start-1 whitespace-nowrap"
+          >
+            {label}
+          </span>
+        ))}
+      </span>
+      <ChevronDown className="size-3.5 shrink-0" />
+    </span>
+  );
+
+  if (publicationLoading) {
+    return (
+      <div
+        className="pointer-events-none relative mr-2 inline-flex shrink-0"
+        aria-busy="true"
+        aria-label="Loading publishing status"
+      >
+        {widthSizer}
+        <span className="absolute right-0 top-1/2 inline-flex h-8 -translate-y-1/2 items-center gap-1 px-2 py-1">
+          <Skeleton className="size-3.5 shrink-0 rounded" />
+          <span className="relative inline-grid">
+            <span className="invisible col-start-1 row-start-1 whitespace-nowrap text-sm font-medium">
+              Published
+            </span>
+            <Skeleton className="col-start-1 row-start-1 h-3.5 self-center" />
+          </span>
+          <ChevronDown
+            className="size-3.5 text-muted-foreground/40"
+            aria-hidden
+          />
+        </span>
+      </div>
+    );
+  }
+
   return (
     <Popover
       open={popoverOpen}
@@ -74,23 +121,7 @@ export function DocumentPublishButton() {
       }}
     >
       <div className="pointer-events-none relative mr-2 inline-flex shrink-0">
-        <span
-          className="invisible inline-flex h-8 items-center gap-1 px-2 py-1 text-sm font-medium"
-          aria-hidden
-        >
-          <span className="size-3.5 shrink-0" />
-          <span className="grid justify-items-start">
-            {RESTING_TRIGGER_LABELS.map((label) => (
-              <span
-                key={label}
-                className="col-start-1 row-start-1 whitespace-nowrap"
-              >
-                {label}
-              </span>
-            ))}
-          </span>
-          <ChevronDown className="size-3.5 shrink-0" />
-        </span>
+        {widthSizer}
 
         <PopoverTrigger asChild>
           <Button
@@ -99,11 +130,15 @@ export function DocumentPublishButton() {
             className={cn(
               "pointer-events-auto absolute right-0 top-1/2 h-8 -translate-y-1/2 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
               "whitespace-nowrap",
-              "transition-colors duration-150",
+              "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
               "hover:bg-accent hover:text-accent-foreground",
               "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
               "[&_svg]:size-3.5",
               (busy || publishFeedback !== "idle") && "disabled:opacity-100",
+              !editor &&
+                !busy &&
+                publishFeedback === "idle" &&
+                "opacity-50 disabled:opacity-50",
               !hasChangesToPublish &&
                 publication &&
                 publishFeedback === "idle" &&

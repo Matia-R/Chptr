@@ -20,11 +20,7 @@ import {
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
 import { NavUser } from "./nav-user";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/app/_components/tooltip";
+import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
@@ -348,21 +344,18 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           >
             <div className="flex h-8 shrink-0 items-center justify-between">
               <span className="text-sm font-semibold">Documents</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    aria-label="New document"
-                    onClick={handleCreateDocument}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>New document</TooltipContent>
-              </Tooltip>
+              <HoverTooltip content="New document" side="right">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  aria-label="New document"
+                  onClick={handleCreateDocument}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </HoverTooltip>
             </div>
 
             <div

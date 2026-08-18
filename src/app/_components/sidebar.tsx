@@ -18,6 +18,7 @@ import {
 } from "~/app/_components/drawer";
 import { Skeleton } from "~/app/_components/skeleton";
 import {
+  HoverTooltip,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -30,7 +31,7 @@ const SIDEBAR_WIDTH = "16rem";
 /** Nearly full-width navigation screen on mobile (~90–92vw). */
 const SIDEBAR_WIDTH_MOBILE = "91vw";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const SIDEBAR_KEYBOARD_SHORTCUT = "\\";
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -110,13 +111,15 @@ const SidebarProvider = React.forwardRef<
         window.removeEventListener("close-mobile-sidebar", handleCloseMobile);
     }, []);
 
-    // Adds a keyboard shortcut to toggle the sidebar (Cmd+Shift+B).
+    // Adds a keyboard shortcut to toggle the sidebar (Cmd+\).
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (
-          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
           (event.metaKey || event.ctrlKey) &&
-          event.shiftKey
+          !event.shiftKey &&
+          !event.altKey &&
+          (event.key === SIDEBAR_KEYBOARD_SHORTCUT ||
+            event.code === "Backslash")
         ) {
           event.preventDefault();
           toggleSidebar();
@@ -299,24 +302,39 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar();
+  const sidebarOpen = isMobile ? openMobile : open;
+  const label = sidebarOpen ? "Close sidebar" : "Open sidebar";
 
   return (
-    <Button
-      ref={ref}
-      data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
-      {...props}
+    <HoverTooltip
+      side="bottom"
+      align="start"
+      content={
+        <span className="inline-flex items-center gap-2">
+          {label}
+          <kbd className="font-sans text-[10px] font-normal text-muted-foreground">
+            ⌘\
+          </kbd>
+        </span>
+      }
     >
-      <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+      <Button
+        ref={ref}
+        data-sidebar="trigger"
+        variant="ghost"
+        size="icon"
+        className={cn("h-7 w-7", className)}
+        onClick={(event) => {
+          onClick?.(event);
+          toggleSidebar();
+        }}
+        {...props}
+      >
+        <PanelLeft />
+        <span className="sr-only">{label}</span>
+      </Button>
+    </HoverTooltip>
   );
 });
 SidebarTrigger.displayName = "SidebarTrigger";
