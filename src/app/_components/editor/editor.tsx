@@ -12,7 +12,6 @@ import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
 import { Alert } from "./custom-blocks/Alert";
 import { AiPromptInput } from "./custom-blocks/AiPromptInput";
 import type * as Y from "yjs";
-import type { WebrtcProvider } from "y-webrtc";
 import { renderCursor } from "./cursor-renderer";
 import {
   supportedLanguages,
@@ -27,11 +26,16 @@ import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
 
+interface CollaborationProvider {
+  awareness: unknown;
+  destroy?: () => void;
+}
+
 interface EditorProps {
   userName: string;
   userColor: string;
   ydoc: Y.Doc;
-  provider: WebrtcProvider;
+  provider: CollaborationProvider;
 }
 
 const schema = BlockNoteSchema.create({

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "chptr-collab",
+  "main": "party/document.ts",
+  "compatibilityDate": "2024-01-01"
+}

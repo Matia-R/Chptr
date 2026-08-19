@@ -7,7 +7,7 @@ import { TRPCClientError } from "@trpc/client";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
-import { useCollaborativeDocCrdt } from "~/hooks/use-collaborative-doc-crdt";
+import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
@@ -80,8 +80,8 @@ export default function DocumentPage() {
   // Fetch user profile (non-blocking: editor shows with placeholder until loaded)
   const { data: userProfile } = useUserProfile();
 
-  // CRDT-based collaborative doc - handles fetching and saving internally
-  const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocCrdt(
+  // PartyKit-based collaborative doc - handles fetching and saving on server
+  const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocPartykit(
     {
       documentId,
       isNew,
