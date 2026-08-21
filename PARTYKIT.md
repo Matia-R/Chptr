@@ -120,6 +120,22 @@ npx partykit env add PARTYKIT_SECRET
 
 Note: For `env` commands, `npx partykit` is fine since it doesn't need to bundle code.
 
+## Database Schema
+
+The PartyKit integration uses a simplified single-table schema:
+
+```sql
+CREATE TABLE document_state (
+    document_id UUID PRIMARY KEY REFERENCES documents(id),
+    state_data BYTEA NOT NULL,    -- Full Y.Doc state
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**To set up:** Run the migration in `migrations/partykit_document_state.sql`
+
+This replaces the old `document_changes` + `document_snapshots` tables with a single table. No more compaction needed since we always store the full state.
+
 ## Files
 
 | File | Purpose |
@@ -127,9 +143,10 @@ Note: For `env` commands, `npx partykit` is fine since it doesn't need to bundle
 | `partykit.json` | PartyKit configuration |
 | `party/document.ts` | PartyKit server (Yjs room handler, JWT verification) |
 | `src/hooks/use-collaborative-doc-partykit.ts` | Client-side hook (gets session, passes JWT) |
-| `src/app/api/partykit/load/route.ts` | API to load document state (uses user's JWT) |
-| `src/app/api/partykit/save/route.ts` | API to save document state (uses user's JWT) |
+| `src/app/api/partykit/load/route.ts` | API to load document state |
+| `src/app/api/partykit/save/route.ts` | API to save document state |
 | `src/utils/supabase/from-token.ts` | Creates Supabase client from JWT |
+| `migrations/partykit_document_state.sql` | Database migration |
 
 ## How It Works
 
@@ -178,4 +195,4 @@ To revert to y-webrtc:
 2. In `src/app/_components/editor/editor.tsx`:
    - Change provider type back to `WebrtcProvider`
 
-The database schema is unchanged, so rollback is seamless.
+**Note:** The PartyKit integration uses a new `document_state` table. The old `document_changes` and `document_snapshots` tables are still present but not used. If you have existing documents that were created with the old system, you may need to migrate the data or keep both systems available.

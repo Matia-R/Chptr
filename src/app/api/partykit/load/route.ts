@@ -1,30 +1,23 @@
 import { NextResponse } from "next/server";
 import { createClientFromToken } from "~/utils/supabase/from-token";
 
-interface SnapshotRow {
-  snapshot_data: string | null;
-  snapshot_cutoff_created_at: string | null;
-}
-
-interface ChangeRow {
-  update_data: string | null;
-  created_at: string;
-}
-
-function byteaResponseToBase64(raw: string | null | undefined): string {
-  const trimmed = (raw ?? "").trim();
-  if (!trimmed) return "";
-  if (
-    trimmed.startsWith("\\x") ||
-    trimmed.startsWith("0x") ||
-    trimmed.startsWith("0X")
-  ) {
-    const hex = trimmed.replace(/^\\x|^0x|^0X/i, "").replace(/\s/g, "");
+function byteaToBase64(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  
+  // Handle PostgreSQL bytea hex format (\x...)
+  if (trimmed.startsWith("\\x")) {
+    const hex = trimmed.slice(2);
     return Buffer.from(hex, "hex").toString("base64");
   }
+  
+  // Handle raw hex
   if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
     return Buffer.from(trimmed, "hex").toString("base64");
   }
+  
+  // Assume already base64
   return trimmed;
 }
 
@@ -58,6 +51,7 @@ export async function POST(request: Request) {
 
     const supabase = createClientFromToken(token);
 
+    // Check if user has access to the document
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .select("id")
@@ -74,52 +68,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: rawSnapshotRow, error: snapshotError } = await supabase
-      .from("document_snapshots")
-      .select("snapshot_data, snapshot_cutoff_created_at")
+    // Load document state
+    const { data: stateRow, error: stateError } = await supabase
+      .from("document_state")
+      .select("state_data")
       .eq("document_id", documentId)
       .single();
 
-    if (snapshotError && snapshotError.code !== "PGRST116") {
-      console.error("[PartyKit Load] Snapshot error:", snapshotError);
-    }
-
-    const snapshotRow = rawSnapshotRow as SnapshotRow | null;
-    const snapshot: string | null = snapshotRow?.snapshot_data
-      ? byteaResponseToBase64(snapshotRow.snapshot_data)
-      : null;
-    const snapshotCutoffCreatedAt: string | null =
-      snapshotRow?.snapshot_cutoff_created_at ?? null;
-
-    let changesQuery = supabase
-      .from("document_changes")
-      .select("update_data, created_at")
-      .eq("document_id", documentId)
-      .order("created_at", { ascending: true });
-
-    if (snapshotCutoffCreatedAt) {
-      changesQuery = changesQuery.gt("created_at", snapshotCutoffCreatedAt);
-    }
-
-    const { data: rawChangesRows, error: changesError } = await changesQuery;
-
-    if (changesError) {
-      console.error("[PartyKit Load] Changes error:", changesError);
+    if (stateError && stateError.code !== "PGRST116") {
+      console.error("[PartyKit Load] State error:", stateError);
       return NextResponse.json(
-        { error: "Failed to load changes" },
+        { error: "Failed to load document state" },
         { status: 500 }
       );
     }
 
-    const changesRows = (rawChangesRows ?? []) as ChangeRow[];
-    const changes = changesRows.map((row) => ({
-      updateData: byteaResponseToBase64(row.update_data),
-    }));
+    // Convert bytea to base64
+    const state = stateRow 
+      ? byteaToBase64((stateRow as { state_data: string }).state_data)
+      : null;
 
-    return NextResponse.json({
-      snapshot,
-      changes,
-    });
+    return NextResponse.json({ state });
   } catch (error) {
     console.error("[PartyKit Load] Error:", error);
     return NextResponse.json(

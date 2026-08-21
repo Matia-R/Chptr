@@ -78,9 +78,7 @@ export default class DocumentParty implements Party.Server {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log(
-            `[PartyKit] Document ${documentId} not found, starting fresh`
-          );
+          console.log(`[PartyKit] Document ${documentId} not found, starting fresh`);
           this.isLoaded = true;
           return true;
         }
@@ -91,30 +89,17 @@ export default class DocumentParty implements Party.Server {
         throw new Error(`Failed to load document: ${response.status}`);
       }
 
-      const data = (await response.json()) as {
-        snapshot: string | null;
-        changes: Array<{ updateData: string }>;
-      };
+      const data = (await response.json()) as { state: string | null };
 
-      const updates: Uint8Array[] = [];
-
-      if (data.snapshot) {
-        updates.push(base64ToUint8Array(data.snapshot));
-      }
-
-      for (const change of data.changes || []) {
-        updates.push(base64ToUint8Array(change.updateData));
-      }
-
-      if (updates.length > 0) {
-        const merged = Y.mergeUpdates(updates);
-        Y.applyUpdate(this.ydoc, merged, "load");
+      if (data.state) {
+        const stateBytes = base64ToUint8Array(data.state);
+        Y.applyUpdate(this.ydoc, stateBytes, "load");
+        console.log(`[PartyKit] Loaded document ${documentId} with existing state`);
+      } else {
+        console.log(`[PartyKit] Document ${documentId} has no saved state, starting fresh`);
       }
 
       this.isLoaded = true;
-      console.log(
-        `[PartyKit] Loaded document ${documentId} with ${updates.length} updates`
-      );
       return true;
     } catch (error) {
       console.error(`[PartyKit] Failed to load document ${documentId}:`, error);
@@ -157,7 +142,7 @@ export default class DocumentParty implements Party.Server {
         },
         body: JSON.stringify({
           documentId,
-          snapshot: stateBase64,
+          state: stateBase64,
         }),
       });
 

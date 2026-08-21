@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClientFromToken } from "~/utils/supabase/from-token";
 
-function base64ToByteaHex(base64: string): string {
+function base64ToBytea(base64: string): string {
   const buf = Buffer.from(base64, "base64");
   return "\\x" + buf.toString("hex");
 }
@@ -25,20 +25,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { documentId, snapshot } = (await request.json()) as {
+    const { documentId, state } = (await request.json()) as {
       documentId: string;
-      snapshot: string;
+      state: string;
     };
 
-    if (!documentId || !snapshot) {
+    if (!documentId || !state) {
       return NextResponse.json(
-        { error: "Missing documentId or snapshot" },
+        { error: "Missing documentId or state" },
         { status: 400 }
       );
     }
 
     const supabase = createClientFromToken(token);
 
+    // Check if user has access to the document
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .select("id")
@@ -52,13 +53,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Upsert document state
     const { error: upsertError } = await supabase
-      .from("document_snapshots")
+      .from("document_state")
       .upsert(
         {
           document_id: documentId,
-          snapshot_data: base64ToByteaHex(snapshot),
-          snapshot_cutoff_created_at: new Date().toISOString(),
+          state_data: base64ToBytea(state),
+          updated_at: new Date().toISOString(),
         },
         { onConflict: "document_id" }
       );
@@ -66,20 +68,12 @@ export async function POST(request: Request) {
     if (upsertError) {
       console.error("[PartyKit Save] Upsert error:", upsertError);
       return NextResponse.json(
-        { error: "Failed to save snapshot" },
+        { error: "Failed to save document state" },
         { status: 500 }
       );
     }
 
-    const { error: deleteError } = await supabase
-      .from("document_changes")
-      .delete()
-      .eq("document_id", documentId);
-
-    if (deleteError) {
-      console.error("[PartyKit Save] Delete error (non-fatal):", deleteError);
-    }
-
+    // Update document's last_updated timestamp
     const { error: updateError } = await supabase
       .from("documents")
       .update({ last_updated: new Date().toISOString() })
