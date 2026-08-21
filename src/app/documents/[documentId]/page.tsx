@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
@@ -11,6 +11,8 @@ import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-party
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
+
+const SKELETON_DELAY_MS = 250;
 
 const DOCUMENT_ERROR = {
   NOT_FOUND: {
@@ -88,6 +90,25 @@ export default function DocumentPage() {
     },
   );
 
+  // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  const isStillLoading = isLoading || !isReady || !ydoc || !provider;
+
+  useEffect(() => {
+    if (!isStillLoading) {
+      // Loading complete, reset skeleton state
+      setShowSkeleton(false);
+      return;
+    }
+
+    // Start timer to show skeleton after delay
+    const timer = setTimeout(() => {
+      setShowSkeleton(true);
+    }, SKELETON_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [isStillLoading]);
+
   // === RENDERING LOGIC ===
 
   // 1. Handle errors — show alert and stop; don't proceed to loading or editor
@@ -103,29 +124,20 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Show loading skeleton for existing documents only
-  if (!isNew && (isLoading || !isReady || !ydoc || !provider)) {
-    return (
-      <MotionFade>
-        <DocumentLoadingSkeleton />
-      </MotionFade>
-    );
-  }
-
-  // 3. For new documents, show nothing while connecting (feels instant)
-  //    For existing documents that somehow got here, show skeleton
-  if (!isReady || !ydoc || !provider) {
-    if (isNew) {
-      return null;
+  // 2. Still loading — show skeleton only after delay to avoid flicker
+  if (isStillLoading) {
+    if (showSkeleton) {
+      return (
+        <MotionFade>
+          <DocumentLoadingSkeleton />
+        </MotionFade>
+      );
     }
-    return (
-      <MotionFade>
-        <DocumentLoadingSkeleton />
-      </MotionFade>
-    );
+    // Before delay: show nothing (feels instant for fast loads)
+    return null;
   }
 
-  // 4. Ready to render
+  // 3. Ready to render
   const userName = userProfile
     ? [userProfile.first_name, userProfile.last_name]
         .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
