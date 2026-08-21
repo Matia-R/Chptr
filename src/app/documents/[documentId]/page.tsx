@@ -12,7 +12,7 @@ import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
 
-const SKELETON_DELAY_MS = 250;
+const SKELETON_DELAY_MS = 500;
 
 const DOCUMENT_ERROR = {
   NOT_FOUND: {
@@ -95,9 +95,10 @@ export default function DocumentPage() {
   const isStillLoading = isLoading || !isReady || !ydoc || !provider;
 
   useEffect(() => {
+    // Reset skeleton state when document changes or loading completes
+    setShowSkeleton(false);
+
     if (!isStillLoading) {
-      // Loading complete, reset skeleton state
-      setShowSkeleton(false);
       return;
     }
 
@@ -107,7 +108,7 @@ export default function DocumentPage() {
     }, SKELETON_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [isStillLoading]);
+  }, [isStillLoading, documentId]);
 
   // === RENDERING LOGIC ===
 
