@@ -103,7 +103,7 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Show loading skeleton (CRDT loading or provider not ready). Do not block on profile.
+  // 2. Show loading skeleton for existing documents only
   if (!isNew && (isLoading || !isReady || !ydoc || !provider)) {
     return (
       <MotionFade>
@@ -112,8 +112,12 @@ export default function DocumentPage() {
     );
   }
 
-  // 3. Still waiting for ydoc/provider (e.g. optimistic new-doc case)
+  // 3. For new documents, show nothing while connecting (feels instant)
+  //    For existing documents that somehow got here, show skeleton
   if (!isReady || !ydoc || !provider) {
+    if (isNew) {
+      return null;
+    }
     return (
       <MotionFade>
         <DocumentLoadingSkeleton />
