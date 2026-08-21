@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "~/utils/supabase/service-role";
+import { createClientFromToken } from "~/utils/supabase/from-token";
 
 function base64ToByteaHex(base64: string): string {
   const buf = Buffer.from(base64, "base64");
@@ -12,6 +12,16 @@ export async function POST(request: Request) {
 
   if (!expectedSecret || partykitSecret !== expectedSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const authHeader = request.headers.get("Authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  if (!token) {
+    return NextResponse.json(
+      { error: "Missing authorization token" },
+      { status: 401 }
+    );
   }
 
   try {
@@ -27,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServiceRoleClient();
+    const supabase = createClientFromToken(token);
 
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -36,7 +46,10 @@ export async function POST(request: Request) {
       .single();
 
     if (docError || !doc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Access denied or document not found" },
+        { status: 403 }
+      );
     }
 
     const { error: upsertError } = await supabase

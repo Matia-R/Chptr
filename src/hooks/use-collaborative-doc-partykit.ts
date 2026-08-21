@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import YPartyKitProvider from "y-partykit/provider";
+import { createClient } from "~/utils/supabase/client";
 
 interface UseCollaborativeDocPartykitOptions {
   documentId: string;
@@ -17,7 +18,8 @@ interface UseCollaborativeDocPartykitResult {
   error: Error | null;
 }
 
-const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
+const PARTYKIT_HOST =
+  process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
 
 export function useCollaborativeDocPartykit({
   documentId,
@@ -48,40 +50,77 @@ export function useCollaborativeDocPartykit({
     setError(null);
     setIsReady(false);
 
-    const ydoc = new Y.Doc();
+    const setup = async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-    const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
-      connect: true,
-    });
+        if (sessionError) {
+          throw new Error(`Failed to get session: ${sessionError.message}`);
+        }
 
-    provider.on("sync", (synced: boolean) => {
-      if (synced) {
-        setIsReady(true);
+        if (!session?.access_token) {
+          throw new Error("Not authenticated");
+        }
+
+        const ydoc = new Y.Doc();
+
+        const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
+          connect: true,
+          params: {
+            token: session.access_token,
+          },
+        });
+
+        provider.on("sync", (synced: boolean) => {
+          if (synced) {
+            setIsReady(true);
+            setIsLoading(false);
+          }
+        });
+
+        provider.on("connection-error", (err: Error) => {
+          console.error("[PartyKit] Connection error:", err);
+          setError(err);
+          setIsLoading(false);
+        });
+
+        provider.on("connection-close", (event: CloseEvent) => {
+          if (event.code === 4001) {
+            setError(new Error("Unauthorized: Please sign in"));
+            setIsLoading(false);
+          } else if (event.code === 4003) {
+            setError(new Error("You don't have access to this document"));
+            setIsLoading(false);
+          }
+        });
+
+        lastDocumentIdRef.current = documentId;
+        initializedRef.current = true;
+        setState({ ydoc, provider });
+
+        cleanupRef.current = () => {
+          initializedRef.current = false;
+          try {
+            provider.destroy();
+          } catch {}
+          try {
+            ydoc.destroy();
+          } catch {}
+          setState(null);
+          setIsReady(false);
+        };
+      } catch (err) {
+        console.error("[PartyKit] Setup error:", err);
+        setError(err instanceof Error ? err : new Error(String(err)));
         setIsLoading(false);
       }
-    });
-
-    provider.on("connection-error", (err: Error) => {
-      console.error("[PartyKit] Connection error:", err);
-      setError(err);
-      setIsLoading(false);
-    });
-
-    lastDocumentIdRef.current = documentId;
-    initializedRef.current = true;
-    setState({ ydoc, provider });
-
-    cleanupRef.current = () => {
-      initializedRef.current = false;
-      try {
-        provider.destroy();
-      } catch {}
-      try {
-        ydoc.destroy();
-      } catch {}
-      setState(null);
-      setIsReady(false);
     };
+
+    void setup();
 
     return () => {
       cleanupRef.current?.();

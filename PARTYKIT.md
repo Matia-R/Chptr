@@ -9,33 +9,47 @@ PartyKit replaces the previous y-webrtc peer-to-peer sync with a server-mediated
 - **Reliable sync**: No more WebRTC connection failures through firewalls
 - **Single persistence point**: Only the PartyKit server writes to the database (no more duplicate saves from multiple clients)
 - **Better scalability**: Server handles coordination instead of mesh connections between clients
+- **RLS respected**: User authentication is verified on every connection
 
 ## Architecture
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  Client A   │     │  Client B   │     │  Client C   │
+│  (w/ JWT)   │     │  (w/ JWT)   │     │  (w/ JWT)   │
 └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
        │                   │                   │
        └───────────────────┼───────────────────┘
-                           │ WebSocket
+                           │ WebSocket + JWT
                            ▼
               ┌────────────────────────┐
               │   PartyKit Server      │
-              │   (per-document room)  │
+              │   - Verifies JWT       │
+              │   - Manages Y.Doc      │
               └───────────┬────────────┘
-                          │ HTTP
+                          │ HTTP + JWT
                           ▼
               ┌────────────────────────┐
               │   Next.js API Routes   │
               │   /api/partykit/*      │
               └───────────┬────────────┘
-                          │
+                          │ RLS enforced
                           ▼
               ┌────────────────────────┐
               │       Supabase         │
               └────────────────────────┘
 ```
+
+## Security Model
+
+1. **Client authenticates with Supabase** and receives a JWT
+2. **Client connects to PartyKit** with JWT in query params
+3. **PartyKit verifies** the JWT is not expired
+4. **PartyKit calls API routes** with the user's JWT
+5. **API routes create Supabase client** using that JWT
+6. **RLS automatically enforced** - users can only access documents they have permission to
+
+No service role key is used. The user's own credentials flow through the entire system.
 
 ## Setup
 
@@ -62,9 +76,6 @@ NEXT_PUBLIC_PARTYKIT_HOST=localhost:1999  # dev
 
 # Shared secret for server-to-server auth
 PARTYKIT_SECRET=your-secret-here  # Generate with: openssl rand -base64 32
-
-# Supabase service role key (for PartyKit API routes)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # App URL for PartyKit server callbacks
 APP_URL=http://localhost:3000  # dev
@@ -110,37 +121,36 @@ npx partykit env add PARTYKIT_SECRET
 | File | Purpose |
 |------|---------|
 | `partykit.json` | PartyKit configuration |
-| `party/document.ts` | PartyKit server (Yjs room handler) |
-| `src/hooks/use-collaborative-doc-partykit.ts` | Client-side hook |
-| `src/app/api/partykit/load/route.ts` | API to load document state |
-| `src/app/api/partykit/save/route.ts` | API to save document state |
-| `src/utils/supabase/service-role.ts` | Supabase client with service role |
+| `party/document.ts` | PartyKit server (Yjs room handler, JWT verification) |
+| `src/hooks/use-collaborative-doc-partykit.ts` | Client-side hook (gets session, passes JWT) |
+| `src/app/api/partykit/load/route.ts` | API to load document state (uses user's JWT) |
+| `src/app/api/partykit/save/route.ts` | API to save document state (uses user's JWT) |
+| `src/utils/supabase/from-token.ts` | Creates Supabase client from JWT |
 
 ## How It Works
 
 ### Client Connection
 
-1. Client opens document page
+1. Client gets Supabase session (includes access_token)
 2. `useCollaborativeDocPartykit` hook creates a Y.Doc and YPartyKitProvider
-3. Provider connects to PartyKit server via WebSocket
+3. Provider connects to PartyKit server with JWT in query params
 4. Provider syncs document state and awareness (cursors)
 
 ### Server Lifecycle
 
-1. First client connects → PartyKit spins up room for that document ID
-2. Room calls `/api/partykit/load` to fetch document state from Supabase
-3. Room applies state to its Y.Doc
-4. As clients make edits, Y.Doc updates are broadcast to all connected clients
-5. Room debounces saves (1 second) and calls `/api/partykit/save`
-6. Last client disconnects → room shuts down (but save completes first)
+1. First client connects with JWT → PartyKit verifies JWT not expired
+2. Room calls `/api/partykit/load` with user's JWT
+3. API route creates Supabase client with that JWT → RLS enforced
+4. If user has access, document loads; otherwise, connection rejected
+5. As clients make edits, Y.Doc updates are broadcast to all connected clients
+6. Room debounces saves (1 second) and calls `/api/partykit/save` with JWT
+7. Last client disconnects → room shuts down (but save completes first)
 
-### Persistence
+### Permission Enforcement
 
-The PartyKit server saves the full Y.Doc state as a snapshot. This:
-
-- Replaces the previous append-only change log approach
-- Clears old changes from `document_changes` table after each save
-- Eliminates the need for client-side compaction
+- **Load**: If user can't read the document, the Supabase query returns nothing/error
+- **Save**: If user can't write to the document, the Supabase upsert fails
+- **Connect**: If load fails due to permissions, the connection is closed with code 4003
 
 ## Costs
 

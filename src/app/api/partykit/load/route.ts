@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "~/utils/supabase/service-role";
+import { createClientFromToken } from "~/utils/supabase/from-token";
 
 interface SnapshotRow {
   snapshot_data: string | null;
@@ -36,6 +36,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const authHeader = request.headers.get("Authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  if (!token) {
+    return NextResponse.json(
+      { error: "Missing authorization token" },
+      { status: 401 }
+    );
+  }
+
   try {
     const { documentId } = (await request.json()) as { documentId: string };
 
@@ -46,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServiceRoleClient();
+    const supabase = createClientFromToken(token);
 
     const { data: doc, error: docError } = await supabase
       .from("documents")
@@ -55,7 +65,13 @@ export async function POST(request: Request) {
       .single();
 
     if (docError || !doc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      if (docError?.code === "PGRST116") {
+        return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      }
+      return NextResponse.json(
+        { error: "Access denied or document not found" },
+        { status: 403 }
+      );
     }
 
     const { data: rawSnapshotRow, error: snapshotError } = await supabase
