@@ -90,16 +90,18 @@ Run both the Next.js dev server and PartyKit dev server:
 # Terminal 1: Next.js
 npm run dev
 
-# Terminal 2: PartyKit
-npx partykit dev
+# Terminal 2: PartyKit (use npm script, not npx!)
+npm run dev:partykit
 ```
+
+**Important:** Use `npm run dev:partykit` instead of `npx partykit dev`. The npx version downloads a fresh PartyKit that can't see your project's dependencies.
 
 PartyKit dev server runs on `localhost:1999` by default.
 
 ### 5. Deploy PartyKit
 
 ```bash
-npx partykit deploy
+npm run deploy:partykit
 ```
 
 This deploys to PartyKit's free tier at `chptr-collab.partykit.dev`.
@@ -115,6 +117,8 @@ npx partykit env add APP_URL
 npx partykit env add PARTYKIT_SECRET
 # Enter: your-secret-here (same as in your Next.js .env)
 ```
+
+Note: For `env` commands, `npx partykit` is fine since it doesn't need to bundle code.
 
 ## Files
 
