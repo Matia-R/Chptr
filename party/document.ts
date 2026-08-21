@@ -62,7 +62,7 @@ export default class DocumentParty implements Party.Server {
     });
   }
 
-  async loadDocument(token: string): Promise<boolean> {
+  async loadDocument(token: string, isNew: boolean): Promise<{ success: boolean; errorCode?: number }> {
     const documentId = this.room.id;
 
     try {
@@ -73,20 +73,12 @@ export default class DocumentParty implements Party.Server {
           "X-Partykit-Secret": this.partykitSecret,
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ documentId }),
+        body: JSON.stringify({ documentId, isNew }),
       });
 
       if (!response.ok) {
-        if (response.status === 404) {
-          console.log(`[PartyKit] Document ${documentId} not found, starting fresh`);
-          this.isLoaded = true;
-          return true;
-        }
-        if (response.status === 401 || response.status === 403) {
-          console.log(`[PartyKit] Unauthorized access to document ${documentId}`);
-          return false;
-        }
-        throw new Error(`Failed to load document: ${response.status}`);
+        console.log(`[PartyKit] Load failed for ${documentId}: ${response.status}`);
+        return { success: false, errorCode: response.status };
       }
 
       const data = (await response.json()) as { state: string | null };
@@ -96,14 +88,14 @@ export default class DocumentParty implements Party.Server {
         Y.applyUpdate(this.ydoc, stateBytes, "load");
         console.log(`[PartyKit] Loaded document ${documentId} with existing state`);
       } else {
-        console.log(`[PartyKit] Document ${documentId} has no saved state, starting fresh`);
+        console.log(`[PartyKit] Document ${documentId} starting with empty state`);
       }
 
       this.isLoaded = true;
-      return true;
+      return { success: true };
     } catch (error) {
       console.error(`[PartyKit] Failed to load document ${documentId}:`, error);
-      return false;
+      return { success: false, errorCode: 500 };
     }
   }
 
@@ -159,6 +151,7 @@ export default class DocumentParty implements Party.Server {
   async onConnect(conn: Party.Connection): Promise<void> {
     const url = new URL(conn.uri, "http://dummy");
     const token = url.searchParams.get("token");
+    const isNew = url.searchParams.get("isNew") === "true";
 
     if (!token) {
       console.log("[PartyKit] Connection rejected: no token provided");
@@ -172,10 +165,15 @@ export default class DocumentParty implements Party.Server {
       return;
     }
 
+    // Only load on first connection to this room
     if (!this.isLoaded) {
-      const success = await this.loadDocument(token);
-      if (!success) {
-        conn.close(4003, "Forbidden: no access to document");
+      const result = await this.loadDocument(token, isNew);
+      if (!result.success) {
+        const code = result.errorCode === 404 ? 4004 : 4003;
+        const message = result.errorCode === 404 
+          ? "Document not found" 
+          : "Access denied";
+        conn.close(code, message);
         return;
       }
     }

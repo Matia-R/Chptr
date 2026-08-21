@@ -39,16 +39,17 @@ export async function POST(request: Request) {
 
     const supabase = createClientFromToken(token);
 
-    // Check if user has access to the document
-    const { data: doc, error: docError } = await supabase
-      .from("documents")
+    // Check if user has permission to this document
+    // RLS on document_permissions will enforce this
+    const { data: permission, error: permError } = await supabase
+      .from("document_permissions")
       .select("id")
-      .eq("id", documentId)
+      .eq("document_id", documentId)
       .single();
 
-    if (docError || !doc) {
+    if (permError || !permission) {
       return NextResponse.json(
-        { error: "Access denied or document not found" },
+        { error: "Access denied" },
         { status: 403 }
       );
     }
@@ -74,14 +75,10 @@ export async function POST(request: Request) {
     }
 
     // Update document's last_updated timestamp
-    const { error: updateError } = await supabase
+    await supabase
       .from("documents")
       .update({ last_updated: new Date().toISOString() })
       .eq("id", documentId);
-
-    if (updateError) {
-      console.error("[PartyKit Save] Update timestamp error (non-fatal):", updateError);
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

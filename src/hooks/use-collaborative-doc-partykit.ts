@@ -21,25 +21,6 @@ interface UseCollaborativeDocPartykitResult {
 const PARTYKIT_HOST =
   process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
 
-async function createDocumentIfNew(
-  documentId: string,
-  accessToken: string
-): Promise<void> {
-  const response = await fetch("/api/documents/create", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ documentId }),
-  });
-
-  if (!response.ok) {
-    const data = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(data.error ?? "Failed to create document");
-  }
-}
-
 export function useCollaborativeDocPartykit({
   documentId,
   isNew = false,
@@ -85,17 +66,14 @@ export function useCollaborativeDocPartykit({
           throw new Error("Not authenticated");
         }
 
-        // If this is a new document, create it in the database first
-        if (isNew) {
-          await createDocumentIfNew(documentId, session.access_token);
-        }
-
         const ydoc = new Y.Doc();
 
+        // Pass isNew flag to PartyKit
         const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
           connect: true,
           params: {
             token: session.access_token,
+            isNew: isNew ? "true" : "false",
           },
         });
 
@@ -118,6 +96,9 @@ export function useCollaborativeDocPartykit({
             setIsLoading(false);
           } else if (event.code === 4003) {
             setError(new Error("You don't have access to this document"));
+            setIsLoading(false);
+          } else if (event.code === 4004) {
+            setError(new Error("Document not found"));
             setIsLoading(false);
           }
         });
