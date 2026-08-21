@@ -2,15 +2,17 @@
 
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
-import { useCollaborativeDocCrdt } from "~/hooks/use-collaborative-doc-crdt";
+import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
+
+const SKELETON_DELAY_MS = 500;
 
 const DOCUMENT_ERROR = {
   NOT_FOUND: {
@@ -80,13 +82,33 @@ export default function DocumentPage() {
   // Fetch user profile (non-blocking: editor shows with placeholder until loaded)
   const { data: userProfile } = useUserProfile();
 
-  // CRDT-based collaborative doc - handles fetching and saving internally
-  const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocCrdt(
+  // PartyKit-based collaborative doc - handles fetching and saving on server
+  const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocPartykit(
     {
       documentId,
       isNew,
     },
   );
+
+  // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  const isStillLoading = isLoading || !isReady || !ydoc || !provider;
+
+  useEffect(() => {
+    // Reset skeleton state when document changes or loading completes
+    setShowSkeleton(false);
+
+    if (!isStillLoading) {
+      return;
+    }
+
+    // Start timer to show skeleton after delay
+    const timer = setTimeout(() => {
+      setShowSkeleton(true);
+    }, SKELETON_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [isStillLoading, documentId]);
 
   // === RENDERING LOGIC ===
 
@@ -103,25 +125,20 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Show loading skeleton (CRDT loading or provider not ready). Do not block on profile.
-  if (!isNew && (isLoading || !isReady || !ydoc || !provider)) {
-    return (
-      <MotionFade>
-        <DocumentLoadingSkeleton />
-      </MotionFade>
-    );
+  // 2. Still loading — show skeleton only after delay to avoid flicker
+  if (isStillLoading) {
+    if (showSkeleton) {
+      return (
+        <MotionFade>
+          <DocumentLoadingSkeleton />
+        </MotionFade>
+      );
+    }
+    // Before delay: show nothing (feels instant for fast loads)
+    return null;
   }
 
-  // 3. Still waiting for ydoc/provider (e.g. optimistic new-doc case)
-  if (!isReady || !ydoc || !provider) {
-    return (
-      <MotionFade>
-        <DocumentLoadingSkeleton />
-      </MotionFade>
-    );
-  }
-
-  // 4. Ready to render
+  // 3. Ready to render
   const userName = userProfile
     ? [userProfile.first_name, userProfile.last_name]
         .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
