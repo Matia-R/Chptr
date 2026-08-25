@@ -23,13 +23,44 @@
  * Keep it secret and never commit it to version control.
  */
 
-import * as dotenv from 'dotenv'
+import * as fs from 'fs'
 import * as path from 'path'
+
+// Simple .env file parser (no external dependencies)
+function loadEnvFile(filePath: string): void {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue
+      
+      const eqIndex = trimmed.indexOf('=')
+      if (eqIndex === -1) continue
+      
+      const key = trimmed.slice(0, eqIndex).trim()
+      let value = trimmed.slice(eqIndex + 1).trim()
+      
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+      
+      // Only set if not already defined in environment
+      if (process.env[key] === undefined) {
+        process.env[key] = value
+      }
+    }
+  } catch {
+    // File doesn't exist, that's fine
+  }
+}
 
 // Load environment variables from .env files (same order as Next.js)
 // .env.local takes precedence over .env
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
-dotenv.config({ path: path.resolve(process.cwd(), '.env') })
+loadEnvFile(path.resolve(process.cwd(), '.env.local'))
+loadEnvFile(path.resolve(process.cwd(), '.env'))
 
 import { createClient } from '@supabase/supabase-js'
 import * as Y from 'yjs'
