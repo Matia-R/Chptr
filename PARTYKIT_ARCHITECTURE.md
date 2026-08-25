@@ -836,27 +836,41 @@ Future: Notify users when:
 
 ### Migrating from Old Schema
 
-If you have existing documents using the old `document_changes` + `document_snapshots` schema:
+A migration script is provided to convert existing documents from the old `document_changes` + `document_snapshots` schema to the new `document_state` schema.
 
-```sql
--- Migration script to convert existing documents to new schema
-INSERT INTO document_state (document_id, state_data, updated_at)
-SELECT 
-    ds.document_id,
-    ds.snapshot_data as state_data,  -- Use latest snapshot
-    ds.created_at as updated_at
-FROM document_snapshots ds
-WHERE NOT EXISTS (
-    SELECT 1 FROM document_state 
-    WHERE document_id = ds.document_id
-);
+**Location:** `scripts/migrate-to-partykit.ts`
 
--- Note: This uses snapshots only. For full accuracy, you would need to:
--- 1. Load snapshot
--- 2. Apply all changes since snapshot
--- 3. Encode full Y.Doc state
--- 4. Insert into document_state
+**What it does:**
+1. Scans for all documents with data in the old tables
+2. For each document:
+   - Loads the snapshot (if exists)
+   - Loads all changes after the snapshot cutoff (the "tail")
+   - Reconstructs the full Y.Doc by applying snapshot + tail
+   - Encodes the full state and inserts into `document_state`
+3. Provides detailed progress and error reporting
+
+**Usage:**
+
+```bash
+# First, do a dry run to see what would be migrated
+SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --dry-run
+
+# Run the actual migration
+SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts
+
+# Migrate a specific document
+SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --document-id=<uuid>
 ```
+
+**Requirements:**
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (from Supabase Dashboard → Settings → API)
+
+**Notes:**
+- The script uses the service role key to bypass RLS and access all documents
+- Already-migrated documents are skipped (safe to re-run)
+- Old tables are not modified - you can run both systems side-by-side
+- The script processes documents in batches of 50 for efficiency
 
 ### Rollback Procedure
 
