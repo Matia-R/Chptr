@@ -15,13 +15,21 @@
  *   # Migrate specific document
  *   npx tsx scripts/migrate-to-partykit.ts --document-id=<uuid>
  * 
- * Required environment variables:
+ * Environment variables (loaded from .env.local, .env, or environment):
  *   NEXT_PUBLIC_SUPABASE_URL - Your Supabase project URL
  *   SUPABASE_SERVICE_ROLE_KEY - Service role key (from Supabase Dashboard → Settings → API)
  * 
  * The service role key bypasses RLS to access all documents.
  * Keep it secret and never commit it to version control.
  */
+
+import * as dotenv from 'dotenv'
+import * as path from 'path'
+
+// Load environment variables from .env files (same order as Next.js)
+// .env.local takes precedence over .env
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 
 import { createClient } from '@supabase/supabase-js'
 import * as Y from 'yjs'
