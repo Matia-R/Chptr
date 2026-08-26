@@ -36,16 +36,16 @@ function isTokenExpired(token: string): boolean {
   return Date.now() >= payload.exp * 1000;
 }
 
-export default class DocumentParty implements Party.Server {
-  ydoc: Y.Doc;
-  isLoaded: boolean = false;
-  pendingSave: boolean = false;
-  saveTimeout: ReturnType<typeof setTimeout> | null = null;
-  authorizedToken: string | null = null;
+type LoadResult = 
+  | { success: true; ydoc: Y.Doc | null }
+  | { success: false; errorCode: number; errorMessage: string };
 
-  constructor(readonly room: Party.Room) {
-    this.ydoc = new Y.Doc();
-  }
+export default class DocumentParty implements Party.Server {
+  authorizedToken: string | null = null;
+  loadedDoc: Y.Doc | null = null;
+  isLoaded: boolean = false;
+
+  constructor(readonly room: Party.Room) {}
 
   get appUrl(): string {
     return (this.room.env.APP_URL as string) || "http://localhost:3000";
@@ -55,14 +55,7 @@ export default class DocumentParty implements Party.Server {
     return (this.room.env.PARTYKIT_SECRET as string) || "";
   }
 
-  async onStart(): Promise<void> {
-    this.ydoc.on("update", (_update: Uint8Array, origin: unknown) => {
-      if (origin === "load") return;
-      this.scheduleSave();
-    });
-  }
-
-  async loadDocument(token: string, isNew: boolean): Promise<{ success: boolean; errorCode?: number }> {
+  async fetchDocument(token: string, isNew: boolean): Promise<LoadResult> {
     const documentId = this.room.id;
 
     try {
@@ -78,50 +71,39 @@ export default class DocumentParty implements Party.Server {
 
       if (!response.ok) {
         console.log(`[PartyKit] Load failed for ${documentId}: ${response.status}`);
-        return { success: false, errorCode: response.status };
+        return {
+          success: false,
+          errorCode: response.status === 404 ? 4004 : 4003,
+          errorMessage: response.status === 404 ? "Document not found" : "Access denied",
+        };
       }
 
       const data = (await response.json()) as { state: string | null };
 
       if (data.state) {
+        const ydoc = new Y.Doc();
         const stateBytes = base64ToUint8Array(data.state);
-        Y.applyUpdate(this.ydoc, stateBytes, "load");
-        console.log(`[PartyKit] Loaded document ${documentId} with existing state`);
+        Y.applyUpdate(ydoc, stateBytes);
+        console.log(`[PartyKit] Loaded document ${documentId} with existing state (${stateBytes.length} bytes)`);
+        return { success: true, ydoc };
       } else {
         console.log(`[PartyKit] Document ${documentId} starting with empty state`);
+        return { success: true, ydoc: null };
       }
-
-      this.isLoaded = true;
-      return { success: true };
     } catch (error) {
       console.error(`[PartyKit] Failed to load document ${documentId}:`, error);
-      return { success: false, errorCode: 500 };
+      return { success: false, errorCode: 4003, errorMessage: "Failed to load document" };
     }
   }
 
-  scheduleSave(): void {
-    if (this.pendingSave) return;
-    this.pendingSave = true;
-
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout);
-    }
-
-    this.saveTimeout = setTimeout(() => {
-      this.pendingSave = false;
-      this.saveTimeout = null;
-      void this.saveDocument();
-    }, 1000);
-  }
-
-  async saveDocument(): Promise<void> {
+  async saveDocument(ydoc: Y.Doc): Promise<void> {
     if (!this.authorizedToken) {
       console.error("[PartyKit] No authorized token available for save");
       return;
     }
 
     const documentId = this.room.id;
-    const stateUpdate = Y.encodeStateAsUpdate(this.ydoc);
+    const stateUpdate = Y.encodeStateAsUpdate(ydoc);
     const stateBase64 = uint8ArrayToBase64(stateUpdate);
 
     try {
@@ -165,35 +147,39 @@ export default class DocumentParty implements Party.Server {
       return;
     }
 
-    // Only load on first connection to this room
-    if (!this.isLoaded) {
-      const result = await this.loadDocument(token, isNew);
-      if (!result.success) {
-        const code = result.errorCode === 404 ? 4004 : 4003;
-        const message = result.errorCode === 404 
-          ? "Document not found" 
-          : "Access denied";
-        conn.close(code, message);
-        return;
-      }
-    }
-
+    // Store the token for saving
     this.authorizedToken = token;
 
+    // Load document on first connection
+    if (!this.isLoaded) {
+      const result = await this.fetchDocument(token, isNew);
+      
+      if (!result.success) {
+        conn.close(result.errorCode, result.errorMessage);
+        return;
+      }
+
+      this.loadedDoc = result.ydoc;
+      this.isLoaded = true;
+    }
+
+    const loadedDoc = this.loadedDoc;
+
     const options: YPartyKitOptions = {
-      callback: { handler: () => {} },
+      gc: false,
+      load: async () => {
+        // Return the pre-loaded document
+        return loadedDoc;
+      },
+      callback: {
+        handler: async (ydoc: Y.Doc) => {
+          await this.saveDocument(ydoc);
+        },
+        debounceWait: 1000,
+        debounceMaxWait: 5000,
+      },
     };
 
     return onConnect(conn, this.room, options);
-  }
-
-  async onClose(): Promise<void> {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout);
-      this.saveTimeout = null;
-    }
-    if (this.pendingSave) {
-      await this.saveDocument();
-    }
   }
 }
