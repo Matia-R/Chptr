@@ -128,7 +128,7 @@ export function useCollaborativeDocPartykit({
         });
 
         provider.on("sync", (synced: boolean) => {
-          if (synced && !closedForAuth) {
+          if (synced && !closedForAuth && !isNew) {
             setIsReady(true);
             setIsLoading(false);
           }
@@ -189,6 +189,10 @@ export function useCollaborativeDocPartykit({
         lastDocumentIdRef.current = documentId;
         initializedRef.current = true;
         setState({ ydoc, provider });
+        if (isNew) {
+          setIsReady(true);
+          setIsLoading(false);
+        }
 
         cleanupRef.current = () => {
           cancelled = true;

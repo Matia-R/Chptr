@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         userId: user.id,
         permission,
+        created: false,
       });
     }
 
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       userId: user.id,
       permission: createdPermission,
+      created: true,
     });
   } catch (error) {
     console.error("[PartyKit Authorize] Error:", error);

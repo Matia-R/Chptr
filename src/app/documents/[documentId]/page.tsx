@@ -78,25 +78,26 @@ export default function DocumentPage() {
     },
   );
 
-  // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads
+  // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
+  // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.
   const [showSkeleton, setShowSkeleton] = useState(false);
-  const isStillLoading = isLoading || !isReady || !ydoc || !provider;
+  const isStillLoading = isNew
+    ? !ydoc || !provider
+    : isLoading || !isReady || !ydoc || !provider;
 
   useEffect(() => {
-    // Reset skeleton state when document changes or loading completes
     setShowSkeleton(false);
 
-    if (!isStillLoading) {
+    if (!isStillLoading || isNew) {
       return;
     }
 
-    // Start timer to show skeleton after delay
     const timer = setTimeout(() => {
       setShowSkeleton(true);
     }, SKELETON_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [isStillLoading, documentId]);
+  }, [isStillLoading, isNew, documentId]);
 
   // === RENDERING LOGIC ===
 
@@ -113,16 +114,16 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Still loading — show skeleton only after delay to avoid flicker
+  // 2. Still loading — new docs stay blank (no skeleton). Existing docs
+  // show a skeleton only after the delay to avoid flicker on fast loads.
   if (isStillLoading) {
-    if (showSkeleton) {
+    if (!isNew && showSkeleton) {
       return (
         <MotionFade>
           <DocumentLoadingSkeleton />
         </MotionFade>
       );
     }
-    // Before delay: show nothing (feels instant for fast loads)
     return null;
   }
 

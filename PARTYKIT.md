@@ -180,19 +180,22 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 
 1. Client gets Supabase session (`access_token`)
 2. `useCollaborativeDocPartykit` creates a Y.Doc and `YPartyKitProvider`
-3. Provider connects to PartyKit with JWT + `isNew` in query params
-4. On `TOKEN_REFRESHED`, the hook replaces the provider (same Y.Doc) so PartyKit stores a fresh token for saves
-5. On 4001/4003/4004/4000/4005, reconnect is disabled and the document page shows the matching alert
+3. **New documents:** the editor is ready immediately (does not wait for PartyKit `sync`). Authorize/create run in the background
+4. **Existing documents:** the editor waits for `sync` after authorize + load
+5. Provider connects to PartyKit with JWT + `isNew` in query params
+6. On `TOKEN_REFRESHED`, the hook reconnects with the same Y.Doc and a fresh JWT
+7. On 4001/4003/4004/4000/4005, reconnect is disabled and the document page shows the matching alert
 
 ### Server Lifecycle
 
 1. Every client connect → `POST /api/partykit/authorize`
 2. Unauthorized / forbidden / missing document → close the socket; do not call `y-partykit`
-3. First *authorized* connection → `POST /api/partykit/load` and cache the Y.Doc in the room
-4. Later authorized connections reuse the in-memory Y.Doc (they still authorized)
-5. Edits broadcast to authorized clients in the room
-6. Debounced save (1s / 5s max) uses a live authorized client's JWT
-7. `onClose` drops that connection's token from the save pool
+3. If authorize **created** the document → skip `/load`, start with an empty Y.Doc
+4. Otherwise first authorized connection → `POST /api/partykit/load` and cache the Y.Doc
+5. Later authorized connections reuse the in-memory Y.Doc (they still authorized)
+6. Edits broadcast to authorized clients in the room
+7. Debounced save (1s / 5s max) uses a live authorized client's JWT
+8. `onClose` drops that connection's token from the save pool
 
 ### Permission Enforcement
 

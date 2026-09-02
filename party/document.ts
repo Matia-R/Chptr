@@ -39,7 +39,7 @@ type LoadResult =
   | { success: false; errorCode: number; errorMessage: string };
 
 type AuthorizeResult =
-  | { ok: true; userId: string; permission: string }
+  | { ok: true; userId: string; permission: string; created: boolean }
   | { ok: false; errorCode: number; errorMessage: string };
 
 type AuthorizedClient = {
@@ -112,8 +112,14 @@ export default class DocumentParty implements Party.Server {
       const data = (await response.json()) as {
         userId: string;
         permission: string;
+        created?: boolean;
       };
-      return { ok: true, userId: data.userId, permission: data.permission };
+      return {
+        ok: true,
+        userId: data.userId,
+        permission: data.permission,
+        created: data.created === true,
+      };
     } catch (error) {
       console.error(
         `[PartyKit] Authorize request failed for ${this.room.id}:`,
@@ -246,16 +252,24 @@ export default class DocumentParty implements Party.Server {
     });
 
     if (!this.isLoaded) {
-      const result = await this.fetchDocument(token);
+      if (auth.created) {
+        this.loadedDoc = null;
+        this.isLoaded = true;
+        console.log(
+          `[PartyKit] New document ${this.room.id} starting empty (skip load)`
+        );
+      } else {
+        const result = await this.fetchDocument(token);
 
-      if (!result.success) {
-        this.authorizedByConnection.delete(conn.id);
-        conn.close(result.errorCode, result.errorMessage);
-        return;
+        if (!result.success) {
+          this.authorizedByConnection.delete(conn.id);
+          conn.close(result.errorCode, result.errorMessage);
+          return;
+        }
+
+        this.loadedDoc = result.ydoc;
+        this.isLoaded = true;
       }
-
-      this.loadedDoc = result.ydoc;
-      this.isLoaded = true;
     }
 
     const loadedDoc = this.loadedDoc;

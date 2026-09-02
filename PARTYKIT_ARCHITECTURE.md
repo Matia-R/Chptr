@@ -380,15 +380,16 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │  2. DocumentPage renders                                                │
 │     ┌──────────┐                                                        │
 │     │  Client  │  - Hook detects isNew=true                             │
-│     │          │  - Renders blank screen (no skeleton)                  │
-│     │          │  - Connects to PartyKit with isNew=true                │
+│     │          │  - Empty Y.Doc + provider are ready immediately        │
+│     │          │  - Editor renders (no skeleton, does not wait for sync)│
+│     │          │  - Connects to PartyKit in the background              │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
 │  3. PartyKit receives connection                                        │
 │     ┌──────────┐                                                        │
 │     │ PartyKit │  - Calls /api/partykit/authorize with isNew=true       │
-│     │  Server  │  - On 200, loads empty state (first connection)        │
+│     │  Server  │  - created=true → skip /load, empty Y.Doc              │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
@@ -397,16 +398,16 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     │ Next.js  │  - JWT valid, no permission row                        │
 │     │   API    │  - document_exists → false                             │
 │     │          │  - isNew=true → create_document_with_owner             │
-│     │          │  - Returns { userId, permission: owner }               │
+│     │          │  - Returns { userId, permission: owner, created: true }│
 │     │          │  If the id already exists → 403 (not create)           │
+│     │          │  If permission already exists → created: false (load)  │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
-│  5. Editor ready                                                        │
+│  5. User is already typing                                              │
 │     ┌──────────┐                                                        │
-│     │  Client  │  - Y.Doc initialized (empty)                           │
-│     │          │  - Editor renders                                      │
-│     │          │  - User can start typing immediately                   │
+│     │  Client  │  - Local edits merge into the empty PartyKit Y.Doc     │
+│     │          │    once the socket syncs                               │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
@@ -418,8 +419,8 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     └──────────┘                                                        │
 │                                                                         │
 │  ═══════════════════════════════════════════════════════════════════    │
-│  RESULT: User sees empty editor instantly. Document created on first    │
-│          connection. State persisted on first edit.                     │
+│  RESULT: User sees empty editor immediately. Authorize creates the      │
+│          document in the background. State persists on first edit.      │
 │  ═══════════════════════════════════════════════════════════════════    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -684,23 +685,16 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 To avoid "flicker" on fast loads while still providing feedback on slow loads:
 
 ```typescript
-const SKELETON_DELAY_MS = 250;
+const SKELETON_DELAY_MS = 500;
 
-const [showSkeleton, setShowSkeleton] = useState(false);
-const isStillLoading = isLoading || !isReady || !ydoc || !provider;
-
-useEffect(() => {
-  if (!isStillLoading) {
-    setShowSkeleton(false);
-    return;
-  }
-  const timer = setTimeout(() => setShowSkeleton(true), SKELETON_DELAY_MS);
-  return () => clearTimeout(timer);
-}, [isStillLoading]);
+const isStillLoading = isNew
+  ? !ydoc || !provider
+  : isLoading || !isReady || !ydoc || !provider;
 
 // Render:
-// - Fast load (< 250ms): blank → editor (no skeleton)
-// - Slow load (> 250ms): blank → skeleton → editor
+// - New document: blank (at most getSession) → editor. Never a skeleton.
+// - Fast existing load (< 500ms): blank → editor (no skeleton)
+// - Slow existing load (> 500ms): blank → skeleton → editor
 ```
 
 ### Instant New Document Feel
@@ -708,9 +702,10 @@ useEffect(() => {
 New document creation feels instant because:
 
 1. No API call before navigation (UUID generated client-side)
-2. No loading skeleton shown (returns `null` while connecting)
-3. Document created during first WebSocket connection
-4. Empty editor appears as soon as connection established
+2. Local empty Y.Doc is treated as ready — the editor does not wait for PartyKit `sync`
+3. No loading skeleton for `isNew`
+4. Authorize creates the owner row in the background; `/load` is skipped when `created: true`
+5. First keystrokes live in the local Y.Doc and merge into the room when the socket connects
 
 ---
 
