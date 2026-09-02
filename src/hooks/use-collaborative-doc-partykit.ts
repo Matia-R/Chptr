@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import YPartyKitProvider from "y-partykit/provider";
-import { DocumentAccessError } from "~/lib/document-access-error";
+import { TRPCClientError } from "@trpc/client";
+import {
+  DocumentAccessError,
+  getDocumentErrorCode,
+} from "~/lib/document-access-error";
+import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 
 interface UseCollaborativeDocPartykitOptions {
@@ -21,6 +26,26 @@ interface UseCollaborativeDocPartykitResult {
 
 const PARTYKIT_HOST =
   process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
+
+const DOCUMENT_STATE_STALE_MS = 30_000;
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64.trim());
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function applyPrefetchedState(ydoc: Y.Doc, state: string | null) {
+  if (!state) return;
+  try {
+    Y.applyUpdate(ydoc, base64ToUint8Array(state), "prefetch");
+  } catch (error) {
+    console.error("[PartyKit] Failed to apply prefetched document state:", error);
+  }
+}
 
 function accessErrorForCloseCode(code: number): DocumentAccessError | null {
   switch (code) {
@@ -51,6 +76,29 @@ function accessErrorForCloseCode(code: number): DocumentAccessError | null {
   }
 }
 
+function accessErrorFromTrpc(error: unknown): DocumentAccessError | null {
+  const code = getDocumentErrorCode(error);
+  if (code === "FORBIDDEN") {
+    return new DocumentAccessError(
+      "FORBIDDEN",
+      "Looks like you don't have access to this doc."
+    );
+  }
+  if (code === "NOT_FOUND") {
+    return new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist.");
+  }
+  if (code === "UNAUTHORIZED") {
+    return new DocumentAccessError(
+      "UNAUTHORIZED",
+      "Please sign in to your account to access this doc."
+    );
+  }
+  if (error instanceof TRPCClientError) {
+    return null;
+  }
+  return null;
+}
+
 function stopReconnect(provider: YPartyKitProvider) {
   provider.shouldConnect = false;
   try {
@@ -64,6 +112,7 @@ export function useCollaborativeDocPartykit({
   documentId,
   isNew = false,
 }: UseCollaborativeDocPartykitOptions): UseCollaborativeDocPartykitResult {
+  const utils = api.useUtils();
   const [state, setState] = useState<{
     ydoc: Y.Doc;
     provider: YPartyKitProvider;
@@ -118,6 +167,21 @@ export function useCollaborativeDocPartykit({
         const ydoc = new Y.Doc();
         const tokenRef = { current: session.access_token };
         let closedForAuth = false;
+        let paintedFromPrefetch = false;
+
+        const markReady = () => {
+          if (closedForAuth || cancelled) return;
+          setIsReady(true);
+          setIsLoading(false);
+        };
+
+        const cached = isNew
+          ? undefined
+          : utils.document.getDocumentState.getData(documentId);
+        if (cached !== undefined) {
+          applyPrefetchedState(ydoc, cached.state);
+          paintedFromPrefetch = true;
+        }
 
         const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
           connect: true,
@@ -129,8 +193,7 @@ export function useCollaborativeDocPartykit({
 
         provider.on("sync", (synced: boolean) => {
           if (synced && !closedForAuth && !isNew) {
-            setIsReady(true);
-            setIsLoading(false);
+            markReady();
           }
         });
 
@@ -189,9 +252,27 @@ export function useCollaborativeDocPartykit({
         lastDocumentIdRef.current = documentId;
         initializedRef.current = true;
         setState({ ydoc, provider });
-        if (isNew) {
-          setIsReady(true);
-          setIsLoading(false);
+        if (isNew || paintedFromPrefetch) {
+          markReady();
+        }
+
+        if (!isNew && cached === undefined) {
+          void utils.document.getDocumentState
+            .fetch(documentId, { staleTime: DOCUMENT_STATE_STALE_MS })
+            .then((data) => {
+              if (cancelled || closedForAuth) return;
+              applyPrefetchedState(ydoc, data.state);
+              markReady();
+            })
+            .catch((err: unknown) => {
+              if (cancelled || closedForAuth) return;
+              const accessError = accessErrorFromTrpc(err);
+              if (!accessError) return;
+              closedForAuth = true;
+              stopReconnect(provider);
+              setError(accessError);
+              setIsLoading(false);
+            });
         }
 
         cleanupRef.current = () => {
@@ -221,6 +302,8 @@ export function useCollaborativeDocPartykit({
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
+    // utils is a stable tRPC client; including it retriggers setup and tears down the room.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId, isNew]);
 
   return {

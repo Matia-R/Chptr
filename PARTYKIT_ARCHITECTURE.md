@@ -101,13 +101,14 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │   ┌─────────────────────────┐    ┌─────────────────────────┐            │
-│   │  /api/partykit/authorize│    │  /api/partykit/load     │            │
-│   │                         │    │  /api/partykit/save     │            │
-│   │  - getUser(JWT)         │    │                         │            │
-│   │  - Check permission row │    │  - Re-validate JWT      │            │
-│   │  - 403 vs 404 via RPC   │    │  - Check permission     │            │
-│   │  - Create only if isNew │    │  - Load / upsert state  │            │
-│   │    and doc is missing   │    │  - RLS still applies    │            │
+│   │  /api/partykit/connect  │    │  /api/partykit/save     │            │
+│   │                         │    │                         │            │
+│   │  - getUser(JWT)         │    │  - Re-validate JWT      │            │
+│   │  - Check permission row │    │  - Check permission     │            │
+│   │  - 403 vs 404 via RPC   │    │  - Upsert state         │            │
+│   │  - Create only if isNew │    │  - RLS still applies    │            │
+│   │    and doc is missing   │    │                         │            │
+│   │  - Return Y.Doc state   │    │                         │            │
 │   └────────────┬────────────┘    └────────────┬────────────┘            │
 │                │                              │                         │
 └────────────────┼──────────────────────────────┼─────────────────────────┘
@@ -153,7 +154,7 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 | **Client (Browser)** | Local Y.Doc, UI rendering, user input, JWT + error-code mapping |
 | **YPartyKitProvider** | WebSocket connection, Yjs sync protocol, awareness |
 | **PartyKit Room** | Authorize every socket, central Y.Doc, broadcast, save-token pool |
-| **Next.js API** | `/authorize` (JWT + permission), `/load` and `/save` (re-check + RLS) |
+| **Next.js API** | `/connect` (JWT + permission + state), `/save` (re-check + RLS) |
 | **Supabase** | Document storage, permissions, RLS, `document_exists` RPC |
 
 ---
@@ -176,28 +177,18 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
      │    ?token=JWT&isNew=false                 │                     │
      │────────────────────►│                     │                     │
      │                     │                     │                     │
-     │                     │ 3. POST /api/partykit/authorize           │
+     │                     │ 3. POST /api/partykit/connect             │
      │                     │    (every connection)                     │
      │                     │────────────────────►│                     │
      │                     │                     │ 4. getUser(JWT)     │
      │                     │                     │    permission row   │
-     │                     │                     │    document_exists  │
-     │                     │                     │────────────────────►│
-     │                     │                     │◄────────────────────│
-     │                     │◄────────────────────│                     │
-     │                     │   200 { userId } or 401/403/404           │
-     │                     │                     │                     │
-     │                     │ 5. First authorized load only             │
-     │                     │    POST /api/partykit/load                │
-     │                     │────────────────────►│                     │
-     │                     │                     │ 6. Permission +     │
      │                     │                     │    document_state   │
      │                     │                     │────────────────────►│
      │                     │                     │◄────────────────────│
      │                     │◄────────────────────│                     │
-     │                     │   { state }         │                     │
+     │                     │   200 { userId, state } or 401/403/404    │
      │                     │                     │                     │
-     │ 7. Yjs Sync         │                     │                     │
+     │ 5. Yjs Sync         │                     │                     │
      │◄───────────────────►│                     │                     │
      │   (document state)  │                     │                     │
      │                     │                     │                     │
@@ -317,11 +308,11 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     │          │     │  Server  │                                       │
 │     └──────────┘     └──────────┘                                       │
 │                            │                                            │
-│                            │ Every connect calls authorize.             │
+│                            │ Every connect calls /connect.              │
 │                            │ PartyKit does not treat JWT expiry         │
 │                            │ as the access check.                       │
 │                            ▼                                            │
-│  3. POST /api/partykit/authorize                                        │
+│  3. POST /api/partykit/connect                                          │
 │     ┌──────────┐     ┌──────────┐                                       │
 │     │ PartyKit │────►│ Next.js  │  PARTYKIT_SECRET + Bearer JWT         │
 │     │  Server  │     │   API    │                                       │
@@ -333,10 +324,11 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │                            │ c. If no row: document_exists()            │
 │                            │    exists → 403, missing → 404             │
 │                            │    missing + isNew → create as owner       │
+│                            │ d. Return document_state in the same body  │
 │                            ▼                                            │
 │  4. ONLY THEN JOIN THE Y.DOC ROOM                                       │
-│     Load (first authorized connection) and save (any live token)        │
-│     re-check JWT + permission, then query as that user so RLS applies.  │
+│     Save (any live token) re-checks JWT + permission, then writes as    │
+│     that user so RLS applies.                                           │
 │                                                                         │
 │  ═══════════════════════════════════════════════════════════════════    │
 │  RESULT: A forged or other-user JWT cannot join a loaded room.          │
@@ -355,7 +347,7 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 | 401 | `4001` | Missing / invalid / expired token | Show "Login required"; stop reconnect |
 | 403 | `4003` | Signed in, no permission | Show "Restricted access"; stop reconnect |
 | 404 | `4004` | Document does not exist | Show "Doc not found"; stop reconnect |
-| 500 | `4005` | Authorize/load failure | Show "Unable to load doc"; stop reconnect |
+| 500 | `4005` | Connect failure | Show "Unable to load doc"; stop reconnect |
 
 ---
 
@@ -388,8 +380,8 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │           ▼                                                             │
 │  3. PartyKit receives connection                                        │
 │     ┌──────────┐                                                        │
-│     │ PartyKit │  - Calls /api/partykit/authorize with isNew=true       │
-│     │  Server  │  - created=true → skip /load, empty Y.Doc              │
+│     │ PartyKit │  - Calls /api/partykit/connect with isNew=true         │
+│     │  Server  │  - created=true → empty Y.Doc (no extra load hop)      │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
@@ -441,24 +433,16 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
-│  2. Connect to PartyKit                                                 │
+│  2. Snapshot + PartyKit in parallel                                     │
 │     ┌──────────┐     ┌──────────┐                                       │
-│     │  Client  │────►│ PartyKit │  WebSocket with JWT, isNew=false      │
+│     │  Client  │────►│ tRPC     │  getDocumentState (cache if hovered)  │
+│     │          │────►│ PartyKit │  WebSocket → POST /connect            │
 │     └──────────┘     └──────────┘                                       │
-│                            │                                            │
-│                            ▼                                            │
-│  3. Authorize, then load state                                          │
-│     ┌──────────┐     ┌──────────┐     ┌──────────┐                      │
-│     │ PartyKit │────►│ Next.js  │────►│ Supabase │                      │
-│     │          │     │ authorize│     │ getUser, │                      │
-│     │          │     │ then load│     │ permission│                     │
-│     │          │◄────│          │◄────│ + state  │                      │
-│     └──────────┘     └──────────┘     └──────────┘                      │
 │           │                                                             │
-│           │ 401/403/404 → close socket, matching UI alert               │
-│           │ 200 → apply state to Y.Doc, sync to client                  │
+│           │ First of: cached/tRPC snapshot or PartyKit sync → editor    │
+│           │ 401/403/404 → matching UI alert                             │
 │           ▼                                                             │
-│  4. Editor renders with content                                         │
+│  3. Editor renders with content                                         │
 │     ┌──────────┐                                                        │
 │     │  Client  │  - Y.Doc populated with existing content               │
 │     │          │  - Editor renders                                      │
@@ -704,8 +688,9 @@ New document creation feels instant because:
 1. No API call before navigation (UUID generated client-side)
 2. Local empty Y.Doc is treated as ready — the editor does not wait for PartyKit `sync`
 3. No loading skeleton for `isNew`
-4. Authorize creates the owner row in the background; `/load` is skipped when `created: true`
+4. Connect creates the owner row in the background; empty state when `created: true`
 5. First keystrokes live in the local Y.Doc and merge into the room when the socket connects
+6. Existing docs: sidebar hover prefetches `getDocumentState` so the editor can paint from cache
 
 ---
 
@@ -727,7 +712,7 @@ New document creation feels instant because:
 
 ### 3. PartyKit Does Not Verify JWT Signatures Itself
 
-**Current:** PartyKit forwards the JWT to `/api/partykit/authorize`. Supabase Auth (`getUser`) verifies signature and expiry. A connection is not attached to the Y.Doc until that call returns 200.
+**Current:** PartyKit forwards the JWT to `/api/partykit/connect`. Supabase Auth (`getUser`) verifies signature and expiry. A connection is not attached to the Y.Doc until that call returns 200.
 
 **Why This Is OK:** Forged tokens fail authorize (401) and never join the room, even if another user already loaded the document.
 

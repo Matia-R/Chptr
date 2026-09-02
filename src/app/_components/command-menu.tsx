@@ -15,6 +15,7 @@ import { FileText, SunMoon, FilePlus } from "lucide-react";
 import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useTheme } from "next-themes";
 import { randomUUID } from "~/lib/utils";
 
@@ -26,6 +27,7 @@ export function CommandMenu() {
   const isOpen = useCommandMenuStore((state) => state.isOpen);
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const closeAll = useCommandMenuStore((state) => state.closeAll);
+  const prefetchDocumentState = usePrefetchDocumentState();
   const { theme, setTheme } = useTheme();
 
   // Instant document creation - navigate immediately with a new UUID
@@ -73,7 +75,9 @@ export function CommandMenu() {
             <CommandItem
               key={doc.id}
               value={doc.name + "_" + doc.id}
+              onMouseEnter={() => prefetchDocumentState(doc.id)}
               onSelect={() => {
+                prefetchDocumentState(doc.id);
                 router.push(`/documents/${doc.id}`);
                 closeAll();
               }}

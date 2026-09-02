@@ -116,7 +116,7 @@ export default function DocumentPage() {
 
   // 2. Still loading — new docs stay blank (no skeleton). Existing docs
   // show a skeleton only after the delay to avoid flicker on fast loads.
-  if (isStillLoading) {
+  if (isStillLoading || !ydoc || !provider) {
     if (!isNew && showSkeleton) {
       return (
         <MotionFade>

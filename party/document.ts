@@ -34,12 +34,8 @@ function jwtLooksExpired(token: string): boolean {
   }
 }
 
-type LoadResult =
-  | { success: true; ydoc: Y.Doc | null }
-  | { success: false; errorCode: number; errorMessage: string };
-
-type AuthorizeResult =
-  | { ok: true; userId: string; permission: string; created: boolean }
+type ConnectResult =
+  | { ok: true; userId: string; permission: string; created: boolean; state: string | null }
   | { ok: false; errorCode: number; errorMessage: string };
 
 type AuthorizedClient = {
@@ -81,12 +77,9 @@ export default class DocumentParty implements Party.Server {
     return (this.room.env.PARTYKIT_SECRET as string) || "";
   }
 
-  async authorizeConnection(
-    token: string,
-    isNew: boolean
-  ): Promise<AuthorizeResult> {
+  async connectDocument(token: string, isNew: boolean): Promise<ConnectResult> {
     try {
-      const response = await fetch(`${this.appUrl}/api/partykit/authorize`, {
+      const response = await fetch(`${this.appUrl}/api/partykit/connect`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,7 +97,7 @@ export default class DocumentParty implements Party.Server {
           response.status
         );
         console.log(
-          `[PartyKit] Authorize failed for ${this.room.id}: ${response.status}`
+          `[PartyKit] Connect failed for ${this.room.id}: ${response.status}`
         );
         return { ok: false, errorCode, errorMessage };
       }
@@ -113,72 +106,24 @@ export default class DocumentParty implements Party.Server {
         userId: string;
         permission: string;
         created?: boolean;
+        state?: string | null;
       };
       return {
         ok: true,
         userId: data.userId,
         permission: data.permission,
         created: data.created === true,
+        state: data.state ?? null,
       };
     } catch (error) {
       console.error(
-        `[PartyKit] Authorize request failed for ${this.room.id}:`,
+        `[PartyKit] Connect request failed for ${this.room.id}:`,
         error
       );
       return {
         ok: false,
         errorCode: 4005,
         errorMessage: "Failed to authorize",
-      };
-    }
-  }
-
-  async fetchDocument(token: string): Promise<LoadResult> {
-    const documentId = this.room.id;
-
-    try {
-      const response = await fetch(`${this.appUrl}/api/partykit/load`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Partykit-Secret": this.partykitSecret,
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ documentId }),
-      });
-
-      if (!response.ok) {
-        console.log(
-          `[PartyKit] Load failed for ${documentId}: ${response.status}`
-        );
-        const { errorCode, errorMessage } = closeCodeFromHttpStatus(
-          response.status
-        );
-        return { success: false, errorCode, errorMessage };
-      }
-
-      const data = (await response.json()) as { state: string | null };
-
-      if (data.state) {
-        const ydoc = new Y.Doc();
-        const stateBytes = base64ToUint8Array(data.state);
-        Y.applyUpdate(ydoc, stateBytes);
-        console.log(
-          `[PartyKit] Loaded document ${documentId} with existing state (${stateBytes.length} bytes)`
-        );
-        return { success: true, ydoc };
-      }
-
-      console.log(
-        `[PartyKit] Document ${documentId} starting with empty state`
-      );
-      return { success: true, ydoc: null };
-    } catch (error) {
-      console.error(`[PartyKit] Failed to load document ${documentId}:`, error);
-      return {
-        success: false,
-        errorCode: 4005,
-        errorMessage: "Failed to load document",
       };
     }
   }
@@ -240,7 +185,7 @@ export default class DocumentParty implements Party.Server {
       return;
     }
 
-    const auth = await this.authorizeConnection(token, isNew);
+    const auth = await this.connectDocument(token, isNew);
     if (!auth.ok) {
       conn.close(auth.errorCode, auth.errorMessage);
       return;
@@ -252,23 +197,21 @@ export default class DocumentParty implements Party.Server {
     });
 
     if (!this.isLoaded) {
-      if (auth.created) {
+      if (auth.created || !auth.state) {
         this.loadedDoc = null;
         this.isLoaded = true;
         console.log(
-          `[PartyKit] New document ${this.room.id} starting empty (skip load)`
+          `[PartyKit] Document ${this.room.id} starting with empty state`
         );
       } else {
-        const result = await this.fetchDocument(token);
-
-        if (!result.success) {
-          this.authorizedByConnection.delete(conn.id);
-          conn.close(result.errorCode, result.errorMessage);
-          return;
-        }
-
-        this.loadedDoc = result.ydoc;
+        const ydoc = new Y.Doc();
+        const stateBytes = base64ToUint8Array(auth.state);
+        Y.applyUpdate(ydoc, stateBytes);
+        this.loadedDoc = ydoc;
         this.isLoaded = true;
+        console.log(
+          `[PartyKit] Loaded document ${this.room.id} with existing state (${stateBytes.length} bytes)`
+        );
       }
     }
 

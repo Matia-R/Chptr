@@ -33,8 +33,7 @@ PartyKit replaces the previous y-webrtc peer-to-peer sync with a server-mediated
               ┌────────────────────────┐
               │   Next.js API Routes   │
               │   /api/partykit/       │
-              │   authorize | load |   │
-              │   save                 │
+              │   connect | save       │
               └───────────┬────────────┘
                           │ User JWT → auth.uid() + RLS
                           ▼
@@ -49,19 +48,20 @@ Authorization is a **per-connection** decision. Persistence is a **room** decisi
 
 1. **Client authenticates with Supabase** and receives a JWT
 2. **Client connects to PartyKit** with that JWT in query params
-3. **PartyKit calls `/api/partykit/authorize` on every connect** (secret + JWT + document id + `isNew`)
-4. **Authorize validates the JWT** with Supabase Auth (`getUser`), then checks `document_permissions` for `(document_id, user_id)`
+3. **PartyKit calls `/api/partykit/connect` on every connect** (secret + JWT + document id + `isNew`)
+4. **Connect validates the JWT** with Supabase Auth (`getUser`), checks `document_permissions`, and returns Y.Doc state in the same response
 5. **403 vs 404** uses the `document_exists` RPC (SECURITY DEFINER). A normal SELECT cannot tell these apart because RLS hides unauthorized rows as "not found"
 6. **`isNew` only creates** when the document truly does not exist. If it exists and the user has no permission row, the socket is closed with 4003
 7. **Only then** does PartyKit attach the socket to the Y.Doc. Later connections are authorized again; they do not skip the gate just because the room is already loaded
-8. **Load/save** re-validate the JWT and permission, then run as that user so RLS still applies
+8. **Save** re-validates the JWT and permission, then runs as that user so RLS still applies
 9. **Saves** use a token from a currently connected authorized client (prefer one that is not expired), not a single room-level JWT
+10. **Existing docs** can paint from a prefetched `getDocumentState` snapshot (sidebar hover) before PartyKit sync finishes
 
-The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the verifier. PartyKit will not join a connection until authorize returns 200.
+The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the verifier. PartyKit will not join a connection until connect returns 200.
 
 ### Error Codes
 
-| HTTP (authorize/load/save) | WebSocket close | UI |
+| HTTP (connect/save) | WebSocket close | UI |
 |----------------------------|-----------------|----|
 | 401 | 4001 | Login required |
 | 403 | 4003 | Restricted access |
@@ -156,20 +156,21 @@ CREATE TABLE document_state (
 
 This replaces the old `document_changes` + `document_snapshots` tables with a single table. No more compaction needed since we always store the full state.
 
-`document_exists(uuid)` is a `SECURITY DEFINER` RPC used only by authorize to distinguish missing documents from documents the caller cannot access.
+`document_exists(uuid)` is a `SECURITY DEFINER` RPC used by connect to distinguish missing documents from documents the caller cannot access.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `partykit.json` | PartyKit configuration |
-| `party/document.ts` | PartyKit server (per-connection authorize, Y.Doc, save token pool) |
-| `src/hooks/use-collaborative-doc-partykit.ts` | Client hook (JWT, close codes, token refresh) |
+| `party/document.ts` | PartyKit server (per-connection connect, Y.Doc, save token pool) |
+| `src/hooks/use-collaborative-doc-partykit.ts` | Client hook (JWT, prefetch snapshot, close codes, token refresh) |
+| `src/hooks/use-prefetch-document-state.ts` | Sidebar/command-menu hover prefetch |
 | `src/lib/document-access-error.ts` | Typed document access errors for the editor page |
-| `src/app/api/partykit/authorize/route.ts` | Validate JWT + permission; create-on-new only after a real miss |
-| `src/app/api/partykit/load/route.ts` | Load Y.Doc state after permission check |
+| `src/app/api/partykit/connect/route.ts` | JWT + permission + state (or create-on-new) in one call |
 | `src/app/api/partykit/save/route.ts` | Save Y.Doc state after permission check |
 | `src/server/partykit/auth.ts` | Shared secret/JWT/permission helpers |
+| `src/server/partykit/connect-document.ts` | Shared permission + state resolution |
 | `src/utils/supabase/from-token.ts` | User-scoped Supabase client from a JWT |
 | `migrations/partykit_document_state.sql` | `document_state` table + RLS |
 | `migrations/document_exists_rpc.sql` | Privileged existence check |
@@ -180,29 +181,28 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 
 1. Client gets Supabase session (`access_token`)
 2. `useCollaborativeDocPartykit` creates a Y.Doc and `YPartyKitProvider`
-3. **New documents:** the editor is ready immediately (does not wait for PartyKit `sync`). Authorize/create run in the background
-4. **Existing documents:** the editor waits for `sync` after authorize + load
+3. **New documents:** the editor is ready immediately (does not wait for PartyKit `sync`). Connect/create run in the background
+4. **Existing documents:** if `getDocumentState` is already cached (sidebar hover) or returns first, apply the snapshot and show the editor. Otherwise wait for PartyKit `sync`
 5. Provider connects to PartyKit with JWT + `isNew` in query params
 6. On `TOKEN_REFRESHED`, the hook reconnects with the same Y.Doc and a fresh JWT
 7. On 4001/4003/4004/4000/4005, reconnect is disabled and the document page shows the matching alert
 
 ### Server Lifecycle
 
-1. Every client connect → `POST /api/partykit/authorize`
+1. Every client connect → `POST /api/partykit/connect` (auth + state in one hop)
 2. Unauthorized / forbidden / missing document → close the socket; do not call `y-partykit`
-3. If authorize **created** the document → skip `/load`, start with an empty Y.Doc
-4. Otherwise first authorized connection → `POST /api/partykit/load` and cache the Y.Doc
-5. Later authorized connections reuse the in-memory Y.Doc (they still authorized)
-6. Edits broadcast to authorized clients in the room
-7. Debounced save (1s / 5s max) uses a live authorized client's JWT
-8. `onClose` drops that connection's token from the save pool
+3. First successful connect caches the Y.Doc in the room (`created` or empty state → empty doc)
+4. Later authorized connections reuse the in-memory Y.Doc (they still go through connect)
+5. Edits broadcast to authorized clients in the room
+6. Debounced save (1s / 5s max) uses a live authorized client's JWT
+7. `onClose` drops that connection's token from the save pool
 
 ### Permission Enforcement
 
-- **Authorize**: `getUser(jwt)` then `document_permissions` for this user. Create only if `isNew` and `document_exists` is false
-- **Load**: Permission first. Missing `document_state` means empty doc, not access denied
+- **Connect**: `getUser(jwt)` then `document_permissions`. Create only if `isNew` and `document_exists` is false. Return state in the same response
 - **Save**: Permission first, then upsert. RLS remains defense in depth
-- **Connect**: Failed authorize never joins the CRDT room
+- **Socket**: Failed connect never joins the CRDT room
+- **Prefetch**: `getDocumentState` uses the same permission rules via tRPC (cookie session + RLS)
 
 ## Costs
 

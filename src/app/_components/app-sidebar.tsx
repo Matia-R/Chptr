@@ -24,6 +24,7 @@ import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { cn, randomUUID } from "~/lib/utils";
 
 const MOBILE_UTILITY_SURFACE_CLASSNAME = cn(
@@ -74,6 +75,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
+  const prefetchDocumentState = usePrefetchDocumentState();
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -182,6 +184,8 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
             href={`/documents/${doc.id}`}
             prefetch={true}
             onClick={dismissMobileNav}
+            onPointerDown={() => prefetchDocumentState(doc.id)}
+            onMouseEnter={() => prefetchDocumentState(doc.id)}
           >
             <span className="min-w-0 flex-1 truncate">{doc.name}</span>
           </Link>
@@ -206,7 +210,12 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
         isActive={pathname === `/documents/${doc.id}`}
         className="h-9 data-[active=true]:font-normal"
       >
-        <Link href={`/documents/${doc.id}`} prefetch={true}>
+        <Link
+          href={`/documents/${doc.id}`}
+          prefetch={true}
+          onMouseEnter={() => prefetchDocumentState(doc.id)}
+          onPointerDown={() => prefetchDocumentState(doc.id)}
+        >
           <span className="truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
