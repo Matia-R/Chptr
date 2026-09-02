@@ -36,6 +36,7 @@ interface EditorProps {
   userColor: string;
   ydoc: Y.Doc;
   provider: CollaborationProvider;
+  editable?: boolean;
 }
 
 const schema = BlockNoteSchema.create({
@@ -51,6 +52,7 @@ export default function Editor({
   userColor,
   ydoc,
   provider,
+  editable = true,
 }: EditorProps) {
   const { theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
@@ -115,6 +117,7 @@ export default function Editor({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (!editable) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         const container = editorContainerRef.current;
         if (!container?.contains(document.activeElement)) return;
@@ -154,7 +157,7 @@ export default function Editor({
         editor.formattingToolbar.closeMenu();
       }
     },
-    [editor],
+    [editor, editable],
   );
 
   useEffect(() => {
@@ -175,6 +178,7 @@ export default function Editor({
     <div ref={editorContainerRef} className="contents">
       <BlockNoteView
         editor={editor}
+        editable={editable}
         theme={currentTheme as "light" | "dark"}
         shadCNComponents={shadCNComponents}
       >

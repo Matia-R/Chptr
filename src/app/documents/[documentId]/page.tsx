@@ -57,18 +57,18 @@ function getDocumentErrorContent(error: unknown): {
 
 function ConnectionLostNotice({
   onRetry,
-  keepEditing,
+  hasDocument,
 }: {
   onRetry: () => void;
-  keepEditing: boolean;
+  hasDocument: boolean;
 }) {
   return (
     <Alert>
       <AlertTitle>Connection lost</AlertTitle>
       <AlertDescription>
         <p>
-          {keepEditing
-            ? "Reconnecting… Keep editing — your latest changes are still on this device and will sync when you’re back online."
+          {hasDocument
+            ? "Reconnecting… Editing is paused until we’re back online."
             : "Reconnecting to your doc… We’ll load it as soon as we’re back online."}
         </p>
         <Button
@@ -152,7 +152,8 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Ready editor: keep it mounted while reconnecting so typing is not lost.
+  // 2. Ready editor: keep it mounted so the doc stays visible, but lock
+  // editing until the socket is back. Offline editing is not shipped yet.
   if (ydoc && provider && isReady) {
     const userName = userProfile
       ? [userProfile.first_name, userProfile.last_name]
@@ -170,13 +171,14 @@ export default function DocumentPage() {
       <MotionFade>
         <div className="flex flex-col gap-3">
           {isReconnecting && (
-            <ConnectionLostNotice onRetry={retryConnection} keepEditing />
+            <ConnectionLostNotice onRetry={retryConnection} hasDocument />
           )}
           <Editor
             userName={userName}
             userColor={userColor}
             ydoc={ydoc}
             provider={provider}
+            editable={!isReconnecting}
           />
         </div>
       </MotionFade>
@@ -187,7 +189,7 @@ export default function DocumentPage() {
   if (isReconnecting) {
     return (
       <MotionFade>
-        <ConnectionLostNotice onRetry={retryConnection} keepEditing={false} />
+        <ConnectionLostNotice onRetry={retryConnection} hasDocument={false} />
       </MotionFade>
     );
   }

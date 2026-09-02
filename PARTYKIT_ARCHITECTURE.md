@@ -574,22 +574,16 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     JWT in the last WebSocket URL)                                      │
 │  4. Hook refreshes the Supabase session and calls provider.connect()    │
 │     so query params are rebuilt with a live JWT                         │
-│  5. User can continue typing (local Y.Doc still works); a banner        │
-│     shows "Connection lost" until status is connected again             │
+│  5. Editor stays mounted (read-only) with a "Connection lost" banner.   │
+│     Editing is paused until the socket is back — offline editing is     │
+│     not shipped yet                                                     │
 │  6. If connect returns 401, that is a stale JWT, not a sign-out.        │
 │     Refresh and reconnect. Login only if getSession() has no session    │
 │  7. Network returns / tab becomes visible → refresh + reconnect         │
-│  8. Y.Doc syncs accumulated changes; PartyKit debounces and saves      │
+│  8. Editor unlocks when status is connected again                       │
 │                                                                         │
-│  Data Safety:                                                           │
-│  ─────────────────────────────────────────────────────────────────      │
-│                                                                         │
-│  - Local edits preserved in Y.Doc (memory)                              │
-│  - NOT persisted to disk during offline                                 │
-│  - If user closes browser while offline, changes lost                   │
-│                                                                         │
-│  Note: True offline support would require IndexedDB persistence         │
-│        (see Future Considerations)                                      │
+│  Note: True offline support (local edits + IndexedDB persistence) is    │
+│        not enabled. See Future Considerations.                          │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
