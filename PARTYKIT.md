@@ -63,13 +63,13 @@ The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the 
 
 | HTTP (connect/save) | WebSocket close | UI |
 |----------------------------|-----------------|----|
-| 401 | 4001 | Login required |
+| 401 | 4001 | Refresh the session and reconnect. Show "Login required" only if there is no session |
 | 403 | 4003 | Restricted access |
 | 404 | 4004 | Doc not found |
 | 400 | 4000 | Bad URL |
-| 500 | 4005 | Unable to load doc |
+| 500 | 4005 | Connection lost; retry (do not unmount the editor) |
 
-The document page maps `DocumentAccessError.code` onto those alerts. Auth close codes disable y-partykit reconnect so a 403 does not spin.
+The document page maps `DocumentAccessError.code` onto those alerts. Fatal close codes (4000/4003/4004) disable y-partykit reconnect. 4001 is a stale JWT on reconnect after sleep or a dropped socket — refresh then reconnect. Transport closes (1001/1006) keep the local Y.Doc and show a reconnecting banner.
 
 ## Setup
 
@@ -185,7 +185,8 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 4. **Existing documents:** if `getDocumentState` is already cached (sidebar hover) or returns first, apply the snapshot and show the editor. Otherwise wait for PartyKit `sync`
 5. Provider connects to PartyKit with JWT + `isNew` in query params
 6. On `TOKEN_REFRESHED`, the hook reconnects with the same Y.Doc and a fresh JWT
-7. On 4001/4003/4004/4000/4005, reconnect is disabled and the document page shows the matching alert
+7. On 4003/4004/4000, reconnect is disabled and the document page shows the matching alert
+8. On drop (1001/1006), 4005, or 4001, the hook refreshes the JWT, reconnects through `provider.connect()` (so query params are rebuilt), and the page keeps the editor with a "Connection lost" banner. Login is only shown if there is no session
 
 ### Server Lifecycle
 

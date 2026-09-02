@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
+import { Button } from "~/app/_components/ui/button";
 import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
@@ -54,6 +55,36 @@ function getDocumentErrorContent(error: unknown): {
   return DOCUMENT_ERROR[key];
 }
 
+function ConnectionLostNotice({
+  onRetry,
+  keepEditing,
+}: {
+  onRetry: () => void;
+  keepEditing: boolean;
+}) {
+  return (
+    <Alert>
+      <AlertTitle>Connection lost</AlertTitle>
+      <AlertDescription>
+        <p>
+          {keepEditing
+            ? "Reconnecting… Keep editing — your latest changes are still on this device and will sync when you’re back online."
+            : "Reconnecting to your doc… We’ll load it as soon as we’re back online."}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          onClick={onRetry}
+        >
+          Retry
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 export default function DocumentPage() {
   const params = useParams();
   const documentId = params.documentId as string;
@@ -71,12 +102,18 @@ export default function DocumentPage() {
   const { data: userProfile } = useUserProfile();
 
   // PartyKit-based collaborative doc - handles fetching and saving on server
-  const { ydoc, provider, isReady, isLoading, error } = useCollaborativeDocPartykit(
-    {
-      documentId,
-      isNew,
-    },
-  );
+  const {
+    ydoc,
+    provider,
+    isReady,
+    isLoading,
+    error,
+    isReconnecting,
+    retryConnection,
+  } = useCollaborativeDocPartykit({
+    documentId,
+    isNew,
+  });
 
   // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
   // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.
@@ -101,7 +138,8 @@ export default function DocumentPage() {
 
   // === RENDERING LOGIC ===
 
-  // 1. Handle errors — show alert and stop; don't proceed to loading or editor
+  // 1. Fatal errors (no access, missing doc, real sign-out) replace the editor.
+  // Connection drops do not — they keep the local Y.Doc and show a banner.
   if (error) {
     const { title, message } = getDocumentErrorContent(error);
     return (
@@ -114,7 +152,47 @@ export default function DocumentPage() {
     );
   }
 
-  // 2. Still loading — new docs stay blank (no skeleton). Existing docs
+  // 2. Ready editor: keep it mounted while reconnecting so typing is not lost.
+  if (ydoc && provider && isReady) {
+    const userName = userProfile
+      ? [userProfile.first_name, userProfile.last_name]
+          .filter(
+            (p): p is string => typeof p === "string" && p.trim().length > 0,
+          )
+          .join(" ")
+          .trim() || "Anonymous User"
+      : "Anonymous User";
+    const userColor = getAvatarColorHex(
+      userProfile?.default_avatar_background_color,
+    );
+
+    return (
+      <MotionFade>
+        <div className="flex flex-col gap-3">
+          {isReconnecting && (
+            <ConnectionLostNotice onRetry={retryConnection} keepEditing />
+          )}
+          <Editor
+            userName={userName}
+            userColor={userColor}
+            ydoc={ydoc}
+            provider={provider}
+          />
+        </div>
+      </MotionFade>
+    );
+  }
+
+  // 3. Never painted: a dropped socket should not look like a missing login.
+  if (isReconnecting) {
+    return (
+      <MotionFade>
+        <ConnectionLostNotice onRetry={retryConnection} keepEditing={false} />
+      </MotionFade>
+    );
+  }
+
+  // 4. Still loading — new docs stay blank (no skeleton). Existing docs
   // show a skeleton only after the delay to avoid flicker on fast loads.
   if (isStillLoading || !ydoc || !provider) {
     if (!isNew && showSkeleton) {
@@ -127,25 +205,5 @@ export default function DocumentPage() {
     return null;
   }
 
-  // 3. Ready to render
-  const userName = userProfile
-    ? [userProfile.first_name, userProfile.last_name]
-        .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
-        .join(" ")
-        .trim() || "Anonymous User"
-    : "Anonymous User";
-  const userColor = getAvatarColorHex(
-    userProfile?.default_avatar_background_color,
-  );
-
-  return (
-    <MotionFade>
-      <Editor
-        userName={userName}
-        userColor={userColor}
-        ydoc={ydoc}
-        provider={provider}
-      />
-    </MotionFade>
-  );
+  return null;
 }

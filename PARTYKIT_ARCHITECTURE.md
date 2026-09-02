@@ -343,11 +343,11 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 
 | HTTP | WebSocket Close Code | Meaning | Client Behavior |
 |------|---------------------|---------|-----------------|
-| 400 | `4000` | Bad request | Show "Bad URL" |
-| 401 | `4001` | Missing / invalid / expired token | Show "Login required"; stop reconnect |
+| 400 | `4000` | Bad request | Show "Bad URL"; stop reconnect |
+| 401 | `4001` | Missing / invalid / expired token | Refresh session and reconnect. Show "Login required" only if there is no session |
 | 403 | `4003` | Signed in, no permission | Show "Restricted access"; stop reconnect |
 | 404 | `4004` | Document does not exist | Show "Doc not found"; stop reconnect |
-| 500 | `4005` | Connect failure | Show "Unable to load doc"; stop reconnect |
+| 500 | `4005` | Connect failure (app unreachable) | Treat as connection lost; retry with a fresh JWT |
 
 ---
 
@@ -567,15 +567,19 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │  Behavior:                                                              │
 │  ─────────────────────────────────────────────────────────────────      │
 │                                                                         │
-│  1. Network drops                                                       │
-│  2. WebSocket disconnects                                               │
-│  3. YPartyKitProvider attempts reconnection (exponential backoff)       │
-│  4. User can continue typing (local Y.Doc still works)                  │
-│  5. Edits queue locally                                                 │
-│  6. Network returns                                                     │
-│  7. WebSocket reconnects                                                │
-│  8. Y.Doc syncs accumulated changes                                     │
-│  9. PartyKit debounces and saves                                        │
+│  1. Network drops (or laptop sleeps)                                    │
+│  2. WebSocket disconnects (1001/1006). PartyKit may log                 │
+│     "Network connection lost" — that connection cannot be recovered     │
+│  3. Hook pauses y-partykit's built-in retry (it would reuse the stale   │
+│     JWT in the last WebSocket URL)                                      │
+│  4. Hook refreshes the Supabase session and calls provider.connect()    │
+│     so query params are rebuilt with a live JWT                         │
+│  5. User can continue typing (local Y.Doc still works); a banner        │
+│     shows "Connection lost" until status is connected again             │
+│  6. If connect returns 401, that is a stale JWT, not a sign-out.        │
+│     Refresh and reconnect. Login only if getSession() has no session    │
+│  7. Network returns / tab becomes visible → refresh + reconnect         │
+│  8. Y.Doc syncs accumulated changes; PartyKit debounces and saves      │
 │                                                                         │
 │  Data Safety:                                                           │
 │  ─────────────────────────────────────────────────────────────────      │

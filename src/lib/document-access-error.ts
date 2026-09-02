@@ -7,6 +7,16 @@ export type DocumentErrorCode =
   | "BAD_REQUEST"
   | "INTERNAL_SERVER_ERROR";
 
+export type DocumentConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "disconnected";
+
+/** Close codes that mean this user cannot use this doc. Do not retry. */
+export function isFatalDocumentCloseCode(code: number): boolean {
+  return code === 4000 || code === 4003 || code === 4004;
+}
+
 export class DocumentAccessError extends Error {
   readonly code: DocumentErrorCode;
 
