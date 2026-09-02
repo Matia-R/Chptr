@@ -92,7 +92,7 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 │                                                                         │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
-                              HTTP + JWT
+                    HTTP + JWT + PARTYKIT_SECRET
                                      │
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -101,13 +101,13 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │   ┌─────────────────────────┐    ┌─────────────────────────┐            │
-│   │  /api/partykit/load     │    │  /api/partykit/save     │            │
-│   │                         │    │                         │            │
-│   │  - Receives JWT         │    │  - Receives JWT         │            │
-│   │  - Creates Supabase     │    │  - Creates Supabase     │            │
-│   │    client with JWT      │    │    client with JWT      │            │
-│   │  - Queries document     │    │  - Upserts document     │            │
-│   │  - RLS enforced         │    │  - RLS enforced         │            │
+│   │  /api/partykit/authorize│    │  /api/partykit/load     │            │
+│   │                         │    │  /api/partykit/save     │            │
+│   │  - getUser(JWT)         │    │                         │            │
+│   │  - Check permission row │    │  - Re-validate JWT      │            │
+│   │  - 403 vs 404 via RPC   │    │  - Check permission     │            │
+│   │  - Create only if isNew │    │  - Load / upsert state  │            │
+│   │    and doc is missing   │    │  - RLS still applies    │            │
 │   └────────────┬────────────┘    └────────────┬────────────┘            │
 │                │                              │                         │
 └────────────────┼──────────────────────────────┼─────────────────────────┘
@@ -150,11 +150,11 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Client (Browser)** | Local Y.Doc, UI rendering, user input, JWT management |
+| **Client (Browser)** | Local Y.Doc, UI rendering, user input, JWT + error-code mapping |
 | **YPartyKitProvider** | WebSocket connection, Yjs sync protocol, awareness |
-| **PartyKit Room** | Central Y.Doc, broadcast updates, debounced persistence |
-| **Next.js API** | JWT→Supabase client, RLS-enforced DB operations |
-| **Supabase** | Document storage, permissions, RLS enforcement |
+| **PartyKit Room** | Authorize every socket, central Y.Doc, broadcast, save-token pool |
+| **Next.js API** | `/authorize` (JWT + permission), `/load` and `/save` (re-check + RLS) |
+| **Supabase** | Document storage, permissions, RLS, `document_exists` RPC |
 
 ---
 
@@ -176,22 +176,28 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
      │    ?token=JWT&isNew=false                 │                     │
      │────────────────────►│                     │                     │
      │                     │                     │                     │
-     │                     │ 3. Verify JWT       │                     │
-     │                     │    (not expired)    │                     │
-     │                     │                     │                     │
-     │                     │ 4. POST /api/partykit/load               │
-     │                     │    Authorization: Bearer JWT              │
-     │                     │    { documentId }   │                     │
+     │                     │ 3. POST /api/partykit/authorize           │
+     │                     │    (every connection)                     │
      │                     │────────────────────►│                     │
-     │                     │                     │                     │
-     │                     │                     │ 5. Query with JWT   │
+     │                     │                     │ 4. getUser(JWT)     │
+     │                     │                     │    permission row   │
+     │                     │                     │    document_exists  │
      │                     │                     │────────────────────►│
      │                     │                     │◄────────────────────│
-     │                     │                     │   { state_data }    │
+     │                     │◄────────────────────│                     │
+     │                     │   200 { userId } or 401/403/404           │
+     │                     │                     │                     │
+     │                     │ 5. First authorized load only             │
+     │                     │    POST /api/partykit/load                │
+     │                     │────────────────────►│                     │
+     │                     │                     │ 6. Permission +     │
+     │                     │                     │    document_state   │
+     │                     │                     │────────────────────►│
+     │                     │                     │◄────────────────────│
      │                     │◄────────────────────│                     │
      │                     │   { state }         │                     │
      │                     │                     │                     │
-     │ 6. Yjs Sync         │                     │                     │
+     │ 7. Yjs Sync         │                     │                     │
      │◄───────────────────►│                     │                     │
      │   (document state)  │                     │                     │
      │                     │                     │                     │
@@ -225,11 +231,13 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
      │                     │      ... 1s ...     │                     │
      │                     │                     │                     │
      │                     │ 6. POST /api/partykit/save               │
-     │                     │    Authorization: Bearer JWT              │
+     │                     │    JWT from a live authorized client       │
      │                     │    { documentId, state }                  │
      │                     │────────────────────►│                     │
      │                     │                     │                     │
-     │                     │                     │ 7. Upsert with JWT  │
+     │                     │                     │ 7. Re-check         │
+     │                     │                     │    permission +     │
+     │                     │                     │    upsert as user   │
      │                     │                     │────────────────────►│
      │                     │                     │◄────────────────────│
      │                     │◄────────────────────│   { success }       │
@@ -287,6 +295,8 @@ CREATE POLICY "Users can write document_state if they have write permission"
 
 ## Security Model
 
+Authorization is **per connection**. The in-memory Y.Doc is cached after the first *authorized* load; that cache is never a substitute for a permission check.
+
 ### JWT Flow Through the System
 
 ```
@@ -300,7 +310,6 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │     │          │◄────│  Auth    │  Receives JWT (access_token)          │
 │     └──────────┘     └──────────┘                                       │
 │           │                                                             │
-│           │ JWT contains: { sub: user_id, exp: expiry, ... }            │
 │           ▼                                                             │
 │  2. CLIENT CONNECTS TO PARTYKIT                                         │
 │     ┌──────────┐     ┌──────────┐                                       │
@@ -308,28 +317,31 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │     │          │     │  Server  │                                       │
 │     └──────────┘     └──────────┘                                       │
 │                            │                                            │
-│                            │ Decodes JWT, checks exp > now              │
-│                            │ (Does NOT verify signature - trusts        │
-│                            │  that Supabase will reject invalid JWTs)   │
+│                            │ Every connect calls authorize.             │
+│                            │ PartyKit does not treat JWT expiry         │
+│                            │ as the access check.                       │
 │                            ▼                                            │
-│  3. PARTYKIT CALLS API WITH USER'S JWT                                  │
+│  3. POST /api/partykit/authorize                                        │
 │     ┌──────────┐     ┌──────────┐                                       │
-│     │ PartyKit │────►│ Next.js  │  Authorization: Bearer <user's JWT>   │
+│     │ PartyKit │────►│ Next.js  │  PARTYKIT_SECRET + Bearer JWT         │
 │     │  Server  │     │   API    │                                       │
 │     └──────────┘     └──────────┘                                       │
 │                            │                                            │
-│                            │ Creates Supabase client WITH user's JWT    │
-│                            │ (not service role key)                     │
+│                            │ a. getUser(JWT) via Auth (signature + exp) │
+│                            │ b. SELECT document_permissions             │
+│                            │    WHERE document_id AND user_id           │
+│                            │ c. If no row: document_exists()            │
+│                            │    exists → 403, missing → 404             │
+│                            │    missing + isNew → create as owner       │
 │                            ▼                                            │
-│  4. SUPABASE ENFORCES RLS                                               │
-│     ┌──────────┐     ┌──────────┐                                       │
-│     │ Next.js  │────►│ Supabase │  Query runs as the user               │
-│     │   API    │◄────│    DB    │  RLS policies check auth.uid()        │
-│     └──────────┘     └──────────┘                                       │
+│  4. ONLY THEN JOIN THE Y.DOC ROOM                                       │
+│     Load (first authorized connection) and save (any live token)        │
+│     re-check JWT + permission, then query as that user so RLS applies.  │
 │                                                                         │
 │  ═══════════════════════════════════════════════════════════════════    │
-│  RESULT: User can only access documents they have permission to.        │
-│          No service role key. No elevated privileges.                   │
+│  RESULT: A forged or other-user JWT cannot join a loaded room.          │
+│          isNew cannot mint access to an existing document.              │
+│          Empty document_state is not treated as "allowed in".           │
 │  ═══════════════════════════════════════════════════════════════════    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -337,12 +349,13 @@ CREATE POLICY "Users can write document_state if they have write permission"
 
 ### Error Codes
 
-| WebSocket Close Code | Meaning | Client Behavior |
-|---------------------|---------|-----------------|
-| `4001` | Token missing | Redirect to login |
-| `4002` | Token expired | Refresh token, reconnect |
-| `4003` | Permission denied (can't load) | Show "Access denied" error |
-| `4004` | Document not found | Show "Document not found" error |
+| HTTP | WebSocket Close Code | Meaning | Client Behavior |
+|------|---------------------|---------|-----------------|
+| 400 | `4000` | Bad request | Show "Bad URL" |
+| 401 | `4001` | Missing / invalid / expired token | Show "Login required"; stop reconnect |
+| 403 | `4003` | Signed in, no permission | Show "Restricted access"; stop reconnect |
+| 404 | `4004` | Document does not exist | Show "Doc not found"; stop reconnect |
+| 500 | `4005` | Authorize/load failure | Show "Unable to load doc"; stop reconnect |
 
 ---
 
@@ -374,18 +387,18 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │           ▼                                                             │
 │  3. PartyKit receives connection                                        │
 │     ┌──────────┐                                                        │
-│     │ PartyKit │  - Verifies JWT                                        │
-│     │  Server  │  - Calls /api/partykit/load with isNew=true            │
+│     │ PartyKit │  - Calls /api/partykit/authorize with isNew=true       │
+│     │  Server  │  - On 200, loads empty state (first connection)        │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
-│  4. Load API handles new document                                       │
+│  4. Authorize API handles new document                                  │
 │     ┌──────────┐                                                        │
-│     │ Next.js  │  - Checks if document exists → NO                      │
-│     │   API    │  - Since isNew=true:                                   │
-│     │          │    - Calls create_document_with_owner RPC              │
-│     │          │    - Creates document + owner permission atomically    │
-│     │          │  - Returns { state: null } (empty doc)                 │
+│     │ Next.js  │  - JWT valid, no permission row                        │
+│     │   API    │  - document_exists → false                             │
+│     │          │  - isNew=true → create_document_with_owner             │
+│     │          │  - Returns { userId, permission: owner }               │
+│     │          │  If the id already exists → 403 (not create)           │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
@@ -433,13 +446,16 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │     └──────────┘     └──────────┘                                       │
 │                            │                                            │
 │                            ▼                                            │
-│  3. Load document state                                                 │
+│  3. Authorize, then load state                                          │
 │     ┌──────────┐     ┌──────────┐     ┌──────────┐                      │
 │     │ PartyKit │────►│ Next.js  │────►│ Supabase │                      │
-│     │          │◄────│   API    │◄────│          │                      │
+│     │          │     │ authorize│     │ getUser, │                      │
+│     │          │     │ then load│     │ permission│                     │
+│     │          │◄────│          │◄────│ + state  │                      │
 │     └──────────┘     └──────────┘     └──────────┘                      │
 │           │                                                             │
-│           │ Apply state to Y.Doc, sync to client                        │
+│           │ 401/403/404 → close socket, matching UI alert               │
+│           │ 200 → apply state to Y.Doc, sync to client                  │
 │           ▼                                                             │
 │  4. Editor renders with content                                         │
 │     ┌──────────┐                                                        │
@@ -510,14 +526,15 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │      → Tab 1 opens /documents/{uuid}                                    │
 │      → isNew=true flag set                                              │
 │      → Connects to PartyKit                                             │
-│      → Load API creates document (via RPC)                              │
+│      → Authorize creates document (via RPC)                             │
 │      → Empty editor shown                                               │
 │                                                                         │
 │  T1: User duplicates tab (Cmd+D) without typing                         │
 │      → Tab 2 opens same URL                                             │
 │      → isNew=false (flag only in Tab 1's memory)                        │
 │      → Connects to PartyKit                                             │
-│      → Load API finds document exists → returns state (empty)           │
+│      → Authorize finds permission row → 200                             │
+│      → Load returns empty state (or live Y.Doc if Tab 1 is connected)   │
 │      → Empty editor shown                                               │
 │                                                                         │
 │  T2: User types in Tab 1                                                │
@@ -540,20 +557,17 @@ CREATE POLICY "Users can write document_state if they have write permission"
 │  ─────────────────────────────────────────────────────────────────      │
 │                                                                         │
 │  1. User editing for extended period                                    │
-│  2. JWT expires (typically 1 hour)                                      │
-│  3. Next save attempt fails (API rejects expired JWT)                   │
-│  4. PartyKit logs error but keeps Y.Doc in memory                       │
-│  5. Client still has local Y.Doc with all changes                       │
+│  2. Supabase refreshes the access token in the browser                  │
+│  3. Hook sees TOKEN_REFRESHED, replaces the PartyKit provider           │
+│     (same Y.Doc), reconnects with the new JWT                           │
+│  4. PartyKit re-authorizes and stores the fresh token for saves         │
+│  5. Save picks a currently connected token that is not expired          │
 │                                                                         │
-│  Mitigation:                                                            │
+│  If the user signs out:                                                 │
 │  ─────────────────────────────────────────────────────────────────      │
 │                                                                         │
-│  - Supabase client auto-refreshes tokens in background                  │
-│  - Client hook could detect token refresh and reconnect                 │
-│  - PartyKit could close connection on save failure, prompting           │
-│    client to reconnect with fresh token                                 │
-│                                                                         │
-│  Current Risk: Low (most edit sessions < 1 hour)                        │
+│  - Hook stops reconnect, shows "Login required"                         │
+│  - PartyKit drops that connection's token from the save pool            │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -708,21 +722,19 @@ New document creation feels instant because:
 
 **Mitigation:** Could add IndexedDB persistence layer (y-indexeddb) for offline resilience.
 
-### 2. Single Room = Single JWT
+### 2. Save Tokens Come From Live Connections
 
-**Current:** PartyKit room uses the JWT of the first client that connected (the "initializer"). Subsequent clients connect but room still uses initializer's JWT for saves.
+**Current:** Each authorized socket contributes its JWT to a room-level pool. Saves use a token that does not look expired; `onClose` removes that connection.
 
-**Implication:** If initializer's permissions change (e.g., demoted from editor to viewer), saves may fail.
+**Implication:** If every connected client’s token expires at once and none have refreshed yet, the next debounce save can fail until a client reconnects with a fresh JWT.
 
-**Mitigation:** Could rotate JWT to most recently connected client with write permissions, or require each save to use a still-connected client's JWT.
+**Mitigation:** The browser hook reconnects on `TOKEN_REFRESHED` so the pool stays current during long sessions.
 
-### 3. JWT Not Cryptographically Verified by PartyKit
+### 3. PartyKit Does Not Verify JWT Signatures Itself
 
-**Current:** PartyKit only checks that JWT is not expired (decodes payload, checks `exp`). It does not verify the signature.
+**Current:** PartyKit forwards the JWT to `/api/partykit/authorize`. Supabase Auth (`getUser`) verifies signature and expiry. A connection is not attached to the Y.Doc until that call returns 200.
 
-**Why This Is OK:** The real security enforcement happens at Supabase when the API route uses the JWT to create a client. Invalid/forged JWTs will fail at that layer.
-
-**Risk:** A malicious actor could potentially connect to PartyKit with a forged JWT, but any actual database operations would fail.
+**Why This Is OK:** Forged tokens fail authorize (401) and never join the room, even if another user already loaded the document.
 
 ### 4. Debounce Delay Before Persistence
 
@@ -891,7 +903,7 @@ To revert to y-webrtc:
 | **Topology** | Star (all clients → PartyKit → database) |
 | **Persistence** | Server-side only, debounced 1s |
 | **Schema** | Single `document_state` table |
-| **Security** | JWT flows through entire system, RLS enforced |
+| **Security** | Per-connection authorize + permission row; RLS on load/save |
 | **New Doc UX** | Instant (no skeleton, create on connect) |
 | **Existing Doc UX** | Delayed skeleton (250ms threshold) |
 | **Multi-tab** | Fully supported via PartyKit sync |

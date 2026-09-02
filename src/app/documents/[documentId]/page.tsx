@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { TRPCClientError } from "@trpc/client";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
@@ -11,6 +10,7 @@ import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-party
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
+import { getDocumentErrorCode } from "~/lib/document-access-error";
 
 const SKELETON_DELAY_MS = 500;
 
@@ -44,25 +44,13 @@ const DOCUMENT_ERROR = {
   },
 } as const;
 
-function getErrorCode(error: unknown): string | undefined {
-  if (error instanceof TRPCClientError) {
-    return (error.data as { code?: string } | undefined)?.code;
-  }
-  if (error instanceof Error && error.cause instanceof TRPCClientError) {
-    return (error.cause.data as { code?: string } | undefined)?.code;
-  }
-  return undefined;
-}
-
 function getDocumentErrorContent(error: unknown): {
   title: string;
   message: string;
 } {
-  const code = getErrorCode(error);
+  const code = getDocumentErrorCode(error);
   const key: keyof typeof DOCUMENT_ERROR =
-    code && code in DOCUMENT_ERROR
-      ? (code as keyof typeof DOCUMENT_ERROR)
-      : "DEFAULT";
+    code && code in DOCUMENT_ERROR ? code : "DEFAULT";
   return DOCUMENT_ERROR[key];
 }
 

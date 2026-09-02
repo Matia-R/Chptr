@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import YPartyKitProvider from "y-partykit/provider";
+import { DocumentAccessError } from "~/lib/document-access-error";
 import { createClient } from "~/utils/supabase/client";
 
 interface UseCollaborativeDocPartykitOptions {
@@ -20,6 +21,44 @@ interface UseCollaborativeDocPartykitResult {
 
 const PARTYKIT_HOST =
   process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
+
+function accessErrorForCloseCode(code: number): DocumentAccessError | null {
+  switch (code) {
+    case 4000:
+      return new DocumentAccessError(
+        "BAD_REQUEST",
+        "The URL provided is incomplete or malformed."
+      );
+    case 4001:
+      return new DocumentAccessError(
+        "UNAUTHORIZED",
+        "Please sign in to your account to access this doc."
+      );
+    case 4003:
+      return new DocumentAccessError(
+        "FORBIDDEN",
+        "Looks like you don't have access to this doc."
+      );
+    case 4004:
+      return new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist.");
+    case 4005:
+      return new DocumentAccessError(
+        "INTERNAL_SERVER_ERROR",
+        "A technical issue occurred on our end."
+      );
+    default:
+      return null;
+  }
+}
+
+function stopReconnect(provider: YPartyKitProvider) {
+  provider.shouldConnect = false;
+  try {
+    provider.disconnect();
+  } catch {
+    // Provider may already be closed.
+  }
+}
 
 export function useCollaborativeDocPartykit({
   documentId,
@@ -50,6 +89,8 @@ export function useCollaborativeDocPartykit({
     setError(null);
     setIsReady(false);
 
+    let cancelled = false;
+
     const setup = async () => {
       try {
         const supabase = createClient();
@@ -59,47 +100,89 @@ export function useCollaborativeDocPartykit({
         } = await supabase.auth.getSession();
 
         if (sessionError) {
-          throw new Error(`Failed to get session: ${sessionError.message}`);
+          throw new DocumentAccessError(
+            "INTERNAL_SERVER_ERROR",
+            `Failed to get session: ${sessionError.message}`
+          );
         }
 
         if (!session?.access_token) {
-          throw new Error("Not authenticated");
+          throw new DocumentAccessError(
+            "UNAUTHORIZED",
+            "Please sign in to your account to access this doc."
+          );
         }
 
-        const ydoc = new Y.Doc();
+        if (cancelled) return;
 
-        // Pass isNew flag to PartyKit
+        const ydoc = new Y.Doc();
+        const tokenRef = { current: session.access_token };
+        let closedForAuth = false;
+
         const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
           connect: true,
-          params: {
-            token: session.access_token,
+          params: () => ({
+            token: tokenRef.current,
             isNew: isNew ? "true" : "false",
-          },
+          }),
         });
 
         provider.on("sync", (synced: boolean) => {
-          if (synced) {
+          if (synced && !closedForAuth) {
             setIsReady(true);
             setIsLoading(false);
           }
         });
 
         provider.on("connection-error", (err: Error) => {
+          if (closedForAuth) return;
           console.error("[PartyKit] Connection error:", err);
-          setError(err);
+          setError(
+            err instanceof DocumentAccessError
+              ? err
+              : new DocumentAccessError(
+                  "INTERNAL_SERVER_ERROR",
+                  err.message || "Unable to connect to this document"
+                )
+          );
           setIsLoading(false);
         });
 
         provider.on("connection-close", (event: CloseEvent) => {
-          if (event.code === 4001) {
-            setError(new Error("Unauthorized: Please sign in"));
+          const accessError = accessErrorForCloseCode(event.code);
+          if (!accessError) return;
+          closedForAuth = true;
+          stopReconnect(provider);
+          setError(accessError);
+          setIsLoading(false);
+        });
+
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((event, nextSession) => {
+          if (cancelled || closedForAuth) return;
+
+          if (event === "SIGNED_OUT") {
+            closedForAuth = true;
+            stopReconnect(provider);
+            setError(
+              new DocumentAccessError(
+                "UNAUTHORIZED",
+                "Please sign in to your account to access this doc."
+              )
+            );
             setIsLoading(false);
-          } else if (event.code === 4003) {
-            setError(new Error("You don't have access to this document"));
-            setIsLoading(false);
-          } else if (event.code === 4004) {
-            setError(new Error("Document not found"));
-            setIsLoading(false);
+            return;
+          }
+
+          if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
+            tokenRef.current = nextSession.access_token;
+            try {
+              provider.disconnect();
+              provider.connect();
+            } catch (err) {
+              console.error("[PartyKit] Failed to reconnect with refreshed token:", err);
+            }
           }
         });
 
@@ -108,7 +191,9 @@ export function useCollaborativeDocPartykit({
         setState({ ydoc, provider });
 
         cleanupRef.current = () => {
+          cancelled = true;
           initializedRef.current = false;
+          subscription.unsubscribe();
           try {
             provider.destroy();
           } catch {}
@@ -128,6 +213,7 @@ export function useCollaborativeDocPartykit({
     void setup();
 
     return () => {
+      cancelled = true;
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
