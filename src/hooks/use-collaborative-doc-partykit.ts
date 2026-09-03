@@ -135,9 +135,25 @@ export function useCollaborativeDocPartykit({
   const lastDocumentIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const retryConnectionRef = useRef<(() => void) | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const retryConnection = useCallback(() => {
     retryConnectionRef.current?.();
+  }, []);
+
+  // Browser `offline` often happens before the WebSocket actually closes.
+  // Drive the same connection-lost UI immediately, not after TCP timeout.
+  useEffect(() => {
+    const syncNetworkStatus = () => {
+      setIsOffline(!navigator.onLine);
+    };
+    syncNetworkStatus();
+    window.addEventListener("offline", syncNetworkStatus);
+    window.addEventListener("online", syncNetworkStatus);
+    return () => {
+      window.removeEventListener("offline", syncNetworkStatus);
+      window.removeEventListener("online", syncNetworkStatus);
+    };
   }, []);
 
   useEffect(() => {
@@ -219,8 +235,16 @@ export function useCollaborativeDocPartykit({
         // connect(), so a sleep/wake reconnect would reuse an expired JWT.
         // Pause that retry and reconnect through provider.connect() so params()
         // runs again with a refreshed token.
+        const isBrowserOffline = () =>
+          typeof navigator !== "undefined" && navigator.onLine === false;
+
         const resumeWithFreshToken = async (options?: { immediate?: boolean }) => {
           if (resumeInFlight || cancelled || closedForAuth) return;
+          if (isBrowserOffline()) {
+            setConnection("disconnected");
+            provider.shouldConnect = false;
+            return;
+          }
           resumeInFlight = true;
           try {
             if (!options?.immediate && consecutiveFailures > 1) {
@@ -330,6 +354,7 @@ export function useCollaborativeDocPartykit({
           consecutiveFailures += 1;
           setConnection("disconnected");
           provider.shouldConnect = false;
+          if (isBrowserOffline()) return;
           void resumeWithFreshToken({ immediate: consecutiveFailures === 1 });
         });
 
@@ -345,6 +370,7 @@ export function useCollaborativeDocPartykit({
 
           if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
             tokenRef.current = nextSession.access_token;
+            if (isBrowserOffline()) return;
             if (provider.wsconnected) {
               try {
                 ignoreNextClose = true;
@@ -363,18 +389,44 @@ export function useCollaborativeDocPartykit({
           }
         });
 
+        const onOffline = () => {
+          if (cancelled || closedForAuth) return;
+          setConnection("disconnected");
+          provider.shouldConnect = false;
+          try {
+            provider.ws?.close();
+          } catch {
+            // Socket may already be closing.
+          }
+        };
+
         const onVisibleOrOnline = () => {
           if (cancelled || closedForAuth) return;
           if (typeof document !== "undefined" && document.visibilityState === "hidden") {
             return;
           }
-          if (provider.wsconnected) return;
+          if (isBrowserOffline()) return;
           consecutiveFailures = 0;
+          const socket = provider.ws;
+          if (provider.wsconnected || socket) {
+            // Half-open socket after a network drop: close it so connect()
+            // can run. connection-close will resume because we are online.
+            provider.shouldConnect = false;
+            if (socket) {
+              try {
+                socket.close();
+              } catch {
+                void resumeWithFreshToken({ immediate: true });
+              }
+              return;
+            }
+          }
           void resumeWithFreshToken({ immediate: true });
         };
 
         document.addEventListener("visibilitychange", onVisibleOrOnline);
         window.addEventListener("online", onVisibleOrOnline);
+        window.addEventListener("offline", onOffline);
 
         lastDocumentIdRef.current = documentId;
         initializedRef.current = true;
@@ -406,6 +458,7 @@ export function useCollaborativeDocPartykit({
           subscription.unsubscribe();
           document.removeEventListener("visibilitychange", onVisibleOrOnline);
           window.removeEventListener("online", onVisibleOrOnline);
+          window.removeEventListener("offline", onOffline);
           try {
             provider.destroy();
           } catch {}
@@ -441,6 +494,7 @@ export function useCollaborativeDocPartykit({
     error,
     connection,
     isReconnecting:
+      isOffline ||
       connection === "disconnected" ||
       (everConnected && connection === "connecting"),
     retryConnection,
