@@ -34,6 +34,8 @@ const PARTYKIT_HOST =
 
 const DOCUMENT_STATE_STALE_MS = 30_000;
 const MAX_RESUME_BACKOFF_MS = 5_000;
+/** Hide brief tab-focus / idle-timeout reconnects. `offline` skips this. */
+const RECONNECT_UI_GRACE_MS = 2_000;
 
 function loginRequired() {
   return new DocumentAccessError(
@@ -115,6 +117,19 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function socketIsOpen(provider: YPartyKitProvider) {
+  return (
+    provider.wsconnected && provider.ws?.readyState === WebSocket.OPEN
+  );
+}
+
+/** Prevent y-partykit's 30s idle timer from killing a socket after a frozen tab. */
+function markSocketAlive(provider: YPartyKitProvider) {
+  if (!socketIsOpen(provider) || !provider.ws) return false;
+  provider.wsLastMessageReceived = Date.now();
+  return true;
+}
+
 export function useCollaborativeDocPartykit({
   documentId,
   isNew = false,
@@ -136,6 +151,7 @@ export function useCollaborativeDocPartykit({
   const initializedRef = useRef(false);
   const retryConnectionRef = useRef<(() => void) | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [showReconnectUi, setShowReconnectUi] = useState(false);
 
   const retryConnection = useCallback(() => {
     retryConnectionRef.current?.();
@@ -156,6 +172,29 @@ export function useCollaborativeDocPartykit({
     };
   }, []);
 
+  // True outages (`offline`) show immediately. Socket blips (tab freeze,
+  // token refresh, brief close) only show if we are still down after a grace.
+  useEffect(() => {
+    const down =
+      isOffline ||
+      connection === "disconnected" ||
+      (everConnected && connection === "connecting");
+
+    if (isOffline) {
+      setShowReconnectUi(true);
+      return;
+    }
+    if (!down) {
+      setShowReconnectUi(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowReconnectUi(true);
+    }, RECONNECT_UI_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [isOffline, connection, everConnected]);
+
   useEffect(() => {
     if (lastDocumentIdRef.current === documentId && initializedRef.current) {
       return;
@@ -170,6 +209,7 @@ export function useCollaborativeDocPartykit({
     setIsReady(false);
     setConnection("connecting");
     setEverConnected(false);
+    setShowReconnectUi(false);
 
     let cancelled = false;
 
@@ -200,7 +240,6 @@ export function useCollaborativeDocPartykit({
         let paintedFromPrefetch = false;
         let resumeInFlight = false;
         let consecutiveFailures = 0;
-        let ignoreNextClose = false;
 
         const markReady = () => {
           if (closedForAuth || cancelled) return;
@@ -245,6 +284,7 @@ export function useCollaborativeDocPartykit({
             provider.shouldConnect = false;
             return;
           }
+          if (socketIsOpen(provider)) return;
           resumeInFlight = true;
           try {
             if (!options?.immediate && consecutiveFailures > 1) {
@@ -256,14 +296,6 @@ export function useCollaborativeDocPartykit({
               if (cancelled || closedForAuth) return;
             }
 
-            if (provider.wsconnected) {
-              const { data } = await supabase.auth.refreshSession();
-              if (data.session?.access_token) {
-                tokenRef.current = data.session.access_token;
-              }
-              return;
-            }
-
             const {
               data: { session: currentSession },
             } = await supabase.auth.getSession();
@@ -273,29 +305,22 @@ export function useCollaborativeDocPartykit({
               return;
             }
 
-            const { data: refreshed, error: refreshError } =
-              await supabase.auth.refreshSession();
-            if (refreshError) {
-              const status = (refreshError as { status?: number }).status;
-              // Invalid/expired refresh token is a real sign-out. Network
-              // failures are not — keep the editor and retry.
-              if (
-                !refreshed.session &&
-                (status === 400 || status === 401)
-              ) {
-                failFatal(loginRequired());
-                return;
-              }
-              console.warn(
-                "[PartyKit] Token refresh failed; retrying with current session:",
-                refreshError.message
-              );
-            }
-            tokenRef.current =
-              refreshed.session?.access_token ?? currentSession.access_token;
-
+            tokenRef.current = currentSession.access_token;
             if (cancelled || closedForAuth) return;
             provider.connect();
+
+            void supabase.auth.refreshSession().then(({ data, error: refreshError }) => {
+              if (cancelled || closedForAuth) return;
+              if (data.session?.access_token) {
+                tokenRef.current = data.session.access_token;
+              }
+              if (refreshError) {
+                const status = (refreshError as { status?: number }).status;
+                if (!data.session && (status === 400 || status === 401)) {
+                  failFatal(loginRequired());
+                }
+              }
+            });
           } catch (err) {
             console.error("[PartyKit] Failed to resume connection:", err);
             consecutiveFailures += 1;
@@ -335,11 +360,6 @@ export function useCollaborativeDocPartykit({
         provider.on("connection-close", (event: CloseEvent) => {
           if (closedForAuth || cancelled) return;
 
-          if (ignoreNextClose) {
-            ignoreNextClose = false;
-            return;
-          }
-
           const fatalError = isFatalDocumentCloseCode(event.code)
             ? accessErrorForCloseCode(event.code)
             : null;
@@ -371,18 +391,9 @@ export function useCollaborativeDocPartykit({
           if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
             tokenRef.current = nextSession.access_token;
             if (isBrowserOffline()) return;
-            if (provider.wsconnected) {
-              try {
-                ignoreNextClose = true;
-                provider.disconnect();
-                provider.connect();
-              } catch (err) {
-                ignoreNextClose = false;
-                console.error(
-                  "[PartyKit] Failed to reconnect with refreshed token:",
-                  err
-                );
-              }
+            if (socketIsOpen(provider)) {
+              // Keep the live socket. The new JWT is used on the next
+              // real reconnect so a tab-focus refresh does not flash the UI.
               return;
             }
             void resumeWithFreshToken({ immediate: true });
@@ -400,32 +411,30 @@ export function useCollaborativeDocPartykit({
           }
         };
 
-        const onVisibleOrOnline = () => {
+        const onVisible = () => {
           if (cancelled || closedForAuth) return;
           if (typeof document !== "undefined" && document.visibilityState === "hidden") {
             return;
           }
           if (isBrowserOffline()) return;
+          // Tab focus is not a disconnect. Keep an open socket and reset
+          // y-partykit's idle timer so a frozen tab does not look dead.
+          if (markSocketAlive(provider)) return;
           consecutiveFailures = 0;
-          const socket = provider.ws;
-          if (provider.wsconnected || socket) {
-            // Half-open socket after a network drop: close it so connect()
-            // can run. connection-close will resume because we are online.
-            provider.shouldConnect = false;
-            if (socket) {
-              try {
-                socket.close();
-              } catch {
-                void resumeWithFreshToken({ immediate: true });
-              }
-              return;
-            }
-          }
           void resumeWithFreshToken({ immediate: true });
         };
 
-        document.addEventListener("visibilitychange", onVisibleOrOnline);
-        window.addEventListener("online", onVisibleOrOnline);
+        const onOnline = () => {
+          if (cancelled || closedForAuth) return;
+          if (isBrowserOffline()) return;
+          consecutiveFailures = 0;
+          if (markSocketAlive(provider)) return;
+          void resumeWithFreshToken({ immediate: true });
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
+        document.addEventListener("resume", onVisible);
+        window.addEventListener("online", onOnline);
         window.addEventListener("offline", onOffline);
 
         lastDocumentIdRef.current = documentId;
@@ -456,8 +465,9 @@ export function useCollaborativeDocPartykit({
           initializedRef.current = false;
           retryConnectionRef.current = null;
           subscription.unsubscribe();
-          document.removeEventListener("visibilitychange", onVisibleOrOnline);
-          window.removeEventListener("online", onVisibleOrOnline);
+          document.removeEventListener("visibilitychange", onVisible);
+          document.removeEventListener("resume", onVisible);
+          window.removeEventListener("online", onOnline);
           window.removeEventListener("offline", onOffline);
           try {
             provider.destroy();
@@ -493,10 +503,7 @@ export function useCollaborativeDocPartykit({
     isLoading,
     error,
     connection,
-    isReconnecting:
-      isOffline ||
-      connection === "disconnected" ||
-      (everConnected && connection === "connecting"),
+    isReconnecting: showReconnectUi,
     retryConnection,
   };
 }

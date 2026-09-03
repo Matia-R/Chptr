@@ -576,8 +576,9 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     so query params are rebuilt with a live JWT                         │
 │  5. Editor stays mounted (read-only) with a "Connection lost" banner.   │
 │     Editing is paused until the socket is back — offline editing is     │
-│     not shipped yet. Browser `offline` shows this immediately (the      │
-│     WebSocket often stays half-open until TCP times out).               │
+│     not shipped yet. Browser `offline` shows this immediately.          │
+│     Tab hide/show is not an outage: a live socket is kept. Other        │
+│     socket blips wait 2s before showing the banner.                     │
 │  6. If connect returns 401, that is a stale JWT, not a sign-out.        │
 │     Refresh and reconnect. Login only if getSession() has no session    │
 │  7. Network returns / tab becomes visible → refresh + reconnect         │
