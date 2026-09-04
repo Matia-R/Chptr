@@ -9,6 +9,7 @@ import { cn } from "~/lib/utils";
 import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
+import { useDocumentIsPersisted } from "~/app/_components/editor/collaborative-doc-store";
 import {
   Popover,
   PopoverContent,
@@ -27,6 +28,7 @@ export function DocumentBreadcrumb() {
   const params = useParams();
   const documentId = params.documentId as string;
   const { isNew, clearFlag } = useNewDocumentFlag();
+  const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
   const isOffline = useBrowserOffline();
   const utils = api.useUtils();
@@ -35,7 +37,7 @@ export function DocumentBreadcrumb() {
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId && !isNew,
+      enabled: !!documentId && isPersisted,
     },
   );
 

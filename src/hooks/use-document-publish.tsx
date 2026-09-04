@@ -33,6 +33,10 @@ import { cn } from "~/lib/utils";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 import { useDocumentEditorStore } from "~/app/_components/editor/document-editor-store";
+import {
+  useCollaborativeDocStore,
+  useDocumentIsPersisted,
+} from "~/app/_components/editor/collaborative-doc-store";
 import type { AppBlockNoteEditor } from "~/app/_components/editor/editor-types";
 import {
   clearPublishUiTimeouts,
@@ -41,6 +45,7 @@ import {
   useDocumentPublishStore,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
+import { writeYjsPublishedContentHash } from "~/lib/yjs-publish-state";
 
 type PublishDocumentResult = RouterOutputs["document"]["publishDocument"];
 
@@ -107,8 +112,17 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const params = useParams();
   const documentId = params.documentId as string | undefined;
   const editor = useDocumentEditorStore((s) => s.editor);
+  const ydoc = useCollaborativeDocStore((s) => s.ydoc);
+  const isYjsContentDirty = useCollaborativeDocStore(
+    (s) => s.isYjsContentDirty,
+  );
+  const hasYjsPublishHash = useCollaborativeDocStore(
+    (s) => s.hasYjsPublishHash,
+  );
   const { isNew } = useNewDocumentFlag();
   const { toast } = useToast();
+  const isPersisted = useDocumentIsPersisted(documentId);
+  const queriesEnabled = isPersisted;
 
   const popoverOpen = useDocumentPublishStore((s) => s.popoverOpen);
   const setPopoverOpen = useDocumentPublishStore((s) => s.setPopoverOpen);
@@ -147,21 +161,21 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     }
   }, [documentId, resetForNavigation]);
 
-  const enabled = !!documentId && !isNew;
-
   const { data: docMeta } = api.document.getDocumentById.useQuery(
     documentId ?? "",
-    { enabled },
+    { enabled: queriesEnabled },
   );
 
-  const { data: publication, isLoading: publicationLoading } =
+  const { data: publication, isLoading: publicationQueryLoading } =
     api.document.getPublicationByDocumentId.useQuery(documentId ?? "", {
-      enabled,
+      enabled: queriesEnabled,
     });
+  // New docs skip the skeleton so Publish is visible before the row exists.
+  const publicationLoading = isNew ? false : publicationQueryLoading;
 
   const { data: ownerPathData } =
     api.document.getPublicationOwnerPathSegment.useQuery(documentId ?? "", {
-      enabled: enabled && !publication,
+      enabled: queriesEnabled && !publication,
     });
 
   const utils = api.useUtils();
@@ -243,15 +257,21 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const hasPendingSlugChange = previewSlugSegment !== publishedSlugBaseline;
 
   const docLastUpdated = docMeta?.document?.last_updated;
+  const publishedAtMs = publication
+    ? new Date(publication.updated_at).getTime()
+    : 0;
+  const hasTimestampEdits =
+    !!docLastUpdated && new Date(docLastUpdated).getTime() > publishedAtMs;
+  const hasTitleChange = !!publication && title !== publication.title;
+  const hasLiveYjsEdits = hasYjsPublishHash
+    ? isYjsContentDirty
+    : isYjsContentDirty || hasTimestampEdits;
   const hasUnpublishedChanges =
-    !!publication &&
-    !!docLastUpdated &&
-    new Date(docLastUpdated).getTime() >
-      new Date(publication.updated_at).getTime();
+    !!publication && (hasLiveYjsEdits || hasTitleChange);
 
   const hasChangesToPublish =
     !publicationLoading &&
-    (publication === null || hasUnpublishedChanges || hasPendingSlugChange);
+    (publication == null || hasUnpublishedChanges || hasPendingSlugChange);
   const primaryTriggerLabel = publicationLoading
     ? "Loading…"
     : !publication
@@ -346,6 +366,10 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         slug: slugOverride.trim() || undefined,
       });
 
+      if (ydoc) {
+        writeYjsPublishedContentHash(ydoc);
+      }
+
       const elapsed = Date.now() - startedAt;
       if (elapsed < SAVE_FEEDBACK_MIN_SAVING_MS) {
         await new Promise((resolve) =>
@@ -372,6 +396,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     slugOverride,
     title,
     toast,
+    ydoc,
     setFreezeFirstPublishActions,
     setPublishFeedback,
   ]);
@@ -512,7 +537,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   }, [documentId, unpublishMutation]);
 
   return useMemo((): DocumentPublishValue | null => {
-    if (!documentId || isNew) return null;
+    if (!documentId) return null;
 
     return {
       documentId,
@@ -551,7 +576,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     hasChangesToPublish,
     hasPendingSlugChange,
     hasUnpublishedChanges,
-    isNew,
     ownerPreview,
     mobileDrawerOpen,
     onAuxiliaryOpenChange,

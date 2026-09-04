@@ -21,6 +21,7 @@ import {
 } from "./editor/document-publish";
 import { useDocumentPublishStore } from "./editor/document-publish-store";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
+import { useDocumentIsPersisted } from "./editor/collaborative-doc-store";
 import { useIsMobile } from "~/hooks/use-mobile";
 
 function formatPublicationDate(iso: string): string {
@@ -36,6 +37,7 @@ export function DocumentActions() {
   const params = useParams();
   const documentId = params.documentId as string;
   const { isNew } = useNewDocumentFlag();
+  const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
   const publishCtx = useDocumentPublish();
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
@@ -57,7 +59,7 @@ export function DocumentActions() {
   const { data, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId && !isNew,
+      enabled: !!documentId && isPersisted,
     },
   );
 

@@ -164,8 +164,12 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 |------|---------|
 | `partykit.json` | PartyKit configuration |
 | `party/document.ts` | PartyKit server (per-connection connect, Y.Doc, save token pool) |
-| `src/hooks/use-collaborative-doc-partykit.ts` | Client hook (JWT, prefetch snapshot, close codes, token refresh) |
+| `src/hooks/use-collaborative-doc-partykit.ts` | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
 | `src/hooks/use-prefetch-document-state.ts` | Sidebar/command-menu hover prefetch |
+| `src/hooks/use-document-publish.tsx` | Header publish button: queries gated on persist, Yjs hash after publish |
+| `src/hooks/use-new-document-flag.ts` | In-memory `isNew` for instant create (not a DB-exists signal) |
+| `src/app/_components/editor/collaborative-doc-store.ts` | Shared Y.Doc session between the document page and the header |
+| `src/lib/yjs-publish-state.ts` | Hash of `document-store`; published snapshot in Y.Map `chptr-publish` |
 | `src/lib/document-access-error.ts` | Typed document access errors for the editor page |
 | `src/app/api/partykit/connect/route.ts` | JWT + permission + state (or create-on-new) in one call |
 | `src/app/api/partykit/save/route.ts` | Save Y.Doc state after permission check |
@@ -187,6 +191,8 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 6. On `TOKEN_REFRESHED`, the hook reconnects with the same Y.Doc and a fresh JWT
 7. On 4003/4004/4000, reconnect is disabled and the document page shows the matching alert
 8. On drop (1001/1006), 4005, or 4001, the hook refreshes the JWT, reconnects through `provider.connect()` (so query params are rebuilt), and the page keeps the editor visible but not editable, with a "Connection lost" banner. Login is only shown if there is no session
+9. The hook binds `useCollaborativeDocStore`: existing docs are `isPersisted` immediately; new docs become persisted when the socket status is `connected` (after `create_document_with_owner`). Header tRPC (`getDocumentById`, publication) stays disabled until then
+10. After first Yjs `sync` (+ 150ms), the hook hashes `document-store` on every update (local and remote) and compares it to `chptr-publish.contentHash` so Publish / Published / Update stays in sync for every collaborator
 
 ### Server Lifecycle
 
@@ -204,6 +210,17 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 - **Save**: Permission first, then upsert. RLS remains defense in depth
 - **Socket**: Failed connect never joins the CRDT room
 - **Prefetch**: `getDocumentState` uses the same permission rules via tRPC (cookie session + RLS)
+
+### Publish button (header)
+
+The header is in the documents layout; the Y.Doc is created on the document page. They share `useCollaborativeDocStore`.
+
+- **New document:** show **Publish** immediately. Do not call `getDocumentById` until `isPersisted` (PartyKit `connected`). The UUID is not a row yet.
+- **After publish:** `publishDocument` writes `document_publications`, then `writeYjsPublishedContentHash` sets `chptr-publish.contentHash` on the live Y.Doc. PartyKit broadcasts that map update; every client recomputes dirty from the same snapshot.
+- **Edits (any user):** a change to `document-store` changes the hash → **Update**. Title/slug still come from Postgres.
+- **Older publications** with no hash yet: fall back to `last_updated` vs `publication.updated_at` until the next publish writes the hash.
+
+See [PARTYKIT_ARCHITECTURE.md](./PARTYKIT_ARCHITECTURE.md#publish-ui-and-new-document-persistence) for the full state machine.
 
 ## Costs
 

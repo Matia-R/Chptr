@@ -13,6 +13,11 @@ import {
 import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
+import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
+import {
+  getYjsContentHash,
+  getYjsPublishedContentHash,
+} from "~/lib/yjs-publish-state";
 
 interface UseCollaborativeDocPartykitOptions {
   documentId: string;
@@ -30,18 +35,19 @@ interface UseCollaborativeDocPartykitResult {
   retryConnection: () => void;
 }
 
-const PARTYKIT_HOST =
-  process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
+const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
 
 const DOCUMENT_STATE_STALE_MS = 30_000;
 const MAX_RESUME_BACKOFF_MS = 5_000;
 /** Hide brief tab-focus / idle-timeout reconnects. `offline` skips this. */
 const RECONNECT_UI_GRACE_MS = 2_000;
+/** Let BlockNote finish binding before treating Yjs updates as publish-dirty. */
+const YJS_PUBLISH_WATCH_DELAY_MS = 150;
 
 function loginRequired() {
   return new DocumentAccessError(
     "UNAUTHORIZED",
-    "Please sign in to your account to access this doc."
+    "Please sign in to your account to access this doc.",
   );
 }
 
@@ -59,7 +65,10 @@ function applyPrefetchedState(ydoc: Y.Doc, state: string | null) {
   try {
     Y.applyUpdate(ydoc, base64ToUint8Array(state), "prefetch");
   } catch (error) {
-    console.error("[PartyKit] Failed to apply prefetched document state:", error);
+    console.error(
+      "[PartyKit] Failed to apply prefetched document state:",
+      error,
+    );
   }
 }
 
@@ -68,12 +77,12 @@ function accessErrorForCloseCode(code: number): DocumentAccessError | null {
     case 4000:
       return new DocumentAccessError(
         "BAD_REQUEST",
-        "The URL provided is incomplete or malformed."
+        "The URL provided is incomplete or malformed.",
       );
     case 4003:
       return new DocumentAccessError(
         "FORBIDDEN",
-        "Looks like you don't have access to this doc."
+        "Looks like you don't have access to this doc.",
       );
     case 4004:
       return new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist.");
@@ -87,7 +96,7 @@ function accessErrorFromTrpc(error: unknown): DocumentAccessError | null {
   if (code === "FORBIDDEN") {
     return new DocumentAccessError(
       "FORBIDDEN",
-      "Looks like you don't have access to this doc."
+      "Looks like you don't have access to this doc.",
     );
   }
   if (code === "NOT_FOUND") {
@@ -96,7 +105,7 @@ function accessErrorFromTrpc(error: unknown): DocumentAccessError | null {
   if (code === "UNAUTHORIZED") {
     return new DocumentAccessError(
       "UNAUTHORIZED",
-      "Please sign in to your account to access this doc."
+      "Please sign in to your account to access this doc.",
     );
   }
   if (error instanceof TRPCClientError) {
@@ -119,9 +128,7 @@ function wait(ms: number) {
 }
 
 function socketIsOpen(provider: YPartyKitProvider) {
-  return (
-    provider.wsconnected && provider.ws?.readyState === WebSocket.OPEN
-  );
+  return provider.wsconnected && provider.ws?.readyState === WebSocket.OPEN;
 }
 
 /** Prevent y-partykit's 30s idle timer from killing a socket after a frozen tab. */
@@ -197,6 +204,11 @@ export function useCollaborativeDocPartykit({
     setEverConnected(false);
     setShowReconnectUi(false);
 
+    useCollaborativeDocStore.getState().bindDocument({
+      documentId,
+      isPersisted: !isNew,
+    });
+
     let cancelled = false;
 
     const setup = async () => {
@@ -210,7 +222,7 @@ export function useCollaborativeDocPartykit({
         if (sessionError) {
           throw new DocumentAccessError(
             "INTERNAL_SERVER_ERROR",
-            `Failed to get session: ${sessionError.message}`
+            `Failed to get session: ${sessionError.message}`,
           );
         }
 
@@ -221,6 +233,7 @@ export function useCollaborativeDocPartykit({
         if (cancelled) return;
 
         const ydoc = new Y.Doc();
+        useCollaborativeDocStore.getState().setYdoc(ydoc);
         const tokenRef = { current: session.access_token };
         let closedForAuth = false;
         let paintedFromPrefetch = false;
@@ -241,13 +254,18 @@ export function useCollaborativeDocPartykit({
           paintedFromPrefetch = true;
         }
 
-        const provider = new YPartyKitProvider(PARTYKIT_HOST, documentId, ydoc, {
-          connect: true,
-          params: () => ({
-            token: tokenRef.current,
-            isNew: isNew ? "true" : "false",
-          }),
-        });
+        const provider = new YPartyKitProvider(
+          PARTYKIT_HOST,
+          documentId,
+          ydoc,
+          {
+            connect: true,
+            params: () => ({
+              token: tokenRef.current,
+              isNew: isNew ? "true" : "false",
+            }),
+          },
+        );
 
         const failFatal = (accessError: DocumentAccessError) => {
           closedForAuth = true;
@@ -263,7 +281,9 @@ export function useCollaborativeDocPartykit({
         const isBrowserOffline = () =>
           typeof navigator !== "undefined" && navigator.onLine === false;
 
-        const resumeWithFreshToken = async (options?: { immediate?: boolean }) => {
+        const resumeWithFreshToken = async (options?: {
+          immediate?: boolean;
+        }) => {
           if (resumeInFlight || cancelled || closedForAuth) return;
           if (isBrowserOffline()) {
             setConnection("disconnected");
@@ -276,7 +296,7 @@ export function useCollaborativeDocPartykit({
             if (!options?.immediate && consecutiveFailures > 1) {
               const delay = Math.min(
                 100 * 2 ** (consecutiveFailures - 1),
-                MAX_RESUME_BACKOFF_MS
+                MAX_RESUME_BACKOFF_MS,
               );
               await wait(delay);
               if (cancelled || closedForAuth) return;
@@ -295,18 +315,20 @@ export function useCollaborativeDocPartykit({
             if (cancelled || closedForAuth) return;
             provider.connect();
 
-            void supabase.auth.refreshSession().then(({ data, error: refreshError }) => {
-              if (cancelled || closedForAuth) return;
-              if (data.session?.access_token) {
-                tokenRef.current = data.session.access_token;
-              }
-              if (refreshError) {
-                const status = (refreshError as { status?: number }).status;
-                if (!data.session && (status === 400 || status === 401)) {
-                  failFatal(loginRequired());
+            void supabase.auth
+              .refreshSession()
+              .then(({ data, error: refreshError }) => {
+                if (cancelled || closedForAuth) return;
+                if (data.session?.access_token) {
+                  tokenRef.current = data.session.access_token;
                 }
-              }
-            });
+                if (refreshError) {
+                  const status = (refreshError as { status?: number }).status;
+                  if (!data.session && (status === 400 || status === 401)) {
+                    failFatal(loginRequired());
+                  }
+                }
+              });
           } catch (err) {
             console.error("[PartyKit] Failed to resume connection:", err);
             consecutiveFailures += 1;
@@ -328,20 +350,56 @@ export function useCollaborativeDocPartykit({
           void resumeWithFreshToken({ immediate: true });
         };
 
+        let publishWatchReady = false;
+        let sessionBaselineHash: string | null = null;
+        let publishWatchTimer: number | null = null;
+
+        const recomputePublishDirty = () => {
+          const publishedHash = getYjsPublishedContentHash(ydoc);
+          const currentHash = getYjsContentHash(ydoc);
+          const hasYjsPublishHash = publishedHash !== undefined;
+          const isYjsContentDirty = hasYjsPublishHash
+            ? currentHash !== publishedHash
+            : sessionBaselineHash != null &&
+              currentHash !== sessionBaselineHash;
+          useCollaborativeDocStore.getState().setYjsPublishState({
+            isYjsContentDirty,
+            hasYjsPublishHash,
+          });
+        };
+
+        const onYjsUpdate = (_update: Uint8Array, origin: unknown) => {
+          if (origin === "prefetch") return;
+          if (!publishWatchReady) return;
+          recomputePublishDirty();
+        };
+        ydoc.on("update", onYjsUpdate);
+
         provider.on("sync", (synced: boolean) => {
           if (synced && !closedForAuth && !isNew) {
             markReady();
           }
-        });
-
-        provider.on("status", ({ status }: { status: DocumentConnectionStatus }) => {
-          if (closedForAuth || cancelled) return;
-          setConnection(status);
-          if (status === "connected") {
-            consecutiveFailures = 0;
-            setEverConnected(true);
+          if (synced && !publishWatchReady && publishWatchTimer == null) {
+            publishWatchTimer = window.setTimeout(() => {
+              publishWatchReady = true;
+              sessionBaselineHash = getYjsContentHash(ydoc);
+              recomputePublishDirty();
+            }, YJS_PUBLISH_WATCH_DELAY_MS);
           }
         });
+
+        provider.on(
+          "status",
+          ({ status }: { status: DocumentConnectionStatus }) => {
+            if (closedForAuth || cancelled) return;
+            setConnection(status);
+            if (status === "connected") {
+              consecutiveFailures = 0;
+              setEverConnected(true);
+              useCollaborativeDocStore.getState().setPersisted(true);
+            }
+          },
+        );
 
         provider.on("connection-close", (event: CloseEvent) => {
           if (closedForAuth || cancelled) return;
@@ -399,7 +457,10 @@ export function useCollaborativeDocPartykit({
 
         const onVisible = () => {
           if (cancelled || closedForAuth) return;
-          if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+          if (
+            typeof document !== "undefined" &&
+            document.visibilityState === "hidden"
+          ) {
             return;
           }
           if (isBrowserOffline()) return;
@@ -450,6 +511,10 @@ export function useCollaborativeDocPartykit({
           cancelled = true;
           initializedRef.current = false;
           retryConnectionRef.current = null;
+          if (publishWatchTimer != null) {
+            window.clearTimeout(publishWatchTimer);
+          }
+          ydoc.off("update", onYjsUpdate);
           subscription.unsubscribe();
           document.removeEventListener("visibilitychange", onVisible);
           document.removeEventListener("resume", onVisible);
@@ -463,6 +528,7 @@ export function useCollaborativeDocPartykit({
           } catch {}
           setState(null);
           setIsReady(false);
+          useCollaborativeDocStore.getState().reset();
         };
       } catch (err) {
         console.error("[PartyKit] Setup error:", err);
@@ -477,6 +543,10 @@ export function useCollaborativeDocPartykit({
       cancelled = true;
       cleanupRef.current?.();
       cleanupRef.current = null;
+      const store = useCollaborativeDocStore.getState();
+      if (store.documentId === documentId) {
+        store.reset();
+      }
     };
     // utils is a stable tRPC client; including it retriggers setup and tears down the room.
     // eslint-disable-next-line react-hooks/exhaustive-deps

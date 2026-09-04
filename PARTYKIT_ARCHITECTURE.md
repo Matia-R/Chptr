@@ -10,6 +10,7 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 - [Database Schema](#database-schema)
 - [Security Model](#security-model)
 - [User Flows](#user-flows)
+- [Publish UI and New-Document Persistence](#publish-ui-and-new-document-persistence)
 - [Edge Cases](#edge-cases)
 - [UX Optimizations](#ux-optimizations)
 - [Caveats and Limitations](#caveats-and-limitations)
@@ -156,6 +157,7 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 | **PartyKit Room** | Authorize every socket, central Y.Doc, broadcast, save-token pool |
 | **Next.js API** | `/connect` (JWT + permission + state), `/save` (re-check + RLS) |
 | **Supabase** | Document storage, permissions, RLS, `document_exists` RPC |
+| **Header / Publish** | Reads the shared Y.Doc via `useCollaborativeDocStore` (the hook lives in the page, the button lives in the layout) |
 
 ---
 
@@ -396,14 +398,30 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
-│  5. User is already typing                                              │
+│  5. Header shows Publish immediately                                    │
+│     ┌──────────┐                                                        │
+│     │  Header  │  - useDocumentPublish returns a context (not null)     │
+│     │          │  - tRPC queries are DISABLED until isPersisted         │
+│     │          │  - Button label is "Publish" (no publication yet)      │
+│     └──────────┘                                                        │
+│           │                                                             │
+│           ▼                                                             │
+│  6. Socket status becomes "connected"                                   │
+│     ┌──────────┐                                                        │
+│     │  Client  │  - documents + permissions rows now exist              │
+│     │          │  - collaborative store sets isPersisted=true           │
+│     │          │  - getDocumentById / getPublication… queries start     │
+│     └──────────┘                                                        │
+│           │                                                             │
+│           ▼                                                             │
+│  7. User is already typing                                              │
 │     ┌──────────┐                                                        │
 │     │  Client  │  - Local edits merge into the empty PartyKit Y.Doc     │
 │     │          │    once the socket syncs                               │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
-│  6. First edit triggers save                                            │
+│  8. First edit triggers save                                            │
 │     ┌──────────┐                                                        │
 │     │ PartyKit │  - Debounce timer starts                               │
 │     │  Server  │  - After 1s, calls /api/partykit/save                  │
@@ -411,8 +429,9 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │     └──────────┘                                                        │
 │                                                                         │
 │  ═══════════════════════════════════════════════════════════════════    │
-│  RESULT: User sees empty editor immediately. Authorize creates the      │
-│          document in the background. State persists on first edit.      │
+│  RESULT: User sees empty editor + Publish immediately. Authorize        │
+│          creates the document in the background. Metadata queries wait  │
+│          until the row exists. State persists on first edit.            │
 │  ═══════════════════════════════════════════════════════════════════    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -495,7 +514,145 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 
 ---
 
+## Publish UI and New-Document Persistence
+
+The publish button lives in the app header (layout), not in the document page. The PartyKit Y.Doc is created in `useCollaborativeDocPartykit` on the page. Those two trees share state through `useCollaborativeDocStore` so the header can follow the live CRDT without owning the socket.
+
+### Why this exists
+
+Two things used to break:
+
+1. **New documents** are a client-generated UUID. The `documents` row is created only when PartyKit `connect` succeeds. Fetching `getDocumentById` on first paint 404s.
+2. **Published → Update** used to compare `documents.last_updated` (tRPC cache) with `document_publications.updated_at`. PartyKit saves that timestamp on the server and never invalidates the client cache, so the button stayed on **Published** after edits. Local `editor.onChange` also missed other users' edits.
+
+Both are now driven off PartyKit: persistence from socket `connected`, unpublished changes from the shared Y.Doc.
+
+### The Y.Doc holds two things
+
+| Yjs type | Key | Role |
+|----------|-----|------|
+| `Y.XmlFragment` | `document-store` | BlockNote body. This is what collaborators edit. |
+| `Y.Map` | `chptr-publish` | Publish metadata. Currently `contentHash`: a hash of `document-store` taken at the last successful publish. |
+
+Awareness (cursors, names) is **not** in the Y.Doc. Cursor motion does not flip the publish button.
+
+The hash is `length:fnv1a(fragment.toJSON())`. It is written with transaction origin `"chptr-publish"` so it is just another Yjs update: PartyKit broadcasts it and later saves it inside `document_state`.
+
+### Shared store
+
+`useCollaborativeDocStore` (`src/app/_components/editor/collaborative-doc-store.ts`):
+
+| Field | Meaning |
+|-------|---------|
+| `documentId` | Route this store is bound to. Queries also require this to match `params.documentId` so a stale bind cannot fetch the wrong id. |
+| `ydoc` | The live Y.Doc from the PartyKit hook. |
+| `isPersisted` | The `documents` row exists. Safe to run `getDocumentById` / publication queries. |
+| `isYjsContentDirty` | Live body hash ≠ published hash (or ≠ session baseline if no hash yet). |
+| `hasYjsPublishHash` | `chptr-publish.contentHash` is present in this Y.Doc. |
+
+`useDocumentIsPersisted(documentId)` is true only when `boundId === documentId && isPersisted`.
+
+### When `isPersisted` becomes true
+
+```
+bindDocument({ documentId, isPersisted: !isNew })
+        │
+        ├─ Existing doc (isNew=false)
+        │     isPersisted=true immediately.
+        │     The row already exists; queries may start before the socket is up.
+        │
+        └─ New doc (isNew=true)
+              isPersisted=false.
+              Connect: JWT → no permission → document_exists false →
+              create_document_with_owner → 200.
+              Client sees provider status "connected" → setPersisted(true).
+              Only then do header/breadcrumb/actions enable tRPC.
+```
+
+`isNew` is an in-memory set (`markDocumentAsNew` before navigate). It is frozen for that mount so the editor can skip the skeleton even after the row exists. **Do not use `isNew` to decide whether the DB row exists.** Use `isPersisted`. A refresh of a newly created URL has `isNew=false` because the set is gone; that is correct — the row should already exist.
+
+### How the header decides Publish / Published / Update
+
+`useDocumentPublish` always returns a context when `params.documentId` is set (including new docs). `DocumentPublishButton` therefore renders immediately.
+
+```
+publicationLoading?     → "Loading…"   (skipped while isNew so new docs do not flash a skeleton)
+no publication row?     → "Publish"
+hasChangesToPublish?    → "Update"
+otherwise               → "Published"
+```
+
+`hasChangesToPublish` is true when there is no publication yet, or when any of:
+
+1. **Yjs body dirty** (see below)
+2. **Title** ≠ `publication.title` (title lives in Postgres, not Yjs)
+3. **Slug** draft ≠ last published slug
+
+### How Yjs dirty is computed
+
+After the first PartyKit `sync`, the hook waits 150ms (BlockNote binding the fragment) then:
+
+1. Snapshots `sessionBaselineHash` = hash of `document-store` as it is now.
+2. On every later `ydoc` `"update"` (local **or** remote, except origin `"prefetch"`), recomputes:
+
+```
+publishedHash = ydoc.getMap("chptr-publish").get("contentHash")
+currentHash   = hash(document-store)
+
+if publishedHash exists:
+    dirty = currentHash !== publishedHash     // all collaborators share this
+else:
+    dirty = currentHash !== sessionBaselineHash
+            OR documents.last_updated > publication.updated_at
+```
+
+The timestamp fallback is only for publications that predate the Yjs hash. After the next successful publish, the hash is in the Y.Doc (and in `document_state` after the debounce save), so every client uses the shared comparison.
+
+### Publish write path
+
+```
+User clicks Publish
+  → export BlockNote HTML + blocks JSON
+  → tRPC document.publishDocument (writes document_publications)
+  → writeYjsPublishedContentHash(ydoc)   // same CRDT, origin "chptr-publish"
+  → PartyKit broadcasts the map update
+  → every connected client recomputes: hashes match → "Published"
+  → later debounce save persists the hash inside document_state
+```
+
+If another user (or tab) then edits `document-store`, every client sees `currentHash !== publishedHash` and flips to **Update** without a refresh.
+
+### Layout vs page
+
+```
+documents/layout.tsx
+  Header
+    DocumentPublishButton  ──► useDocumentPublish()
+    DocumentBreadcrumb     ──► getDocumentById enabled: isPersisted
+    DocumentActions        ──► same
+
+documents/[documentId]/page.tsx
+  useCollaborativeDocPartykit()
+    bindDocument / setYdoc / setPersisted
+    ydoc.on("update") → setYjsPublishState
+```
+
+The header must not assume the Y.Doc exists on first paint. For a new doc it shows **Publish** with queries off; after `connected` it fetches metadata.
+
+### Files
+
+| File | Role |
+|------|------|
+| `src/hooks/use-collaborative-doc-partykit.ts` | Bind store, persist on `connected`, observe Yjs for dirty |
+| `src/app/_components/editor/collaborative-doc-store.ts` | Cross-tree session (header ↔ page) |
+| `src/lib/yjs-publish-state.ts` | Hash + read/write `chptr-publish` map |
+| `src/hooks/use-document-publish.tsx` | Label, mutations, write hash after publish |
+| `src/hooks/use-new-document-flag.ts` | In-memory `isNew` (skeleton / connect `isNew` query param only) |
+
+---
+
 ## Edge Cases
+
 
 ### Edge Case 1: New Document, No Edits, Duplicate Tab
 
@@ -884,10 +1041,11 @@ To revert to y-webrtc:
 | **Persistence** | Server-side only, debounced 1s |
 | **Schema** | Single `document_state` table |
 | **Security** | Per-connection authorize + permission row; RLS on load/save |
-| **New Doc UX** | Instant (no skeleton, create on connect) |
-| **Existing Doc UX** | Delayed skeleton (250ms threshold) |
-| **Multi-tab** | Fully supported via PartyKit sync |
+| **New Doc UX** | Instant editor + Publish; tRPC waits until connect creates the row |
+| **Existing Doc UX** | Delayed skeleton (500ms threshold) |
+| **Publish / Update** | Shared Yjs `contentHash` in `chptr-publish`; all connected clients see the same button state |
+| **Multi-tab** | Fully supported via PartyKit sync (including publish dirty) |
 | **Offline** | Limited (local Y.Doc only, no IndexedDB) |
 | **Cost** | Free tier for small usage |
 
-This architecture provides a solid foundation for single-user multi-device editing, with clear paths to enable multi-user collaboration when needed.
+This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same CRDT.
