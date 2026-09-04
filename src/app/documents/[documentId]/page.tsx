@@ -3,10 +3,12 @@
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { CloudOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
-import { Button } from "~/app/_components/ui/button";
+import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
 import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
@@ -55,33 +57,21 @@ function getDocumentErrorContent(error: unknown): {
   return DOCUMENT_ERROR[key];
 }
 
-function ConnectionLostNotice({
-  onRetry,
-  hasDocument,
-}: {
-  onRetry: () => void;
-  hasDocument: boolean;
-}) {
+function OfflineBanner() {
   return (
-    <Alert>
-      <AlertTitle>Connection lost</AlertTitle>
-      <AlertDescription>
-        <p>
-          {hasDocument
-            ? "Reconnecting… Editing is paused until we’re back online."
-            : "Reconnecting to your doc… We’ll load it as soon as we’re back online."}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3"
-          onClick={onRetry}
-        >
-          Retry
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <motion.div
+      role="status"
+      initial={{ opacity: 0, y: -6, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.95 }}
+      transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
+      className="pointer-events-none fixed inset-x-0 top-14 z-50 flex justify-center px-4 md:top-16"
+    >
+      <p className="flex items-center gap-2 rounded-full border bg-sidebar px-4 py-2.5 text-sm text-foreground shadow-sm">
+        <CloudOff className="size-4 shrink-0" aria-hidden />
+        You’re offline. Editing is paused.
+      </p>
+    </motion.div>
   );
 }
 
@@ -102,18 +92,11 @@ export default function DocumentPage() {
   const { data: userProfile } = useUserProfile();
 
   // PartyKit-based collaborative doc - handles fetching and saving on server
-  const {
-    ydoc,
-    provider,
-    isReady,
-    isLoading,
-    error,
-    isReconnecting,
-    retryConnection,
-  } = useCollaborativeDocPartykit({
-    documentId,
-    isNew,
-  });
+  const { ydoc, provider, isReady, isLoading, error, isReconnecting } =
+    useCollaborativeDocPartykit({
+      documentId,
+      isNew,
+    });
 
   // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
   // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.
@@ -169,18 +152,16 @@ export default function DocumentPage() {
 
     return (
       <MotionFade>
-        <div className="flex flex-col gap-3">
-          {isReconnecting && (
-            <ConnectionLostNotice onRetry={retryConnection} hasDocument />
-          )}
-          <Editor
-            userName={userName}
-            userColor={userColor}
-            ydoc={ydoc}
-            provider={provider}
-            editable={!isReconnecting}
-          />
-        </div>
+        <AnimatePresence>
+          {isReconnecting ? <OfflineBanner key="offline-banner" /> : null}
+        </AnimatePresence>
+        <Editor
+          userName={userName}
+          userColor={userColor}
+          ydoc={ydoc}
+          provider={provider}
+          editable={!isReconnecting}
+        />
       </MotionFade>
     );
   }
@@ -189,7 +170,9 @@ export default function DocumentPage() {
   if (isReconnecting) {
     return (
       <MotionFade>
-        <ConnectionLostNotice onRetry={retryConnection} hasDocument={false} />
+        <AnimatePresence>
+          <OfflineBanner key="offline-banner" />
+        </AnimatePresence>
       </MotionFade>
     );
   }

@@ -6,24 +6,31 @@ import { useRouter } from "next/navigation";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { useCallback } from "react";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { randomUUID } from "~/lib/utils";
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const isOffline = useBrowserOffline();
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
+    if (isOffline) return;
     const newId = randomUUID();
     markDocumentAsNew(newId);
     router.push(`/documents/${newId}`);
-  }, [router]);
+  }, [isOffline, router]);
 
   return (
     <MotionFade>
       <div className="flex h-full min-h-[50vh] flex-col items-center justify-center">
         <div className="space-y-4">
           <p className="text-muted-foreground">Start by opening a note or</p>
-          <Button onClick={handleCreateDocument} variant="link">
+          <Button
+            onClick={handleCreateDocument}
+            variant="link"
+            disabled={isOffline}
+          >
             Create a new one
             <ArrowRight className="size-4" />
           </Button>

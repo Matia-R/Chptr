@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
 import { useAccountSettingsStore } from "~/hooks/use-account-settings";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { cn } from "~/lib/utils";
 
 export function NavUser({
@@ -54,6 +55,7 @@ export function NavUser({
   const router = useRouter();
   const queryClient = useQueryClient();
   const openAccountSettings = useAccountSettingsStore((state) => state.open);
+  const isOffline = useBrowserOffline();
 
   // On mobile the nav itself is a drawer; dismiss it before opening the
   // settings drawer so the two don't stack.
@@ -67,6 +69,7 @@ export function NavUser({
   };
 
   const handleSignOut = async () => {
+    if (isOffline) return;
     const supabase = createClient();
     await supabase.auth.signOut();
     // Clear all cached server state so the next user doesn't see the previous user's data
@@ -229,6 +232,7 @@ export function NavUser({
             </DropdownMenuItem>
             <DropdownMenuItem
               className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+              disabled={isOffline}
               onClick={handleSignOut}
             >
               <LogOut />

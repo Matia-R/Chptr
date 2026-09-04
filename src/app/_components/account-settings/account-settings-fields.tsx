@@ -65,6 +65,7 @@ export type ProfileFieldsProps = AccountSettingsFieldsProps & {
   avatar: AvatarDraft;
   defaultAvatarColor: string | null;
   isSaving?: boolean;
+  disabled?: boolean;
   usernameAvailabilityStatus?: UsernameAvailabilityStatus;
 };
 
@@ -74,10 +75,12 @@ export function ProfileFields({
   avatar,
   defaultAvatarColor,
   isSaving,
+  disabled,
   usernameAvailabilityStatus = "idle",
 }: ProfileFieldsProps) {
   const errors = form.formState.errors;
   const className = inputClassName(surface);
+  const fieldsDisabled = Boolean(disabled || isSaving);
 
   // Watched so the fallback initials track what is being typed.
   const firstName = form.watch("first_name");
@@ -90,7 +93,7 @@ export function ProfileFields({
         firstName={firstName}
         lastName={lastName}
         defaultAvatarColor={defaultAvatarColor}
-        disabled={isSaving}
+        disabled={fieldsDisabled}
       />
       <div className={formSpacing.stack}>
         <div
@@ -108,8 +111,9 @@ export function ProfileFields({
             <Input
               id="account-settings-first-name"
               autoComplete="given-name"
-              className={className}
+              className={cn(className, fieldsDisabled && "cursor-auto")}
               {...form.register("first_name")}
+              readOnly={fieldsDisabled}
             />
           </SettingsField>
           <SettingsField
@@ -120,8 +124,9 @@ export function ProfileFields({
             <Input
               id="account-settings-last-name"
               autoComplete="family-name"
-              className={className}
+              className={cn(className, fieldsDisabled && "cursor-auto")}
               {...form.register("last_name")}
+              readOnly={fieldsDisabled}
             />
           </SettingsField>
         </div>
@@ -143,8 +148,9 @@ export function ProfileFields({
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            className={className}
+            className={cn(className, fieldsDisabled && "cursor-auto")}
             {...form.register("username")}
+            readOnly={fieldsDisabled}
           />
         </SettingsField>
       </div>

@@ -25,6 +25,7 @@ import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { cn, randomUUID } from "~/lib/utils";
 
 const MOBILE_UTILITY_SURFACE_CLASSNAME = cn(
@@ -76,6 +77,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const { isMobile, setOpenMobile } = useSidebar();
   const prefetchDocumentState = usePrefetchDocumentState();
+  const isOffline = useBrowserOffline();
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -124,6 +126,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
   // Instant document creation with optimistic sidebar update
   const handleCreateDocument = React.useCallback(() => {
+    if (isOffline) return;
     const newId = randomUUID();
 
     // Mark as new for the document page
@@ -144,7 +147,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
     dismissMobileNav();
     router.push(`/documents/${newId}`);
-  }, [dismissMobileNav, router, utils]);
+  }, [dismissMobileNav, isOffline, router, utils]);
 
   const openSearch = React.useCallback(() => {
     dismissMobileNav();
@@ -281,6 +284,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                 size="icon"
                 className={MOBILE_ICON_ACTION_CLASSNAME}
                 aria-label="Create new document"
+                disabled={isOffline}
                 onClick={handleCreateDocument}
               >
                 <Plus className="size-4" />
@@ -355,17 +359,23 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
           >
             <div className="flex h-8 shrink-0 items-center justify-between">
               <span className="text-sm font-semibold">Documents</span>
-              <HoverTooltip content="New document" side="right">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  aria-label="New document"
-                  onClick={handleCreateDocument}
-                >
-                  <Plus className="size-4" />
-                </Button>
+              <HoverTooltip
+                content={isOffline ? "You’re offline" : "New document"}
+                side="right"
+              >
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    aria-label="New document"
+                    disabled={isOffline}
+                    onClick={handleCreateDocument}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </span>
               </HoverTooltip>
             </div>
 

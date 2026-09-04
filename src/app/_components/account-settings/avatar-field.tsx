@@ -49,6 +49,9 @@ export function AvatarField({
             variant="outline"
             size="sm"
             disabled={disabled}
+            className={cn(
+              disabled && "disabled:pointer-events-auto disabled:cursor-auto",
+            )}
             onClick={() => inputRef.current?.click()}
           >
             {draft.hasImage ? "Change photo" : "Upload photo"}
@@ -59,6 +62,9 @@ export function AvatarField({
               variant="ghost"
               size="sm"
               disabled={disabled}
+              className={cn(
+                disabled && "disabled:pointer-events-auto disabled:cursor-auto",
+              )}
               onClick={draft.clear}
             >
               Remove

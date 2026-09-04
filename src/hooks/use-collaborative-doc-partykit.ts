@@ -12,6 +12,7 @@ import {
 } from "~/lib/document-access-error";
 import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 
 interface UseCollaborativeDocPartykitOptions {
   documentId: string;
@@ -150,26 +151,11 @@ export function useCollaborativeDocPartykit({
   const lastDocumentIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const retryConnectionRef = useRef<(() => void) | null>(null);
-  const [isOffline, setIsOffline] = useState(false);
+  const isOffline = useBrowserOffline();
   const [showReconnectUi, setShowReconnectUi] = useState(false);
 
   const retryConnection = useCallback(() => {
     retryConnectionRef.current?.();
-  }, []);
-
-  // Browser `offline` often happens before the WebSocket actually closes.
-  // Drive the same connection-lost UI immediately, not after TCP timeout.
-  useEffect(() => {
-    const syncNetworkStatus = () => {
-      setIsOffline(!navigator.onLine);
-    };
-    syncNetworkStatus();
-    window.addEventListener("offline", syncNetworkStatus);
-    window.addEventListener("online", syncNetworkStatus);
-    return () => {
-      window.removeEventListener("offline", syncNetworkStatus);
-      window.removeEventListener("online", syncNetworkStatus);
-    };
   }, []);
 
   // True outages (`offline`) show immediately. Socket blips (tab freeze,

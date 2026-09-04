@@ -16,6 +16,7 @@ import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useTheme } from "next-themes";
 import { randomUUID } from "~/lib/utils";
 
@@ -29,14 +30,16 @@ export function CommandMenu() {
   const closeAll = useCommandMenuStore((state) => state.closeAll);
   const prefetchDocumentState = usePrefetchDocumentState();
   const { theme, setTheme } = useTheme();
+  const isOffline = useBrowserOffline();
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
+    if (isOffline) return;
     const newId = randomUUID();
     markDocumentAsNew(newId);
     router.push(`/documents/${newId}`);
     closeAll();
-  }, [router, closeAll]);
+  }, [router, closeAll, isOffline]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -88,7 +91,11 @@ export function CommandMenu() {
           ))}
         </CommandGroup>
         <CommandGroup heading="Quick Actions">
-          <CommandItem value="new-document" onSelect={handleCreateDocument}>
+          <CommandItem
+            value="new-document"
+            disabled={isOffline}
+            onSelect={handleCreateDocument}
+          >
             <FilePlus aria-hidden />
             New document
           </CommandItem>
