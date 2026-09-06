@@ -39,7 +39,6 @@ export function DocumentPublishButton() {
   if (!ctx) return null;
 
   const {
-    editor,
     popoverOpen,
     setPopoverOpen,
     onAuxiliaryOpenChange,
@@ -135,16 +134,12 @@ export function DocumentPublishButton() {
               "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
               "[&_svg]:size-3.5",
               (busy || publishFeedback !== "idle") && "disabled:opacity-100",
-              !editor &&
-                !busy &&
-                publishFeedback === "idle" &&
-                "opacity-50 disabled:opacity-50",
               !hasChangesToPublish &&
                 publication &&
                 publishFeedback === "idle" &&
                 "text-muted-foreground",
             )}
-            disabled={!editor || busy}
+            disabled={busy}
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
