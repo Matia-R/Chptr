@@ -25,25 +25,25 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 
 The previous architecture used `y-webrtc` for peer-to-peer sync between clients. This had several limitations:
 
-| Problem | Impact |
-|---------|--------|
-| **Mesh topology** | N clients = N×(N-1)/2 connections. 5 users × 3 tabs = 105 WebRTC connections |
-| **Firewall failures** | WebRTC P2P fails through corporate/strict firewalls with no fallback |
-| **Redundant persistence** | Every client independently saves to database (N clients = N save streams) |
-| **Complex compaction** | Append-only log + snapshots + background compaction logic |
-| **Public signaling** | Relied on public STUN/TURN servers for connection establishment |
+| Problem                   | Impact                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| **Mesh topology**         | N clients = N×(N-1)/2 connections. 5 users × 3 tabs = 105 WebRTC connections |
+| **Firewall failures**     | WebRTC P2P fails through corporate/strict firewalls with no fallback         |
+| **Redundant persistence** | Every client independently saves to database (N clients = N save streams)    |
+| **Complex compaction**    | Append-only log + snapshots + background compaction logic                    |
+| **Public signaling**      | Relied on public STUN/TURN servers for connection establishment              |
 
 ### PartyKit Solution
 
 PartyKit provides a **server-mediated WebSocket architecture** running on Cloudflare's edge network:
 
-| Benefit | Description |
-|---------|-------------|
-| **Star topology** | N clients = N connections (to central server) |
-| **Universal connectivity** | WebSocket works through all firewalls |
-| **Single writer** | Only PartyKit server persists to database |
-| **Simple schema** | One table, full state, no compaction |
-| **Free tier** | Cloudflare Workers free tier covers small-medium usage |
+| Benefit                    | Description                                            |
+| -------------------------- | ------------------------------------------------------ |
+| **Star topology**          | N clients = N connections (to central server)          |
+| **Universal connectivity** | WebSocket works through all firewalls                  |
+| **Single writer**          | Only PartyKit server persists to database              |
+| **Simple schema**          | One table, full state, no compaction                   |
+| **Free tier**              | Cloudflare Workers free tier covers small-medium usage |
 
 ---
 
@@ -150,14 +150,14 @@ PartyKit provides a **server-mediated WebSocket architecture** running on Cloudf
 
 ### Component Responsibilities
 
-| Component | Responsibility |
-|-----------|----------------|
-| **Client (Browser)** | Local Y.Doc, UI rendering, user input, JWT + error-code mapping |
-| **YPartyKitProvider** | WebSocket connection, Yjs sync protocol, awareness |
-| **PartyKit Room** | Authorize every socket, central Y.Doc, broadcast, save-token pool |
-| **Next.js API** | `/connect` (JWT + permission + state), `/save` (re-check + RLS) |
-| **Supabase** | Document storage, permissions, RLS, `document_exists` RPC |
-| **Header / Publish** | Reads the shared Y.Doc via `useCollaborativeDocStore` (the hook lives in the page, the button lives in the layout) |
+| Component             | Responsibility                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Client (Browser)**  | Local Y.Doc, UI rendering, user input, JWT + error-code mapping                                                    |
+| **YPartyKitProvider** | WebSocket connection, Yjs sync protocol, awareness                                                                 |
+| **PartyKit Room**     | Authorize every socket, central Y.Doc, broadcast, save-token pool                                                  |
+| **Next.js API**       | `/connect` (JWT + permission + state), `/save` (re-check + RLS)                                                    |
+| **Supabase**          | Document storage, permissions, RLS, `document_exists` RPC                                                          |
+| **Header / Publish**  | Reads the shared Y.Doc via `useCollaborativeDocStore` (the hook lives in the page, the button lives in the layout) |
 
 ---
 
@@ -276,19 +276,19 @@ CREATE POLICY "Users can write document_state if they have write permission"
 
 ### Schema Comparison
 
-| Aspect | Old (y-webrtc) | New (PartyKit) |
-|--------|----------------|----------------|
-| **Tables** | `document_changes` + `document_snapshots` | `document_state` |
-| **Rows per doc** | Many (1 per change) + 1 snapshot | 1 |
-| **Compaction** | Required (when changes > 100) | Not needed |
-| **Storage** | Incremental updates | Full state |
-| **Complexity** | High (compaction logic) | Low |
+| Aspect           | Old (y-webrtc)                            | New (PartyKit)   |
+| ---------------- | ----------------------------------------- | ---------------- |
+| **Tables**       | `document_changes` + `document_snapshots` | `document_state` |
+| **Rows per doc** | Many (1 per change) + 1 snapshot          | 1                |
+| **Compaction**   | Required (when changes > 100)             | Not needed       |
+| **Storage**      | Incremental updates                       | Full state       |
+| **Complexity**   | High (compaction logic)                   | Low              |
 
 ---
 
 ## Security Model
 
-Authorization is **per connection**. The in-memory Y.Doc is cached after the first *authorized* load; that cache is never a substitute for a permission check.
+Authorization is **per connection**. The in-memory Y.Doc is cached after the first _authorized_ load; that cache is never a substitute for a permission check.
 
 ### JWT Flow Through the System
 
@@ -343,13 +343,13 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 
 ### Error Codes
 
-| HTTP | WebSocket Close Code | Meaning | Client Behavior |
-|------|---------------------|---------|-----------------|
-| 400 | `4000` | Bad request | Show "Bad URL"; stop reconnect |
-| 401 | `4001` | Missing / invalid / expired token | Refresh session and reconnect. Show "Login required" only if there is no session |
-| 403 | `4003` | Signed in, no permission | Show "Restricted access"; stop reconnect |
-| 404 | `4004` | Document does not exist | Show "Doc not found"; stop reconnect |
-| 500 | `4005` | Connect failure (app unreachable) | Treat as connection lost; retry with a fresh JWT |
+| HTTP | WebSocket Close Code | Meaning                           | Client Behavior                                                                  |
+| ---- | -------------------- | --------------------------------- | -------------------------------------------------------------------------------- |
+| 400  | `4000`               | Bad request                       | Show "Bad URL"; stop reconnect                                                   |
+| 401  | `4001`               | Missing / invalid / expired token | Refresh session and reconnect. Show "Login required" only if there is no session |
+| 403  | `4003`               | Signed in, no permission          | Show "Restricted access"; stop reconnect                                         |
+| 404  | `4004`               | Document does not exist           | Show "Doc not found"; stop reconnect                                             |
+| 500  | `4005`               | Connect failure (app unreachable) | Treat as connection lost; retry with a fresh JWT                                 |
 
 ---
 
@@ -529,10 +529,10 @@ Both are now driven off PartyKit: persistence from socket `connected`, unpublish
 
 ### The Y.Doc holds two things
 
-| Yjs type | Key | Role |
-|----------|-----|------|
-| `Y.XmlFragment` | `document-store` | BlockNote body. This is what collaborators edit. |
-| `Y.Map` | `chptr-publish` | Publish metadata. Currently `contentHash`: a hash of `document-store` taken at the last successful publish. |
+| Yjs type        | Key              | Role                                                                                                        |
+| --------------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Y.XmlFragment` | `document-store` | BlockNote body. This is what collaborators edit.                                                            |
+| `Y.Map`         | `chptr-publish`  | Publish metadata. Currently `contentHash`: a hash of `document-store` taken at the last successful publish. |
 
 Awareness (cursors, names) is **not** in the Y.Doc. Cursor motion does not flip the publish button.
 
@@ -542,15 +542,21 @@ The hash is `length:fnv1a(fragment.toJSON())`. It is written with transaction or
 
 `useCollaborativeDocStore` (`src/app/_components/editor/collaborative-doc-store.ts`):
 
-| Field | Meaning |
-|-------|---------|
-| `documentId` | Route this store is bound to. Queries also require this to match `params.documentId` so a stale bind cannot fetch the wrong id. |
-| `ydoc` | The live Y.Doc from the PartyKit hook. |
-| `isPersisted` | The `documents` row exists. Safe to run `getDocumentById` / publication queries. |
-| `isYjsContentDirty` | Live body hash ≠ published hash (or ≠ session baseline if no hash yet). |
-| `hasYjsPublishHash` | `chptr-publish.contentHash` is present in this Y.Doc. |
+| Field               | Meaning                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `documentId`        | Route this store is bound to. Queries also require this to match `params.documentId` so a stale bind cannot fetch the wrong id. |
+| `ydoc`              | The live Y.Doc from the PartyKit hook.                                                                                          |
+| `isPersisted`       | The `documents` row exists. Safe to run `getDocumentById` / publication queries.                                                |
+| `isYjsContentDirty` | Live body hash ≠ published hash (or ≠ session baseline if no hash yet).                                                         |
+| `hasYjsPublishHash` | `chptr-publish.contentHash` is present in this Y.Doc.                                                                           |
+| `isYjsPublishReady` | First post-sync comparison has run for the **bound** doc.                                                                       |
+| `yjsPublishByDocumentId` | Last live comparison per id. Survives `reset` / navigate. The header uses this on the first paint of a recently visited doc. |
 
 `useDocumentIsPersisted(documentId)` is true only when `boundId === documentId && isPersisted`.
+
+`useCollaborativeDocForRoute` uses the live flags only when the store is bound to this route **and** `isYjsPublishReady`. Otherwise it uses `yjsPublishByDocumentId[routeId]` if we have already computed that doc this session.
+
+`getDocumentState` is the wrong cache for this button. Hover prefetch does not refetch while React Query still considers the snapshot fresh, and that snapshot is the last HTTP fetch — not the Y.Doc the user just edited. PartyKit persist is also debounced, so the server copy can still be clean after the button already showed Update.
 
 ### When `isPersisted` becomes true
 
@@ -590,6 +596,8 @@ otherwise               → "Published"
 
 ### How Yjs dirty is computed
 
+Each successful live comparison is stored on `yjsPublishByDocumentId[id]`. Switching back to that doc reads it immediately; the header does not wait for PartyKit to bind again.
+
 After the first PartyKit `sync`, the hook waits 150ms (BlockNote binding the fragment) then:
 
 1. Snapshots `sessionBaselineHash` = hash of `document-store` as it is now.
@@ -628,7 +636,7 @@ If another user (or tab) then edits `document-store`, every client sees `current
 documents/layout.tsx
   Header
     DocumentPublishButton  ──► useDocumentPublish()
-    DocumentBreadcrumb     ──► getDocumentById enabled: isPersisted
+    DocumentBreadcrumb     ──► getDocumentById for existing ids immediately
     DocumentActions        ──► same
 
 documents/[documentId]/page.tsx
@@ -639,20 +647,21 @@ documents/[documentId]/page.tsx
 
 The header must not assume the Y.Doc exists on first paint. For a new doc it shows **Publish** with queries off; after `connected` it fetches metadata.
 
+The header is a **sibling** of the page and stays mounted across `/documents/{id}` navigations. It renders **before** the page effect rebinds the store. For one frame `params.documentId` is already the new id while the store (and a disabled query) still hold the previous doc. React Query cache (`staleTime` 30s) makes that frame skip the loading skeleton, so a published+dirty previous doc briefly shows **Update** on an unpublished dest. Existing docs therefore query by route id immediately; Yjs dirty flags apply only when `store.documentId === route id`; disabled queries are not allowed to keep the previous `data`.
+
 ### Files
 
-| File | Role |
-|------|------|
-| `src/hooks/use-collaborative-doc-partykit.ts` | Bind store, persist on `connected`, observe Yjs for dirty |
-| `src/app/_components/editor/collaborative-doc-store.ts` | Cross-tree session (header ↔ page) |
-| `src/lib/yjs-publish-state.ts` | Hash + read/write `chptr-publish` map |
-| `src/hooks/use-document-publish.tsx` | Label, mutations, write hash after publish |
-| `src/hooks/use-new-document-flag.ts` | In-memory `isNew` (skeleton / connect `isNew` query param only) |
+| File                                                    | Role                                                            |
+| ------------------------------------------------------- | --------------------------------------------------------------- |
+| `src/hooks/use-collaborative-doc-partykit.ts`           | Bind store, persist on `connected`, observe Yjs for dirty       |
+| `src/app/_components/editor/collaborative-doc-store.ts` | Cross-tree session (header ↔ page)                             |
+| `src/lib/yjs-publish-state.ts`                          | Hash + read/write `chptr-publish` map                           |
+| `src/hooks/use-document-publish.tsx`                    | Label, mutations, write hash after publish                      |
+| `src/hooks/use-new-document-flag.ts`                    | In-memory `isNew` (skeleton / connect `isNew` query param only) |
 
 ---
 
 ## Edge Cases
-
 
 ### Edge Case 1: New Document, No Edits, Duplicate Tab
 
@@ -937,7 +946,7 @@ YPartyKitProvider already supports Yjs Awareness:
 
 ```typescript
 // Already available via provider.awareness
-provider.awareness.setLocalStateField('user', {
+provider.awareness.setLocalStateField("user", {
   name: userName,
   color: userColor,
 });
@@ -947,6 +956,7 @@ provider.awareness.setLocalStateField('user', {
 ```
 
 Future work:
+
 - Show avatars of connected users
 - Show cursor positions in document
 - Show "User X is editing..." indicators
@@ -955,11 +965,11 @@ Future work:
 
 Current schema supports:
 
-| Level | Can Read | Can Edit | Can Delete | Can Share |
-|-------|----------|----------|------------|-----------|
-| `viewer` | ✓ | ✗ | ✗ | ✗ |
-| `editor` | ✓ | ✓ | ✗ | ✗ |
-| `owner` | ✓ | ✓ | ✓ | ✓ |
+| Level    | Can Read | Can Edit | Can Delete | Can Share |
+| -------- | -------- | -------- | ---------- | --------- |
+| `viewer` | ✓        | ✗        | ✗          | ✗         |
+| `editor` | ✓        | ✓        | ✗          | ✗         |
+| `owner`  | ✓        | ✓        | ✓          | ✓         |
 
 RLS policies should enforce these based on `permission_level`.
 
@@ -975,6 +985,7 @@ Considerations for production:
 ### Webhooks / Real-time Notifications
 
 Future: Notify users when:
+
 - Someone shares a document with them
 - Someone joins a document they're editing
 - Significant changes made to shared document
@@ -990,6 +1001,7 @@ A migration script is provided to convert existing documents from the old `docum
 **Location:** `scripts/migrate-to-partykit.ts`
 
 **What it does:**
+
 1. Scans for all documents with data in the old tables
 2. For each document:
    - Loads the snapshot (if exists)
@@ -1012,10 +1024,12 @@ SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --do
 ```
 
 **Requirements:**
+
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (from Supabase Dashboard → Settings → API)
 
 **Notes:**
+
 - The script uses the service role key to bypass RLS and access all documents
 - Already-migrated documents are skipped (safe to re-run)
 - Old tables are not modified - you can run both systems side-by-side
@@ -1034,18 +1048,18 @@ To revert to y-webrtc:
 
 ## Summary
 
-| Aspect | Implementation |
-|--------|----------------|
-| **Sync Protocol** | Yjs over WebSocket via PartyKit |
-| **Topology** | Star (all clients → PartyKit → database) |
-| **Persistence** | Server-side only, debounced 1s |
-| **Schema** | Single `document_state` table |
-| **Security** | Per-connection authorize + permission row; RLS on load/save |
-| **New Doc UX** | Instant editor + Publish; tRPC waits until connect creates the row |
-| **Existing Doc UX** | Delayed skeleton (500ms threshold) |
+| Aspect               | Implementation                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| **Sync Protocol**    | Yjs over WebSocket via PartyKit                                                              |
+| **Topology**         | Star (all clients → PartyKit → database)                                                     |
+| **Persistence**      | Server-side only, debounced 1s                                                               |
+| **Schema**           | Single `document_state` table                                                                |
+| **Security**         | Per-connection authorize + permission row; RLS on load/save                                  |
+| **New Doc UX**       | Instant editor + Publish; tRPC waits until connect creates the row                           |
+| **Existing Doc UX**  | Delayed skeleton (500ms threshold)                                                           |
 | **Publish / Update** | Shared Yjs `contentHash` in `chptr-publish`; all connected clients see the same button state |
-| **Multi-tab** | Fully supported via PartyKit sync (including publish dirty) |
-| **Offline** | Limited (local Y.Doc only, no IndexedDB) |
-| **Cost** | Free tier for small usage |
+| **Multi-tab**        | Fully supported via PartyKit sync (including publish dirty)                                  |
+| **Offline**          | Limited (local Y.Doc only, no IndexedDB)                                                     |
+| **Cost**             | Free tier for small usage                                                                    |
 
 This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same CRDT.

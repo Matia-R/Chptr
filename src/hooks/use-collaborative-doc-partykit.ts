@@ -355,6 +355,10 @@ export function useCollaborativeDocPartykit({
         let publishWatchTimer: number | null = null;
 
         const recomputePublishDirty = () => {
+          if (cancelled || closedForAuth) return;
+          if (useCollaborativeDocStore.getState().documentId !== documentId) {
+            return;
+          }
           const publishedHash = getYjsPublishedContentHash(ydoc);
           const currentHash = getYjsContentHash(ydoc);
           const hasYjsPublishHash = publishedHash !== undefined;

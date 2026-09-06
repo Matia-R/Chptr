@@ -1,11 +1,11 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useRef, useCallback } from "react";
+import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 
 /**
  * In-memory store for tracking "new" document IDs.
- * 
+ *
  * This is intentionally in-memory only:
  * - Can't be manipulated by users via URL
  * - Doesn't transfer when copying/sharing URLs (new tab = fresh memory)
@@ -36,29 +36,33 @@ export function isDocumentNew(documentId: string): boolean {
 
 /**
  * Hook to check if the current document is "new" and get a cleanup function.
- * 
+ *
  * This hook freezes the "isNew" state per documentId to prevent re-renders
  * when the flag is cleared. The frozen state is reset when documentId changes.
- * 
+ *
  * @returns {Object} { isNew, clearFlag }
  */
 export function useNewDocumentFlag() {
-  const params = useParams();
-  const documentId = params.documentId as string;
-  
+  const documentId = useRouteDocumentId() ?? "";
+
   // Track which documentId we've frozen the isNew state for
-  const frozenStateRef = useRef<{ documentId: string; isNew: boolean } | null>(null);
-  
+  const frozenStateRef = useRef<{ documentId: string; isNew: boolean } | null>(
+    null,
+  );
+
   // Reset frozen state when documentId changes, or initialize it
-  if (!frozenStateRef.current || frozenStateRef.current.documentId !== documentId) {
+  if (
+    !frozenStateRef.current ||
+    frozenStateRef.current.documentId !== documentId
+  ) {
     frozenStateRef.current = {
       documentId,
       isNew: newDocumentIds.has(documentId),
     };
   }
-  
+
   const isNew = frozenStateRef.current.isNew;
-  
+
   // Clear the flag (call on first successful persistence)
   const clearFlag = useCallback(() => {
     if (documentId) {
@@ -67,7 +71,7 @@ export function useNewDocumentFlag() {
       // The frozen state stays true until navigation to prevent flicker
     }
   }, [documentId]);
-  
+
   return {
     isNew,
     clearFlag,

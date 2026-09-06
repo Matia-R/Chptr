@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
+import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { MoreVertical } from "lucide-react";
 import { Button } from "./button";
 import {
@@ -34,8 +34,7 @@ function formatPublicationDate(iso: string): string {
 }
 
 export function DocumentActions() {
-  const params = useParams();
-  const documentId = params.documentId as string;
+  const documentId = useRouteDocumentId() ?? "";
   const { isNew } = useNewDocumentFlag();
   const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
@@ -59,7 +58,7 @@ export function DocumentActions() {
   const { data, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId && isPersisted,
+      enabled: !!documentId && (!isNew || isPersisted),
     },
   );
 

@@ -41,7 +41,7 @@ export function Header() {
                 className="flex items-center gap-2"
               >
                 <div className="hidden shrink-0 md:flex md:items-center">
-                  <DocumentPublishButton />
+                  <DocumentPublishButton key={pathname} />
                 </div>
                 <DocumentActions />
               </motion.div>

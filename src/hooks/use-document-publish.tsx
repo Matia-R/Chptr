@@ -9,7 +9,6 @@
 
 import { Check, Loader2, Undo2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -18,6 +17,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 
 import { Button } from "~/app/_components/button";
 import { Input } from "~/app/_components/input";
@@ -34,8 +34,8 @@ import { api, type RouterOutputs } from "~/trpc/react";
 
 import { useDocumentEditorStore } from "~/app/_components/editor/document-editor-store";
 import {
+  useCollaborativeDocForRoute,
   useCollaborativeDocStore,
-  useDocumentIsPersisted,
 } from "~/app/_components/editor/collaborative-doc-store";
 import type { AppBlockNoteEditor } from "~/app/_components/editor/editor-types";
 import {
@@ -109,20 +109,21 @@ export type DocumentPublishValue = {
 };
 
 export function useDocumentPublish(): DocumentPublishValue | null {
-  const params = useParams();
-  const documentId = params.documentId as string | undefined;
+  const documentId = useRouteDocumentId();
   const editor = useDocumentEditorStore((s) => s.editor);
   const ydoc = useCollaborativeDocStore((s) => s.ydoc);
-  const isYjsContentDirty = useCollaborativeDocStore(
-    (s) => s.isYjsContentDirty,
-  );
-  const hasYjsPublishHash = useCollaborativeDocStore(
-    (s) => s.hasYjsPublishHash,
-  );
   const { isNew } = useNewDocumentFlag();
   const { toast } = useToast();
-  const isPersisted = useDocumentIsPersisted(documentId);
-  const queriesEnabled = isPersisted;
+  const {
+    isPersisted,
+    isYjsContentDirty,
+    hasYjsPublishHash,
+    isYjsPublishReady,
+  } = useCollaborativeDocForRoute(documentId);
+  // Existing docs: query as soon as the route id is known. Waiting for the
+  // page to bind the Yjs store would keep the previous doc's query result
+  // for a frame (header paints before the page effect).
+  const queriesEnabled = !!documentId && (!isNew || isPersisted);
 
   const popoverOpen = useDocumentPublishStore((s) => s.popoverOpen);
   const setPopoverOpen = useDocumentPublishStore((s) => s.setPopoverOpen);
@@ -151,34 +152,40 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     (s) => s.resetForNavigation,
   );
 
-  /** Only reset store when the route document changes — not when extra consumers mount (popover panel, drawer panel). */
+  /** Reset panel state in render so the first paint of the new route is clean. */
   const prevDocumentIdForResetRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
+  if (prevDocumentIdForResetRef.current !== documentId) {
     const prev = prevDocumentIdForResetRef.current;
     prevDocumentIdForResetRef.current = documentId;
-    if (prev !== undefined && prev !== documentId) {
+    if (prev !== undefined) {
       resetForNavigation();
     }
-  }, [documentId, resetForNavigation]);
+  }
 
-  const { data: docMeta } = api.document.getDocumentById.useQuery(
-    documentId ?? "",
-    { enabled: queriesEnabled },
-  );
+  const utils = api.useUtils();
 
-  const { data: publication, isLoading: publicationQueryLoading } =
-    api.document.getPublicationByDocumentId.useQuery(documentId ?? "", {
-      enabled: queriesEnabled,
-    });
-  // New docs skip the skeleton so Publish is visible before the row exists.
-  const publicationLoading = isNew ? false : publicationQueryLoading;
+  api.document.getDocumentById.useQuery(documentId ?? "", {
+    enabled: queriesEnabled,
+  });
+  api.document.getPublicationByDocumentId.useQuery(documentId ?? "", {
+    enabled: queriesEnabled,
+  });
+  // Read the cache for THIS id only. A mounted header's useQuery observer can
+  // still expose the previous document for a frame when the route changes.
+  const docMeta = documentId
+    ? utils.document.getDocumentById.getData(documentId)
+    : undefined;
+  const publicationFromCache = documentId
+    ? utils.document.getPublicationByDocumentId.getData(documentId)
+    : undefined;
+  const publication = publicationFromCache;
+  const publicationLoading =
+    !isNew && !!documentId && queriesEnabled && publication === undefined;
 
   const { data: ownerPathData } =
     api.document.getPublicationOwnerPathSegment.useQuery(documentId ?? "", {
-      enabled: queriesEnabled && !publication,
+      enabled: queriesEnabled && publication === null,
     });
-
-  const utils = api.useUtils();
 
   const publishMutation = api.document.publishDocument.useMutation({
     onSuccess: (result: PublishDocumentResult) => {
@@ -262,10 +269,19 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     : 0;
   const hasTimestampEdits =
     !!docLastUpdated && new Date(docLastUpdated).getTime() > publishedAtMs;
-  const hasTitleChange = !!publication && title !== publication.title;
-  const hasLiveYjsEdits = hasYjsPublishHash
-    ? isYjsContentDirty
-    : isYjsContentDirty || hasTimestampEdits;
+  // Don't treat a missing meta row as a title edit — "Untitled" is the
+  // fallback while getDocumentById is still in flight.
+  const hasTitleChange =
+    !!publication && !!docMeta && title !== publication.title;
+  // last_updated is bumped on every PartyKit save, including persist after
+  // publish. Until Yjs has compared this doc, timestamps look dirty and the
+  // button flashes Update. Trust them only as a fallback once Yjs is ready
+  // and this doc has no publish snapshot yet.
+  const hasLiveYjsEdits = !isYjsPublishReady
+    ? false
+    : hasYjsPublishHash
+      ? isYjsContentDirty
+      : isYjsContentDirty || hasTimestampEdits;
   const hasUnpublishedChanges =
     !!publication && (hasLiveYjsEdits || hasTitleChange);
 

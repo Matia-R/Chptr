@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
+import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
 import * as React from "react";
@@ -25,8 +25,7 @@ import { useIsMobile } from "~/hooks/use-mobile";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 
 export function DocumentBreadcrumb() {
-  const params = useParams();
-  const documentId = params.documentId as string;
+  const documentId = useRouteDocumentId() ?? "";
   const { isNew, clearFlag } = useNewDocumentFlag();
   const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
@@ -37,7 +36,7 @@ export function DocumentBreadcrumb() {
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId && isPersisted,
+      enabled: !!documentId && (!isNew || isPersisted),
     },
   );
 

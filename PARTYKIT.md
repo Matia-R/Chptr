@@ -61,13 +61,13 @@ The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the 
 
 ### Error Codes
 
-| HTTP (connect/save) | WebSocket close | UI |
-|----------------------------|-----------------|----|
-| 401 | 4001 | Refresh the session and reconnect. Show "Login required" only if there is no session |
-| 403 | 4003 | Restricted access |
-| 404 | 4004 | Doc not found |
-| 400 | 4000 | Bad URL |
-| 500 | 4005 | Connection lost; retry (do not unmount the editor) |
+| HTTP (connect/save) | WebSocket close | UI                                                                                   |
+| ------------------- | --------------- | ------------------------------------------------------------------------------------ |
+| 401                 | 4001            | Refresh the session and reconnect. Show "Login required" only if there is no session |
+| 403                 | 4003            | Restricted access                                                                    |
+| 404                 | 4004            | Doc not found                                                                        |
+| 400                 | 4000            | Bad URL                                                                              |
+| 500                 | 4005            | Connection lost; retry (do not unmount the editor)                                   |
 
 The document page maps `DocumentAccessError.code` onto those alerts. Fatal close codes (4000/4003/4004) disable y-partykit reconnect. 4001 is a stale JWT on reconnect after sleep or a dropped socket — refresh then reconnect. Transport closes (1001/1006) keep the local Y.Doc visible, lock the editor, and show a reconnecting banner.
 
@@ -160,24 +160,24 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `partykit.json` | PartyKit configuration |
-| `party/document.ts` | PartyKit server (per-connection connect, Y.Doc, save token pool) |
-| `src/hooks/use-collaborative-doc-partykit.ts` | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
-| `src/hooks/use-prefetch-document-state.ts` | Sidebar/command-menu hover prefetch |
-| `src/hooks/use-document-publish.tsx` | Header publish button: queries gated on persist, Yjs hash after publish |
-| `src/hooks/use-new-document-flag.ts` | In-memory `isNew` for instant create (not a DB-exists signal) |
-| `src/app/_components/editor/collaborative-doc-store.ts` | Shared Y.Doc session between the document page and the header |
-| `src/lib/yjs-publish-state.ts` | Hash of `document-store`; published snapshot in Y.Map `chptr-publish` |
-| `src/lib/document-access-error.ts` | Typed document access errors for the editor page |
-| `src/app/api/partykit/connect/route.ts` | JWT + permission + state (or create-on-new) in one call |
-| `src/app/api/partykit/save/route.ts` | Save Y.Doc state after permission check |
-| `src/server/partykit/auth.ts` | Shared secret/JWT/permission helpers |
-| `src/server/partykit/connect-document.ts` | Shared permission + state resolution |
-| `src/utils/supabase/from-token.ts` | User-scoped Supabase client from a JWT |
-| `migrations/partykit_document_state.sql` | `document_state` table + RLS |
-| `migrations/document_exists_rpc.sql` | Privileged existence check |
+| File                                                    | Purpose                                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `partykit.json`                                         | PartyKit configuration                                                                            |
+| `party/document.ts`                                     | PartyKit server (per-connection connect, Y.Doc, save token pool)                                  |
+| `src/hooks/use-collaborative-doc-partykit.ts`           | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
+| `src/hooks/use-prefetch-document-state.ts`              | Sidebar/command-menu hover prefetch                                                               |
+| `src/hooks/use-document-publish.tsx`                    | Header publish button: queries gated on persist, Yjs hash after publish                           |
+| `src/hooks/use-new-document-flag.ts`                    | In-memory `isNew` for instant create (not a DB-exists signal)                                     |
+| `src/app/_components/editor/collaborative-doc-store.ts` | Shared Y.Doc session between the document page and the header                                     |
+| `src/lib/yjs-publish-state.ts`                          | Hash of `document-store`; published snapshot in Y.Map `chptr-publish`                             |
+| `src/lib/document-access-error.ts`                      | Typed document access errors for the editor page                                                  |
+| `src/app/api/partykit/connect/route.ts`                 | JWT + permission + state (or create-on-new) in one call                                           |
+| `src/app/api/partykit/save/route.ts`                    | Save Y.Doc state after permission check                                                           |
+| `src/server/partykit/auth.ts`                           | Shared secret/JWT/permission helpers                                                              |
+| `src/server/partykit/connect-document.ts`               | Shared permission + state resolution                                                              |
+| `src/utils/supabase/from-token.ts`                      | User-scoped Supabase client from a JWT                                                            |
+| `migrations/partykit_document_state.sql`                | `document_state` table + RLS                                                                      |
+| `migrations/document_exists_rpc.sql`                    | Privileged existence check                                                                        |
 
 ## How It Works
 
@@ -226,18 +226,19 @@ See [PARTYKIT_ARCHITECTURE.md](./PARTYKIT_ARCHITECTURE.md#publish-ui-and-new-doc
 
 PartyKit runs on Cloudflare Workers. Estimated costs:
 
-| Users | Monthly Cost |
-|-------|--------------|
-| 0-50 | $0 (free tier) |
-| 50-500 | ~$5 |
-| 500-2000 | ~$10-25 |
-| 2000+ | ~$25-100 |
+| Users    | Monthly Cost   |
+| -------- | -------------- |
+| 0-50     | $0 (free tier) |
+| 50-500   | ~$5            |
+| 500-2000 | ~$10-25        |
+| 2000+    | ~$25-100       |
 
 ## Rollback
 
 To revert to y-webrtc:
 
 1. In `src/app/documents/[documentId]/page.tsx`:
+
    - Change import back to `use-collaborative-doc-crdt`
    - Change hook call back to `useCollaborativeDocCrdt`
 
