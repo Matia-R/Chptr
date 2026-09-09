@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import type { User } from "@supabase/supabase-js";
+import type { PostgrestError, User } from "@supabase/supabase-js";
 import {
-  createClientFromToken,
+  type createClientFromToken,
   getUserFromAccessToken,
 } from "~/utils/supabase/from-token";
 
@@ -20,7 +20,7 @@ export function requirePartykitSecret(request: Request): NextResponse | null {
 export function getBearerToken(request: Request): string | null {
   const authHeader = request.headers.get("Authorization");
   const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
-  return token || null;
+  return token ?? null;
 }
 
 export async function authenticatePartykitUser(request: Request): Promise<
@@ -85,9 +85,9 @@ export async function documentExists(
   supabase: PartykitSupabase,
   documentId: string
 ): Promise<boolean> {
-  const { data, error } = await supabase.rpc("document_exists", {
+  const { data, error } = (await supabase.rpc("document_exists", {
     p_document_id: documentId,
-  });
+  })) as { data: unknown; error: PostgrestError | null };
 
   if (error) {
     console.error("[PartyKit] document_exists RPC failed:", error);

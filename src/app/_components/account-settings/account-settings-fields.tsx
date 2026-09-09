@@ -80,7 +80,7 @@ export function ProfileFields({
 }: ProfileFieldsProps) {
   const errors = form.formState.errors;
   const className = inputClassName(surface);
-  const fieldsDisabled = Boolean(disabled || isSaving);
+  const fieldsDisabled = Boolean(disabled) || Boolean(isSaving);
 
   // Watched so the fallback initials track what is being typed.
   const firstName = form.watch("first_name");
@@ -234,7 +234,9 @@ export function ChangePasswordFields({
         </SettingsField>
       ) : null}
       {rootError ? (
-        <p className="text-[0.8rem] font-medium text-destructive">{rootError}</p>
+        <p className="text-[0.8rem] font-medium text-destructive">
+          {rootError}
+        </p>
       ) : successMessage ? (
         <p className="text-[0.8rem] font-medium text-emerald-600 dark:text-emerald-400">
           {successMessage}

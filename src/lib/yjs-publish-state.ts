@@ -1,4 +1,4 @@
-import * as Y from "yjs";
+import type * as Y from "yjs";
 
 /** Shared Y.Map: every collaborator sees the same published snapshot. */
 export const YJS_PUBLISH_MAP = "chptr-publish";

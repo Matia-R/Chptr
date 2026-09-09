@@ -34,6 +34,17 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 import { createClient } from '@supabase/supabase-js'
 import * as Y from 'yjs'
 
+function createServiceClient(url: string, key: string) {
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+type ServiceClient = ReturnType<typeof createServiceClient>
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -54,6 +65,10 @@ type DocumentSnapshotRow = {
 type DocumentChangeRow = {
   update_data: string
   created_at: string
+}
+
+type DocumentIdRow = {
+  document_id: string
 }
 
 type MigrationResult = {
@@ -123,7 +138,7 @@ function reconstructYDocState(
 }
 
 async function migrateDocument(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ServiceClient,
   documentId: string,
   dryRun: boolean
 ): Promise<MigrationResult> {
@@ -234,7 +249,7 @@ async function migrateDocument(
 }
 
 async function getAllDocumentIds(
-  supabase: ReturnType<typeof createClient>
+  supabase: ServiceClient
 ): Promise<string[]> {
   const documentIds = new Set<string>()
 
@@ -247,7 +262,7 @@ async function getAllDocumentIds(
     throw new Error(`Failed to fetch snapshot document IDs: ${snapshotError.message}`)
   }
 
-  for (const row of snapshotDocs ?? []) {
+  for (const row of (snapshotDocs ?? []) as DocumentIdRow[]) {
     documentIds.add(row.document_id)
   }
 
@@ -266,7 +281,7 @@ async function getAllDocumentIds(
       throw new Error(`Failed to fetch change document IDs: ${changeError.message}`)
     }
 
-    const rows = changeDocs ?? []
+    const rows = (changeDocs ?? []) as DocumentIdRow[]
     for (const row of rows) {
       documentIds.add(row.document_id)
     }
@@ -321,12 +336,7 @@ async function main() {
   }
 
   // Create Supabase client with service role (bypasses RLS)
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
+  const supabase = createServiceClient(supabaseUrl, serviceRoleKey)
 
   console.log(`📡 Connected to: ${supabaseUrl}`)
   console.log()
