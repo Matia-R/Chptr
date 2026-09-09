@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canWrite } from "~/lib/document-permission";
 import {
   authenticatePartykitUser,
   getDocumentPermission,
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       documentId,
       auth.user.id
     );
-    if (!permission) {
+    if (!canWrite(permission)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 

@@ -1,6 +1,7 @@
 import type * as Party from "partykit/server";
 import { onConnect, type YPartyKitOptions } from "y-partykit";
 import * as Y from "yjs";
+import { canWrite } from "../src/lib/document-permission";
 
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64.trim());
@@ -41,6 +42,7 @@ type ConnectResult =
 type AuthorizedClient = {
   token: string;
   userId: string;
+  permission: string;
 };
 
 function closeCodeFromHttpStatus(status: number): {
@@ -131,6 +133,7 @@ export default class DocumentParty implements Party.Server {
   pickSaveToken(): string | null {
     let fallback: string | null = null;
     for (const client of this.authorizedByConnection.values()) {
+      if (!canWrite(client.permission)) continue;
       fallback = client.token;
       if (!jwtLooksExpired(client.token)) {
         return client.token;
@@ -194,6 +197,7 @@ export default class DocumentParty implements Party.Server {
     this.authorizedByConnection.set(conn.id, {
       token,
       userId: auth.userId,
+      permission: auth.permission,
     });
 
     if (!this.isLoaded) {
@@ -219,6 +223,7 @@ export default class DocumentParty implements Party.Server {
 
     const options: YPartyKitOptions = {
       gc: false,
+      readOnly: !canWrite(auth.permission),
       load: async () => {
         return loadedDoc;
       },
