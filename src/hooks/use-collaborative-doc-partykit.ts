@@ -345,21 +345,6 @@ export function useCollaborativeDocPartykit({
             tokenRef.current = currentSession.access_token;
             if (cancelled || closedForAuth) return;
             provider.connect();
-
-            void supabase.auth
-              .refreshSession()
-              .then(({ data, error: refreshError }) => {
-                if (cancelled || closedForAuth) return;
-                if (data.session?.access_token) {
-                  tokenRef.current = data.session.access_token;
-                }
-                if (refreshError) {
-                  const status = (refreshError as { status?: number }).status;
-                  if (!data.session && (status === 400 || status === 401)) {
-                    failFatal(loginRequired());
-                  }
-                }
-              });
           } catch (err) {
             console.error("[PartyKit] Failed to resume connection:", err);
             consecutiveFailures += 1;
@@ -474,13 +459,9 @@ export function useCollaborativeDocPartykit({
 
           if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
             tokenRef.current = nextSession.access_token;
-            if (isBrowserOffline()) return;
-            if (socketIsOpen(provider)) {
-              // Keep the live socket. The new JWT is used on the next
-              // real reconnect so a tab-focus refresh does not flash the UI.
-              return;
-            }
-            void resumeWithFreshToken({ immediate: true });
+            // Do not reconnect here. resumeWithFreshToken used to call
+            // refreshSession(), which re-emitted TOKEN_REFRESHED while the
+            // socket was down and looped until Supabase returned 429.
           }
         });
 
