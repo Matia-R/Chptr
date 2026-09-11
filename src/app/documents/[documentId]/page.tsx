@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CloudOff } from "lucide-react";
+import { CloudOff, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
@@ -57,7 +57,7 @@ function getDocumentErrorContent(error: unknown): {
   return DOCUMENT_ERROR[key];
 }
 
-function OfflineBanner() {
+function ConnectionBanner({ isOffline }: { isOffline: boolean }) {
   return (
     <motion.div
       role="status"
@@ -68,8 +68,14 @@ function OfflineBanner() {
       className="pointer-events-none fixed inset-x-0 top-14 z-50 flex justify-center px-4 md:top-16"
     >
       <p className="flex items-center gap-2 rounded-full border bg-sidebar px-4 py-2.5 text-sm text-foreground shadow-sm">
-        <CloudOff className="size-4 shrink-0" aria-hidden />
-        You’re offline. Editing is paused.
+        {isOffline ? (
+          <CloudOff className="size-4 shrink-0" aria-hidden />
+        ) : (
+          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+        )}
+        {isOffline
+          ? "You’re offline. Editing is paused."
+          : "Reconnecting. Editing is paused."}
       </p>
     </motion.div>
   );
@@ -92,11 +98,18 @@ export default function DocumentPage() {
   const { data: userProfile } = useUserProfile();
 
   // PartyKit-based collaborative doc - handles fetching and saving on server
-  const { ydoc, provider, isReady, isLoading, error, isReconnecting } =
-    useCollaborativeDocPartykit({
-      documentId,
-      isNew,
-    });
+  const {
+    ydoc,
+    provider,
+    isReady,
+    isLoading,
+    error,
+    isReconnecting,
+    isOffline,
+  } = useCollaborativeDocPartykit({
+    documentId,
+    isNew,
+  });
 
   // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
   // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.
@@ -153,7 +166,12 @@ export default function DocumentPage() {
     return (
       <MotionFade>
         <AnimatePresence>
-          {isReconnecting ? <OfflineBanner key="offline-banner" /> : null}
+          {isReconnecting ? (
+            <ConnectionBanner
+              key={isOffline ? "offline-banner" : "reconnect-banner"}
+              isOffline={isOffline}
+            />
+          ) : null}
         </AnimatePresence>
         <Editor
           userName={userName}
@@ -171,7 +189,10 @@ export default function DocumentPage() {
     return (
       <MotionFade>
         <AnimatePresence>
-          <OfflineBanner key="offline-banner" />
+          <ConnectionBanner
+            key={isOffline ? "offline-banner" : "reconnect-banner"}
+            isOffline={isOffline}
+          />
         </AnimatePresence>
       </MotionFade>
     );

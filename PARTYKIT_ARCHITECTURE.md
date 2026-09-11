@@ -447,8 +447,8 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │  1. User navigates to /documents/{existing-uuid}                        │
 │     ┌──────────┐                                                        │
 │     │  Client  │  - isNew=false (not from "New Document" flow)          │
-│     │          │  - Renders nothing initially (< 250ms)                 │
-│     │          │  - If > 250ms: show loading skeleton                   │
+│     │          │  - Renders nothing initially (< 500ms)                 │
+│     │          │  - If > 500ms: show loading skeleton                   │
 │     └──────────┘                                                        │
 │           │                                                             │
 │           ▼                                                             │
@@ -470,7 +470,7 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 │                                                                         │
 │  ═══════════════════════════════════════════════════════════════════    │
 │  TYPICAL LOAD TIME: < 100ms (fast network)                              │
-│  SKELETON APPEARS: Only if load takes > 250ms                           │
+│  SKELETON APPEARS: Only if load takes > 500ms                           │
 │  ═══════════════════════════════════════════════════════════════════    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -783,7 +783,7 @@ The header is a **sibling** of the page and stays mounted across `/documents/{id
 │  Mitigation (Current):                                                  │
 │  ─────────────────────────────────────────────────────────────────      │
 │                                                                         │
-│  - Delayed loading skeleton (shows after 250ms)                         │
+│  - Delayed loading skeleton (shows after 500ms)                         │
 │  - Fast loads: no flicker                                               │
 │  - Slow loads: skeleton provides feedback                               │
 │                                                                         │
@@ -971,7 +971,7 @@ Current schema supports:
 | `editor` | ✓        | ✓        | ✗          | ✗         |
 | `owner`  | ✓        | ✓        | ✓          | ✓         |
 
-RLS policies should enforce these based on `permission_level`.
+App-level `canWrite` already treats only `editor` and `owner` as writable (`document_permissions.permission`). Sharing is not shipped, so every real row is `owner` and `document_state` INSERT/UPDATE RLS still allows any permission row. When implementing sharing, tighten those policies to `permission IN ('editor', 'owner')` (UPDATE needs both `USING` and `WITH CHECK`). SELECT can stay any permission row.
 
 ### Rate Limiting / Abuse Prevention
 

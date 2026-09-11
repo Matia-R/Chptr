@@ -32,6 +32,7 @@ interface UseCollaborativeDocPartykitResult {
   error: Error | null;
   connection: DocumentConnectionStatus;
   isReconnecting: boolean;
+  isOffline: boolean;
   retryConnection: () => void;
 }
 
@@ -153,11 +154,13 @@ export function useCollaborativeDocPartykit({
   const [connection, setConnection] =
     useState<DocumentConnectionStatus>("connecting");
   const [everConnected, setEverConnected] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastDocumentIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const retryConnectionRef = useRef<(() => void) | null>(null);
+  const reconnectGraceTimerRef = useRef<number | null>(null);
   const isOffline = useBrowserOffline();
   const [showReconnectUi, setShowReconnectUi] = useState(false);
 
@@ -165,28 +168,54 @@ export function useCollaborativeDocPartykit({
     retryConnectionRef.current?.();
   }, []);
 
-  // True outages (`offline`) show immediately. Socket blips (tab freeze,
-  // token refresh, brief close) only show if we are still down after a grace.
-  useEffect(() => {
-    const down =
-      isOffline ||
-      connection === "disconnected" ||
-      (everConnected && connection === "connecting");
+  const clearReconnectGraceTimer = useCallback(() => {
+    if (reconnectGraceTimerRef.current != null) {
+      window.clearTimeout(reconnectGraceTimerRef.current);
+      reconnectGraceTimerRef.current = null;
+    }
+  }, []);
 
+  // y-partykit "connected" is only TCP open — PartyKit may drop the socket
+  // immediately (process down, auth still running). Hide the banner only after
+  // Yjs sync. Once shown, keep it through connecting/disconnected retries.
+  useEffect(() => {
     if (isOffline) {
+      clearReconnectGraceTimer();
       setShowReconnectUi(true);
       return;
     }
-    if (!down) {
+
+    const recovered = connection === "connected" && isSynced;
+    if (recovered) {
+      clearReconnectGraceTimer();
       setShowReconnectUi(false);
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    const down =
+      connection === "disconnected" || (everConnected && !recovered);
+    if (!down) {
+      return;
+    }
+
+    if (showReconnectUi || reconnectGraceTimerRef.current != null) {
+      return;
+    }
+
+    reconnectGraceTimerRef.current = window.setTimeout(() => {
+      reconnectGraceTimerRef.current = null;
       setShowReconnectUi(true);
     }, RECONNECT_UI_GRACE_MS);
-    return () => window.clearTimeout(timer);
-  }, [isOffline, connection, everConnected]);
+  }, [
+    isOffline,
+    connection,
+    everConnected,
+    isSynced,
+    showReconnectUi,
+    clearReconnectGraceTimer,
+  ]);
+
+  useEffect(() => () => clearReconnectGraceTimer(), [clearReconnectGraceTimer]);
 
   useEffect(() => {
     if (lastDocumentIdRef.current === documentId && initializedRef.current) {
@@ -202,7 +231,9 @@ export function useCollaborativeDocPartykit({
     setIsReady(false);
     setConnection("connecting");
     setEverConnected(false);
+    setIsSynced(false);
     setShowReconnectUi(false);
+    clearReconnectGraceTimer();
 
     useCollaborativeDocStore.getState().bindDocument({
       documentId,
@@ -380,6 +411,7 @@ export function useCollaborativeDocPartykit({
         ydoc.on("update", onYjsUpdate);
 
         provider.on("sync", (synced: boolean) => {
+          setIsSynced(synced);
           if (synced && !closedForAuth && !isNew) {
             markReady();
           }
@@ -402,6 +434,9 @@ export function useCollaborativeDocPartykit({
               setEverConnected(true);
               useCollaborativeDocStore.getState().setPersisted(true);
             }
+            if (status === "disconnected") {
+              setIsSynced(false);
+            }
           },
         );
 
@@ -421,6 +456,7 @@ export function useCollaborativeDocPartykit({
           // Transport closes (1001/1006) are the laptop-lid / network drop.
           consecutiveFailures += 1;
           setConnection("disconnected");
+          setIsSynced(false);
           provider.shouldConnect = false;
           if (isBrowserOffline()) return;
           void resumeWithFreshToken({ immediate: consecutiveFailures === 1 });
@@ -564,6 +600,7 @@ export function useCollaborativeDocPartykit({
     error,
     connection,
     isReconnecting: showReconnectUi,
+    isOffline,
     retryConnection,
   };
 }

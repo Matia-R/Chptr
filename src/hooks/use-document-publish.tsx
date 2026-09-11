@@ -111,10 +111,10 @@ export type DocumentPublishValue = {
 export function useDocumentPublish(): DocumentPublishValue | null {
   const documentId = useRouteDocumentId();
   const editor = useDocumentEditorStore((s) => s.editor);
-  const ydoc = useCollaborativeDocStore((s) => s.ydoc);
   const { isNew } = useNewDocumentFlag();
   const { toast } = useToast();
   const {
+    aligned,
     isPersisted,
     isYjsContentDirty,
     hasYjsPublishHash,
@@ -343,7 +343,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   }, [anyPublishPanelOpen, setSlugOverride]);
 
   const handlePublish = useCallback(async () => {
-    if (!editor || !documentId) {
+    if (!editor || !documentId || !aligned) {
       toast({
         variant: "destructive",
         title: "Editor not ready",
@@ -382,8 +382,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         slug: slugOverride.trim() || undefined,
       });
 
-      if (ydoc) {
-        writeYjsPublishedContentHash(ydoc);
+      const live = useCollaborativeDocStore.getState();
+      if (live.ydoc && live.documentId === documentId) {
+        writeYjsPublishedContentHash(live.ydoc);
       }
 
       const elapsed = Date.now() - startedAt;
@@ -404,6 +405,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
     }
   }, [
+    aligned,
     documentId,
     editor,
     publication,
@@ -412,7 +414,6 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     slugOverride,
     title,
     toast,
-    ydoc,
     setFreezeFirstPublishActions,
     setPublishFeedback,
   ]);
