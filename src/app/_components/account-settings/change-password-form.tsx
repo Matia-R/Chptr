@@ -10,6 +10,8 @@ import {
 import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
 
 import { ChangePasswordFields } from "./account-settings-fields";
+import { OfflinePasswordUnavailable } from "./offline-notices";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import {
   useChangePassword,
   type ChangePasswordFormApi,
@@ -63,6 +65,7 @@ export function MobileChangePassword({
   } = useChangePassword({
     onSaved: () => leave(onSaved),
   });
+  const isOffline = useBrowserOffline();
 
   React.useEffect(() => {
     onSavingChange?.(isSaving);
@@ -74,19 +77,24 @@ export function MobileChangePassword({
       title="Password"
       doneLabel={<SaveFeedbackLabel state={saveState} idleLabel="Update" />}
       disabled={isSaving}
-      doneDisabled={saveDisabled}
+      doneDisabled={isOffline || saveDisabled}
       doneClassName={isBusy ? "disabled:opacity-100" : undefined}
       dismissKeyboardOnDone={false}
       onBack={onBack}
       onDone={() => {
+        if (isOffline) return;
         void submit();
       }}
     >
-      <ChangePasswordFields
-        form={form}
-        surface="drawer"
-        reauthRequired={reauthRequired}
-      />
+      {isOffline ? (
+        <OfflinePasswordUnavailable />
+      ) : (
+        <ChangePasswordFields
+          form={form}
+          surface="drawer"
+          reauthRequired={reauthRequired}
+        />
+      )}
     </MobileDrawerFieldView>
   );
 }

@@ -12,7 +12,6 @@ import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
 import { Alert } from "./custom-blocks/Alert";
 import { AiPromptInput } from "./custom-blocks/AiPromptInput";
 import type * as Y from "yjs";
-import type { WebrtcProvider } from "y-webrtc";
 import { renderCursor } from "./cursor-renderer";
 import {
   supportedLanguages,
@@ -27,11 +26,17 @@ import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
 
+interface CollaborationProvider {
+  awareness: unknown;
+  destroy?: () => void;
+}
+
 interface EditorProps {
   userName: string;
   userColor: string;
   ydoc: Y.Doc;
-  provider: WebrtcProvider;
+  provider: CollaborationProvider;
+  editable?: boolean;
 }
 
 const schema = BlockNoteSchema.create({
@@ -47,6 +52,7 @@ export default function Editor({
   userColor,
   ydoc,
   provider,
+  editable = true,
 }: EditorProps) {
   const { theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
@@ -111,6 +117,7 @@ export default function Editor({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (!editable) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         const container = editorContainerRef.current;
         if (!container?.contains(document.activeElement)) return;
@@ -150,7 +157,7 @@ export default function Editor({
         editor.formattingToolbar.closeMenu();
       }
     },
-    [editor],
+    [editor, editable],
   );
 
   useEffect(() => {
@@ -171,6 +178,7 @@ export default function Editor({
     <div ref={editorContainerRef} className="contents">
       <BlockNoteView
         editor={editor}
+        editable={editable}
         theme={currentTheme as "light" | "dark"}
         shadCNComponents={shadCNComponents}
       >

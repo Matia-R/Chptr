@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
+import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
 import * as React from "react";
@@ -9,6 +9,7 @@ import { cn } from "~/lib/utils";
 import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
+import { useDocumentIsPersisted } from "~/app/_components/editor/collaborative-doc-store";
 import {
   Popover,
   PopoverContent,
@@ -21,19 +22,21 @@ import {
   runWithMobileDrawerOpenSync,
 } from "~/app/_components/mobile-drawer";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 
 export function DocumentBreadcrumb() {
-  const params = useParams();
-  const documentId = params.documentId as string;
+  const documentId = useRouteDocumentId() ?? "";
   const { isNew, clearFlag } = useNewDocumentFlag();
+  const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
+  const isOffline = useBrowserOffline();
   const utils = api.useUtils();
   const { toast } = useToast();
 
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
     {
-      enabled: !!documentId && !isNew,
+      enabled: !!documentId && (!isNew || isPersisted),
     },
   );
 
@@ -158,6 +161,7 @@ export function DocumentBreadcrumb() {
   }, [document?.document?.name]);
 
   const openTitleEditor = React.useCallback(() => {
+    if (isOffline) return;
     setEditingName(document?.document?.name ?? "Untitled");
     if (isMobile) {
       runWithMobileDrawerOpenSync(() => {
@@ -169,7 +173,13 @@ export function DocumentBreadcrumb() {
     } else {
       setPopoverOpen(true);
     }
-  }, [document?.document?.name, isMobile]);
+  }, [document?.document?.name, isMobile, isOffline]);
+
+  React.useEffect(() => {
+    if (!isOffline) return;
+    setPopoverOpen(false);
+    setDrawerOpen(false);
+  }, [isOffline]);
 
   const sharedStyles =
     "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
@@ -196,18 +206,23 @@ export function DocumentBreadcrumb() {
   const titleTrigger = (
     <button
       type="button"
+      disabled={isOffline}
       className={cn(
         sharedStyles,
-        "flex w-full min-w-0 items-center gap-2 pr-2 text-left hover:bg-accent hover:text-accent-foreground",
+        "flex w-full min-w-0 items-center gap-2 pr-2 text-left",
+        !isOffline && "hover:bg-accent hover:text-accent-foreground",
+        isOffline && "cursor-default disabled:opacity-100",
       )}
       title={displayName}
       onClick={openTitleEditor}
     >
       <span className="min-w-0 flex-1 truncate">{displayName}</span>
-      <SquarePen
-        className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        aria-hidden
-      />
+      {!isOffline ? (
+        <SquarePen
+          className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          aria-hidden
+        />
+      ) : null}
     </button>
   );
 
@@ -220,7 +235,10 @@ export function DocumentBreadcrumb() {
               <div className="group relative min-w-0">{titleTrigger}</div>
               <MobileFormDrawer
                 open={drawerOpen}
-                onOpenChange={setDrawerOpen}
+                onOpenChange={(open) => {
+                  if (open && isOffline) return;
+                  setDrawerOpen(open);
+                }}
                 title="Edit title"
                 initialValue={document?.document?.name ?? "Untitled"}
                 onCommit={commitTitle}
@@ -233,6 +251,7 @@ export function DocumentBreadcrumb() {
             <Popover
               open={popoverOpen}
               onOpenChange={(open) => {
+                if (open && isOffline) return;
                 if (open) {
                   closingWithoutCommitRef.current = false;
                   skipCommitOnNextCloseRef.current = false;

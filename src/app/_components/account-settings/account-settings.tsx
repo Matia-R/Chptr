@@ -33,6 +33,7 @@ import {
   type AccountSettingsView,
 } from "~/hooks/use-account-settings";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
@@ -50,6 +51,10 @@ import {
   type AccountSettingsProfile,
 } from "./use-account-settings-form";
 import { useChangePassword } from "./use-change-password";
+import {
+  OfflinePasswordUnavailable,
+  OfflineProfileNotice,
+} from "./offline-notices";
 
 /** Field editors and password open the keyboard; the profile list does not. */
 const KEYBOARD_VIEWS: readonly AccountSettingsView[] = [
@@ -86,8 +91,11 @@ const PROFILE_FORM_ID = "account-settings-profile-form";
 const PASSWORD_FORM_ID = "account-settings-password-form";
 
 /** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
-const DIALOG_SHELL_CLASS =
-  "flex h-[min(85vh,32.1rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-sidebar p-0 shadow-2xl";
+const DIALOG_SHELL_BASE =
+  "flex w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-sidebar p-0 shadow-2xl";
+const DIALOG_SHELL_HEIGHT = "h-[min(85vh,32.1rem)]";
+/** +1% so the extra offline notice line fits without clipping. */
+const DIALOG_SHELL_HEIGHT_OFFLINE = "h-[min(85.85vh,32.421rem)]";
 
 const DIALOG_HEADER_CLASS = "shrink-0 py-5 pl-6 pr-12";
 
@@ -118,10 +126,12 @@ function UnavailableBody() {
 function DialogSection({
   title,
   description,
+  notice,
   children,
 }: {
   title: string;
   description: string;
+  notice?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -131,6 +141,7 @@ function DialogSection({
           {title}
         </h3>
         <p className="text-xs text-muted-foreground">{description}</p>
+        {notice}
       </div>
       {children}
     </section>
@@ -182,6 +193,7 @@ function AccountSettingsDialogBody({
   onSavingChange?: (saving: boolean) => void;
 }) {
   const [section, setSection] = React.useState<DialogSectionId>("profile");
+  const isOffline = useBrowserOffline();
 
   const profileForm = useAccountSettingsForm({ profile });
   const passwordForm = useChangePassword();
@@ -233,6 +245,7 @@ function AccountSettingsDialogBody({
               <DialogSection
                 title="Profile"
                 description="Your photo, name, and the handle used in your public document URLs."
+                notice={isOffline ? <OfflineProfileNotice /> : null}
               >
                 <ProfileFields
                   form={profileForm.form}
@@ -240,6 +253,7 @@ function AccountSettingsDialogBody({
                   avatar={profileForm.avatar}
                   defaultAvatarColor={profile.default_avatar_background_color}
                   isSaving={profileForm.isSaving}
+                  disabled={isOffline}
                   usernameAvailabilityStatus={
                     profileForm.usernameAvailabilityStatus
                   }
@@ -248,46 +262,54 @@ function AccountSettingsDialogBody({
             </form>
           </div>
           <div hidden={section !== "password"}>
-            <DialogSection
-              title="Password"
-              description="Confirm your current password, then choose a new one of at least 8 characters."
-            >
-              <ChangePasswordSection
-                form={passwordForm.form}
-                formId={PASSWORD_FORM_ID}
-                onSubmit={passwordForm.submit}
-                reauthRequired={passwordForm.reauthRequired}
-                successMessage={
-                  passwordForm.saveState === "saved" ? "Password updated" : null
-                }
-              />
-            </DialogSection>
+            {isOffline ? (
+              <OfflinePasswordUnavailable />
+            ) : (
+              <DialogSection
+                title="Password"
+                description="Confirm your current password, then choose a new one of at least 8 characters."
+              >
+                <ChangePasswordSection
+                  form={passwordForm.form}
+                  formId={PASSWORD_FORM_ID}
+                  onSubmit={passwordForm.submit}
+                  reauthRequired={passwordForm.reauthRequired}
+                  successMessage={
+                    passwordForm.saveState === "saved"
+                      ? "Password updated"
+                      : null
+                  }
+                />
+              </DialogSection>
+            )}
           </div>
         </div>
       </div>
 
-      <div className={DIALOG_FOOTER_CLASS}>
-        <Button
-          type="submit"
-          form={active.formId}
-          size="sm"
-          className={cn(
-            "active:scale-[0.98]",
-            // Animate only during save feedback — not when section switches
-            // flip enabled/disabled or the idle label.
-            active.isBusy &&
-              "transition-[transform,background-color,color,opacity] duration-200 ease-out disabled:opacity-100",
-          )}
-          disabled={active.saveDisabled}
-        >
-          <SaveFeedbackLabel
-            state={active.saveState}
-            idleLabel={active.idleLabel}
-            savingLabel={active.savingLabel}
-            savedLabel={active.savedLabel}
-          />
-        </Button>
-      </div>
+      {isOffline && section === "password" ? null : (
+        <div className={DIALOG_FOOTER_CLASS}>
+          <Button
+            type="submit"
+            form={active.formId}
+            size="sm"
+            className={cn(
+              "active:scale-[0.98]",
+              // Animate only during save feedback — not when section switches
+              // flip enabled/disabled or the idle label.
+              active.isBusy &&
+                "transition-[transform,background-color,color,opacity] duration-200 ease-out disabled:opacity-100",
+            )}
+            disabled={isOffline || active.saveDisabled}
+          >
+            <SaveFeedbackLabel
+              state={active.saveState}
+              idleLabel={active.idleLabel}
+              savingLabel={active.savingLabel}
+              savedLabel={active.savedLabel}
+            />
+          </Button>
+        </div>
+      )}
     </>
   );
 }
@@ -301,6 +323,7 @@ function AccountSettingsDialog({
 }) {
   const { data: profile, isLoading } = useUserProfile();
   const [isSaving, setIsSaving] = React.useState(false);
+  const isOffline = useBrowserOffline();
 
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
@@ -320,7 +343,10 @@ function AccountSettingsDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className={DIALOG_SHELL_CLASS}
+        className={cn(
+          DIALOG_SHELL_BASE,
+          isOffline ? DIALOG_SHELL_HEIGHT_OFFLINE : DIALOG_SHELL_HEIGHT,
+        )}
         onEscapeKeyDown={preventDismissWhileSaving}
         onPointerDownOutside={preventDismissWhileSaving}
         onInteractOutside={preventDismissWhileSaving}
@@ -384,6 +410,7 @@ function AccountSettingsDrawerBody({
     useAccountSettingsForm({
       profile,
     });
+  const isOffline = useBrowserOffline();
   const [childSaving, setChildSaving] = React.useState(false);
   const dismissLocked = isSaving || childSaving;
   const { theme, setTheme } = useTheme();
@@ -416,6 +443,7 @@ function AccountSettingsDrawerBody({
     .join(" ");
 
   const handleSignOut = async () => {
+    if (isOffline) return;
     const supabase = createClient();
     await supabase.auth.signOut();
     queryClient.clear();
@@ -454,6 +482,7 @@ function AccountSettingsDrawerBody({
           <MobileActionButtonRow
             icon={LogOut}
             label="Log out"
+            disabled={isOffline}
             onClick={() => {
               void handleSignOut();
             }}
@@ -476,7 +505,7 @@ function AccountSettingsDrawerBody({
         doneLabel={<SaveFeedbackLabel state={saveState} />}
         disabled={isSaving}
         // Save is only for avatar changes on this screen.
-        doneDisabled={saveDisabled || isBusy || !avatar.isDirty}
+        doneDisabled={isOffline || saveDisabled || isBusy || !avatar.isDirty}
         doneClassName={isBusy ? "disabled:opacity-100" : undefined}
         onBack={stage.returnToMainView}
         onDone={() => {
@@ -484,24 +513,27 @@ function AccountSettingsDrawerBody({
         }}
       />
       <div className="flex flex-col gap-6 px-4 pb-8 pt-2">
+        {isOffline ? <OfflineProfileNotice /> : null}
         <AvatarField
           draft={avatar}
           firstName={profile.first_name ?? ""}
           lastName={profile.last_name ?? ""}
           defaultAvatarColor={profile.default_avatar_background_color}
-          disabled={isSaving}
+          disabled={isOffline || isSaving}
         />
         <MobileActionGroup>
           <MobileActionButtonRow
             icon={User}
             label="First name"
             trailing={<RowTrailing value={profile.first_name ?? undefined} />}
+            disabled={isOffline}
             onClick={() => openSubView("first_name")}
           />
           <MobileActionButtonRow
             icon={User}
             label="Last name"
             trailing={<RowTrailing value={profile.last_name ?? undefined} />}
+            disabled={isOffline}
             onClick={() => openSubView("last_name")}
           />
           <MobileActionButtonRow
@@ -512,6 +544,7 @@ function AccountSettingsDrawerBody({
                 value={profile.username ? `@${profile.username}` : undefined}
               />
             }
+            disabled={isOffline}
             onClick={() => openSubView("username")}
           />
         </MobileActionGroup>

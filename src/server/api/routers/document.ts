@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 import type { AuthContext } from "~/server/db";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
@@ -19,6 +20,8 @@ import {
   publishDocument,
   unpublishDocument,
 } from "~/server/db";
+import type { PartykitSupabase } from "~/server/partykit/auth";
+import { connectDocument } from "~/server/partykit/connect-document";
 
 function authFromCtx(ctx: { user: { id: string }; supabase: AuthContext["supabase"] }): AuthContext {
   return { supabase: ctx.supabase, userId: ctx.user.id };
@@ -66,6 +69,28 @@ export const documentRouter = createTRPCRouter({
             return getDocumentsIdsForUser(
                 ctx.user && ctx.supabase ? authFromCtx(ctx as { user: { id: string }; supabase: AuthContext["supabase"] }) : undefined
             );
+        }),
+
+    /**
+     * Snapshot of Y.Doc state for a document the caller can access.
+     * Used to paint the editor before PartyKit sync (sidebar hover prefetch).
+     */
+    getDocumentState: protectedProcedure
+        .input(z.string().uuid())
+        .query(async ({ input, ctx }) => {
+            const result = await connectDocument({
+                supabase: ctx.supabase as unknown as PartykitSupabase,
+                userId: ctx.user.id,
+                documentId: input,
+                isNew: false,
+            });
+            if (!result.ok) {
+                throw new TRPCError({
+                    code: result.status === 403 ? "FORBIDDEN" : "NOT_FOUND",
+                    message: result.error,
+                });
+            }
+            return { state: result.state };
         }),
 
     // =============================================================================
