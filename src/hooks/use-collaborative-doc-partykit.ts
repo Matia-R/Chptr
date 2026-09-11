@@ -36,11 +36,7 @@ interface UseCollaborativeDocPartykitResult {
   retryConnection: () => void;
 }
 
-const PARTYKIT_HOST =
-  process.env.NEXT_PUBLIC_PARTYKIT_HOST ??
-  (process.env.NODE_ENV === "production"
-    ? "chptr-collab.partykit.dev"
-    : "localhost:1999");
+const PARTYKIT_HOST = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
 
 const DOCUMENT_STATE_STALE_MS = 30_000;
 const MAX_RESUME_BACKOFF_MS = 5_000;
