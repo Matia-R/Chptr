@@ -108,14 +108,7 @@ export function DocumentBreadcrumb() {
 
       updateName.mutate({ id: documentId, name: trimmedName });
     },
-    [
-      clearFlag,
-      documentId,
-      isNew,
-      resolvedName,
-      updateName,
-      utils,
-    ],
+    [clearFlag, documentId, isNew, resolvedName, updateName, utils],
   );
 
   const commitTitle = React.useCallback(
@@ -181,8 +174,9 @@ export function DocumentBreadcrumb() {
   }
 
   const isEditingTitle = popoverOpen || drawerOpen;
+  const titleName = isEditingTitle ? editingName : resolvedName;
   const displayName =
-    (isEditingTitle ? editingName : resolvedName) || "Untitled";
+    titleName !== undefined && titleName.length > 0 ? titleName : "Untitled";
 
   const titleTrigger = (
     <button

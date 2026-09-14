@@ -382,8 +382,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                         {
                           "--item-count": documents?.documents?.length ?? 0,
                           "--row-stride": `${DESKTOP_DOC_ROW_STRIDE}px`,
-                          height:
-                            "calc(var(--item-count) * var(--row-stride))",
+                          height: "calc(var(--item-count) * var(--row-stride))",
                         } as React.CSSProperties
                       }
                     >
