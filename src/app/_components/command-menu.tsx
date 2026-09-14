@@ -17,14 +17,19 @@ import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
+import { useDocumentList } from "~/hooks/use-known-document-name";
+import {
+  applyDocumentCreated,
+  broadcastDocumentCreated,
+} from "~/hooks/use-document-meta-sync";
 import { useTheme } from "next-themes";
 import { randomUUID } from "~/lib/utils";
 
 export function CommandMenu() {
   const [search, setSearch] = useState("");
   const router = useRouter();
-  const { data: documents } =
-    api.document.getDocumentIdsForAuthenticatedUser.useQuery();
+  const { data: documents } = useDocumentList();
+  const utils = api.useUtils();
   const isOpen = useCommandMenuStore((state) => state.isOpen);
   const setOpen = useCommandMenuStore((state) => state.setOpen);
   const closeAll = useCommandMenuStore((state) => state.closeAll);
@@ -37,9 +42,11 @@ export function CommandMenu() {
     if (isOffline) return;
     const newId = randomUUID();
     markDocumentAsNew(newId);
+    applyDocumentCreated(utils, newId, "Untitled");
+    broadcastDocumentCreated(newId, "Untitled");
     router.push(`/documents/${newId}`);
     closeAll();
-  }, [router, closeAll, isOffline]);
+  }, [router, closeAll, isOffline, utils]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
