@@ -26,6 +26,12 @@ import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
+import { useDocumentList } from "~/hooks/use-known-document-name";
+import {
+  applyDocumentCreated,
+  broadcastDocumentCreated,
+  useDocumentMetaSync,
+} from "~/hooks/use-document-meta-sync";
 import { cn, randomUUID } from "~/lib/utils";
 
 const MOBILE_UTILITY_SURFACE_CLASSNAME = cn(
@@ -66,11 +72,7 @@ const DESKTOP_DOC_ROW_HEIGHT = 36;
 const DESKTOP_DOC_ROW_GAP = 4;
 const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  initialDocuments: { id: string; name: string }[];
-}
-
-export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const pathname = usePathname();
   const utils = api.useUtils();
@@ -78,6 +80,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   const { isMobile, setOpenMobile } = useSidebar();
   const prefetchDocumentState = usePrefetchDocumentState();
   const isOffline = useBrowserOffline();
+  useDocumentMetaSync();
 
   // State to track scroll position for shadow indicators
   const [showTopShadow, setShowTopShadow] = React.useState(false);
@@ -97,11 +100,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
   );
 
   // Use TRPC query to keep documents in sync
-  const { data: documents } =
-    api.document.getDocumentIdsForAuthenticatedUser.useQuery(undefined, {
-      initialData: { success: true, documents: initialDocuments },
-      refetchOnMount: true,
-    });
+  const { data: documents } = useDocumentList();
 
   // Ensure shadow state is correct on mount and when content changes
   React.useEffect(() => {
@@ -131,19 +130,8 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
 
     // Mark as new for the document page
     markDocumentAsNew(newId);
-
-    // Optimistically add to sidebar list
-    utils.document.getDocumentIdsForAuthenticatedUser.setData(
-      undefined,
-      (old) => {
-        if (!old?.documents) return old;
-        // Add new doc at the beginning of the list
-        return {
-          ...old,
-          documents: [{ id: newId, name: "Untitled" }, ...old.documents],
-        };
-      },
-    );
+    applyDocumentCreated(utils, newId, "Untitled");
+    broadcastDocumentCreated(newId, "Untitled");
 
     dismissMobileNav();
     router.push(`/documents/${newId}`);
@@ -394,8 +382,7 @@ export function AppSidebar({ initialDocuments, ...props }: AppSidebarProps) {
                         {
                           "--item-count": documents?.documents?.length ?? 0,
                           "--row-stride": `${DESKTOP_DOC_ROW_STRIDE}px`,
-                          height:
-                            "calc(var(--item-count) * var(--row-stride))",
+                          height: "calc(var(--item-count) * var(--row-stride))",
                         } as React.CSSProperties
                       }
                     >
