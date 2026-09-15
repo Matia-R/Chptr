@@ -29,6 +29,18 @@ import {
   broadcastDocumentName,
 } from "~/hooks/use-document-meta-sync";
 
+function getCachedDocumentName(
+  utils: ReturnType<typeof api.useUtils>,
+  documentId: string,
+) {
+  return (
+    utils.document.getDocumentById.getData(documentId)?.document?.name ??
+    utils.document.getDocumentIdsForAuthenticatedUser
+      .getData()
+      ?.documents?.find((doc) => doc.id === documentId)?.name
+  );
+}
+
 export function DocumentBreadcrumb() {
   const documentId = useRouteDocumentId() ?? "";
   const { isNew, clearFlag } = useNewDocumentFlag();
@@ -50,16 +62,27 @@ export function DocumentBreadcrumb() {
   const resolvedName =
     fetchedName ?? knownName ?? (isNew ? "Untitled" : undefined);
 
-  const previousNameRef = React.useRef<string>("Untitled");
   const closingWithoutCommitRef = React.useRef(false);
   /** Enter already ran commitTitle; skip duplicate if onOpenChange(false) follows. */
   const skipCommitOnNextCloseRef = React.useRef(false);
 
   const updateName = api.document.updateDocumentName.useMutation({
-    onError: (err) => {
-      setEditingName(previousNameRef.current);
-      applyDocumentName(utils, documentId, previousNameRef.current);
-      broadcastDocumentName(documentId, previousNameRef.current);
+    onMutate: ({ id, name }) => {
+      const previousName =
+        getCachedDocumentName(utils, id) ?? resolvedName ?? "Untitled";
+      applyDocumentName(utils, id, name);
+      broadcastDocumentName(id, name);
+      return { previousName, optimisticName: name };
+    },
+    onError: (err, { id }, context) => {
+      if (
+        context &&
+        getCachedDocumentName(utils, id) === context.optimisticName
+      ) {
+        setEditingName(context.previousName);
+        applyDocumentName(utils, id, context.previousName);
+        broadcastDocumentName(id, context.previousName);
+      }
 
       toast({
         variant: "destructive",
@@ -68,9 +91,19 @@ export function DocumentBreadcrumb() {
           err instanceof Error ? err.message : "An unexpected error occurred",
       });
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id }, context) => {
+      const cachedName = getCachedDocumentName(utils, id);
+      if (
+        context &&
+        cachedName !== undefined &&
+        cachedName !== context.optimisticName &&
+        cachedName !== context.previousName
+      ) {
+        return;
+      }
+
       void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
-      void utils.document.getDocumentById.invalidate(documentId);
+      void utils.document.getDocumentById.invalidate(id);
     },
   });
 
@@ -96,19 +129,14 @@ export function DocumentBreadcrumb() {
 
   const persistName = React.useCallback(
     (trimmedName: string) => {
-      previousNameRef.current = resolvedName ?? "Untitled";
-
       if (isNew) {
         clearFlag();
       }
 
       setEditingName(trimmedName);
-      applyDocumentName(utils, documentId, trimmedName);
-      broadcastDocumentName(documentId, trimmedName);
-
       updateName.mutate({ id: documentId, name: trimmedName });
     },
-    [clearFlag, documentId, isNew, resolvedName, updateName, utils],
+    [clearFlag, documentId, isNew, updateName],
   );
 
   const commitTitle = React.useCallback(
