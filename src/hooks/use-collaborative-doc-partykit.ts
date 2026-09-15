@@ -452,11 +452,6 @@ export function useCollaborativeDocPartykit({
         } = supabase.auth.onAuthStateChange((event, nextSession) => {
           if (cancelled || closedForAuth) return;
 
-          if (event === "SIGNED_OUT") {
-            failFatal(loginRequired());
-            return;
-          }
-
           if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
             tokenRef.current = nextSession.access_token;
             // Do not reconnect here. resumeWithFreshToken used to call
