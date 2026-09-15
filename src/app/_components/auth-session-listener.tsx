@@ -15,7 +15,10 @@ export function AuthSessionListener() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -23,8 +26,8 @@ export function AuthSessionListener() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
-      if (!isProtectedRoute(pathnameRef.current)) return;
       queryClient.clear();
+      if (!isProtectedRoute(pathnameRef.current)) return;
       router.replace("/login");
     });
 
