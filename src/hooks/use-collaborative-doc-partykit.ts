@@ -265,15 +265,13 @@ export function useCollaborativeDocPartykit({
           await wait(Math.min(100 * 2 ** attempt, MAX_RESUME_BACKOFF_MS));
         }
 
-        if (!accessToken) {
-          throw loginRequired();
-        }
-
         if (cancelled) return;
 
+        // Retry exhaustion is a dropped connection, not a sign-out. Continue
+        // setup so online / visibility / session / retry can recover later.
         const ydoc = new Y.Doc();
         useCollaborativeDocStore.getState().setYdoc(ydoc);
-        const tokenRef = { current: accessToken };
+        const tokenRef = { current: accessToken ?? "" };
         let closedForAuth = false;
         let paintedFromPrefetch = false;
         let resumeInFlight = false;
@@ -300,7 +298,7 @@ export function useCollaborativeDocPartykit({
           documentId,
           ydoc,
           {
-            connect: true,
+            connect: Boolean(accessToken),
             params: () => ({
               token: tokenRef.current,
               isNew: isNew ? "true" : "false",
@@ -385,11 +383,10 @@ export function useCollaborativeDocPartykit({
 
             sessionRecoverAttempts += 1;
             consecutiveFailures += 1;
-            if (
-              sessionRecoverAttempts >= SESSION_RECOVER_MAX_ATTEMPTS &&
-              !isBrowserOffline()
-            ) {
-              failFatal(loginRequired());
+            if (sessionRecoverAttempts >= SESSION_RECOVER_MAX_ATTEMPTS) {
+              // Pause this burst. Online / visibility / session / retry
+              // reset the counter and try again. Do not failFatal — empty
+              // JWT after sleep is not logout.
               return;
             }
             scheduleResume();
@@ -410,6 +407,12 @@ export function useCollaborativeDocPartykit({
           sessionRecoverAttempts = 0;
           void resumeWithFreshToken({ immediate: true });
         };
+
+        if (!accessToken) {
+          setConnection("disconnected");
+          provider.shouldConnect = false;
+          scheduleResume();
+        }
 
         let publishWatchReady = false;
         let sessionBaselineHash: string | null = null;
