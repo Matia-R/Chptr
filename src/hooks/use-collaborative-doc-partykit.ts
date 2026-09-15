@@ -273,6 +273,7 @@ export function useCollaborativeDocPartykit({
         useCollaborativeDocStore.getState().setYdoc(ydoc);
         const tokenRef = { current: accessToken ?? "" };
         let closedForAuth = false;
+        let signedOutCheck = false;
         let paintedFromPrefetch = false;
         let resumeInFlight = false;
         let consecutiveFailures = 0;
@@ -342,7 +343,9 @@ export function useCollaborativeDocPartykit({
         const resumeWithFreshToken = async (options?: {
           immediate?: boolean;
         }) => {
-          if (resumeInFlight || cancelled || closedForAuth) return;
+          if (resumeInFlight || cancelled || closedForAuth || signedOutCheck) {
+            return;
+          }
           if (isBrowserOffline()) {
             setConnection("disconnected");
             provider.shouldConnect = false;
@@ -484,6 +487,14 @@ export function useCollaborativeDocPartykit({
             return;
           }
 
+          if (signedOutCheck) {
+            consecutiveFailures += 1;
+            setConnection("disconnected");
+            setIsSynced(false);
+            provider.shouldConnect = false;
+            return;
+          }
+
           // 4001 is an expired/stale JWT on reconnect, not a sign-out.
           // 4005 is PartyKit failing to reach the app (sleep, restart, blip).
           // Transport closes (1001/1006) are the laptop-lid / network drop.
@@ -501,27 +512,37 @@ export function useCollaborativeDocPartykit({
           if (cancelled || closedForAuth) return;
 
           if (event === "SIGNED_OUT") {
-            // Auto-refresh can emit SIGNED_OUT while the laptop is waking.
-            // Keep the editor and try to recover; login only if refresh is
-            // actually dead. A live socket is left up — tearing it down made
-            // a false SIGNED_OUT look like a kick-out.
-            if (socketIsOpen(provider)) {
-              void ensureLiveAccessToken(supabase).then((result) => {
+            // Drop the authenticated socket immediately so this tab cannot
+            // keep writing after another tab signed out. Reconnect only if
+            // a fresh refresh proves the session is still alive (false
+            // SIGNED_OUT on laptop wake).
+            signedOutCheck = true;
+            setConnection("disconnected");
+            setIsSynced(false);
+            provider.shouldConnect = false;
+            try {
+              provider.ws?.close();
+            } catch {
+              // Socket may already be closing.
+            }
+            void ensureLiveAccessToken(supabase, { allowCached: false }).then(
+              (result) => {
                 if (cancelled || closedForAuth) return;
                 if (result.status === "ok") {
+                  signedOutCheck = false;
                   tokenRef.current = result.accessToken;
                   sessionRecoverAttempts = 0;
+                  provider.connect();
                   return;
                 }
                 if (result.status === "fatal") {
                   failFatal(loginRequired());
+                  return;
                 }
-              });
-              return;
-            }
-            setConnection("disconnected");
-            provider.shouldConnect = false;
-            void resumeWithFreshToken({ immediate: true });
+                signedOutCheck = false;
+                void resumeWithFreshToken({ immediate: true });
+              },
+            );
             return;
           }
 
@@ -551,7 +572,7 @@ export function useCollaborativeDocPartykit({
         };
 
         const onVisible = () => {
-          if (cancelled || closedForAuth) return;
+          if (cancelled || closedForAuth || signedOutCheck) return;
           if (
             typeof document !== "undefined" &&
             document.visibilityState === "hidden"
@@ -568,7 +589,7 @@ export function useCollaborativeDocPartykit({
         };
 
         const onOnline = () => {
-          if (cancelled || closedForAuth) return;
+          if (cancelled || closedForAuth || signedOutCheck) return;
           if (isBrowserOffline()) return;
           consecutiveFailures = 0;
           sessionRecoverAttempts = 0;

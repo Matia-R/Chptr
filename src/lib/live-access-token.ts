@@ -11,6 +11,7 @@ const FATAL_REFRESH_CODES = new Set([
   "refresh_token_not_found",
   "invalid_grant",
   "session_not_found",
+  "session_expired",
   "user_banned",
   "user_not_found",
 ]);
@@ -56,11 +57,12 @@ export function isFatalAuthRefreshError(error: unknown): boolean {
   ) {
     return false;
   }
+  if (error.name === "AuthSessionMissingError") return true;
   if (FATAL_REFRESH_CODES.has(code)) return true;
 
   return (
     (error.status === 400 || error.status === 401) &&
-    /refresh.?token|invalid.?grant/i.test(error.message)
+    /refresh.?token|invalid.?grant|session missing/i.test(error.message)
   );
 }
 
@@ -76,9 +78,13 @@ function tokenFromSession(session: Session | null): string | null {
  *
  * Reads the cached session first. Calls `refreshSession` only when the access
  * token is missing or near expiry — never from a TOKEN_REFRESHED handler.
+ *
+ * Pass `{ allowCached: false }` after SIGNED_OUT so a leftover access token
+ * cannot keep the PartyKit socket authenticated for a signed-out user.
  */
 export async function ensureLiveAccessToken(
   supabase: AuthSessionClient,
+  options?: { allowCached?: boolean },
 ): Promise<LiveAccessTokenResult> {
   const {
     data: { session },
@@ -90,7 +96,11 @@ export async function ensureLiveAccessToken(
   }
 
   const cached = tokenFromSession(session);
-  if (cached && !accessTokenNeedsRefresh(cached)) {
+  if (
+    options?.allowCached !== false &&
+    cached &&
+    !accessTokenNeedsRefresh(cached)
+  ) {
     return { status: "ok", accessToken: cached };
   }
 
@@ -100,6 +110,9 @@ export async function ensureLiveAccessToken(
     return { status: "ok", accessToken: refreshed };
   }
   if (isFatalAuthRefreshError(error)) {
+    return { status: "fatal" };
+  }
+  if (!session && !data.session && !error) {
     return { status: "fatal" };
   }
   return { status: "retry" };
