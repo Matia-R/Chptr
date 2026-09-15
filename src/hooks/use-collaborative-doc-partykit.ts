@@ -14,6 +14,7 @@ import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
+import { ensureLiveAccessToken } from "~/lib/live-access-token";
 import {
   getYjsContentHash,
   getYjsPublishedContentHash,
@@ -44,6 +45,8 @@ const MAX_RESUME_BACKOFF_MS = 5_000;
 const RECONNECT_UI_GRACE_MS = 2_000;
 /** Let BlockNote finish binding before treating Yjs updates as publish-dirty. */
 const YJS_PUBLISH_WATCH_DELAY_MS = 150;
+/** Empty/expired JWT after sleep is not logout — retry refresh this many times. */
+const SESSION_RECOVER_MAX_ATTEMPTS = 8;
 
 function loginRequired() {
   return new DocumentAccessError(
@@ -192,8 +195,7 @@ export function useCollaborativeDocPartykit({
       return;
     }
 
-    const down =
-      connection === "disconnected" || (everConnected && !recovered);
+    const down = connection === "disconnected" || (everConnected && !recovered);
     if (!down) {
       return;
     }
@@ -245,19 +247,25 @@ export function useCollaborativeDocPartykit({
     const setup = async () => {
       try {
         const supabase = createClient();
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          throw new DocumentAccessError(
-            "INTERNAL_SERVER_ERROR",
-            `Failed to get session: ${sessionError.message}`,
-          );
+        let accessToken: string | null = null;
+        for (
+          let attempt = 0;
+          attempt < SESSION_RECOVER_MAX_ATTEMPTS;
+          attempt++
+        ) {
+          if (cancelled) return;
+          const result = await ensureLiveAccessToken(supabase);
+          if (result.status === "ok") {
+            accessToken = result.accessToken;
+            break;
+          }
+          if (result.status === "fatal") {
+            throw loginRequired();
+          }
+          await wait(Math.min(100 * 2 ** attempt, MAX_RESUME_BACKOFF_MS));
         }
 
-        if (!session?.access_token) {
+        if (!accessToken) {
           throw loginRequired();
         }
 
@@ -265,11 +273,13 @@ export function useCollaborativeDocPartykit({
 
         const ydoc = new Y.Doc();
         useCollaborativeDocStore.getState().setYdoc(ydoc);
-        const tokenRef = { current: session.access_token };
+        const tokenRef = { current: accessToken };
         let closedForAuth = false;
         let paintedFromPrefetch = false;
         let resumeInFlight = false;
         let consecutiveFailures = 0;
+        let sessionRecoverAttempts = 0;
+        let resumeTimer: number | null = null;
 
         const markReady = () => {
           if (closedForAuth || cancelled) return;
@@ -300,6 +310,10 @@ export function useCollaborativeDocPartykit({
 
         const failFatal = (accessError: DocumentAccessError) => {
           closedForAuth = true;
+          if (resumeTimer != null) {
+            window.clearTimeout(resumeTimer);
+            resumeTimer = null;
+          }
           stopReconnect(provider);
           setError(accessError);
           setIsLoading(false);
@@ -311,6 +325,21 @@ export function useCollaborativeDocPartykit({
         // runs again with a refreshed token.
         const isBrowserOffline = () =>
           typeof navigator !== "undefined" && navigator.onLine === false;
+
+        const scheduleResume = () => {
+          if (resumeTimer != null) {
+            window.clearTimeout(resumeTimer);
+          }
+          const delay = Math.min(
+            100 * 2 ** Math.max(consecutiveFailures - 1, 0),
+            MAX_RESUME_BACKOFF_MS,
+          );
+          resumeTimer = window.setTimeout(() => {
+            resumeTimer = null;
+            if (cancelled || closedForAuth) return;
+            void resumeWithFreshToken();
+          }, delay);
+        };
 
         const resumeWithFreshToken = async (options?: {
           immediate?: boolean;
@@ -333,27 +362,42 @@ export function useCollaborativeDocPartykit({
               if (cancelled || closedForAuth) return;
             }
 
-            const {
-              data: { session: currentSession },
-            } = await supabase.auth.getSession();
+            // Refresh only here — never from TOKEN_REFRESHED — so auto-refresh
+            // and this path cannot loop refreshSession into 429s.
+            const result = await ensureLiveAccessToken(supabase);
+            if (cancelled || closedForAuth) return;
 
-            if (!currentSession?.access_token) {
+            if (result.status === "ok") {
+              consecutiveFailures = 0;
+              sessionRecoverAttempts = 0;
+              tokenRef.current = result.accessToken;
+              provider.connect();
+              return;
+            }
+
+            setConnection("disconnected");
+            provider.shouldConnect = false;
+
+            if (result.status === "fatal") {
               failFatal(loginRequired());
               return;
             }
 
-            tokenRef.current = currentSession.access_token;
-            if (cancelled || closedForAuth) return;
-            provider.connect();
+            sessionRecoverAttempts += 1;
+            consecutiveFailures += 1;
+            if (
+              sessionRecoverAttempts >= SESSION_RECOVER_MAX_ATTEMPTS &&
+              !isBrowserOffline()
+            ) {
+              failFatal(loginRequired());
+              return;
+            }
+            scheduleResume();
           } catch (err) {
             console.error("[PartyKit] Failed to resume connection:", err);
             consecutiveFailures += 1;
-            if (!cancelled && !closedForAuth && tokenRef.current) {
-              try {
-                provider.connect();
-              } catch {
-                // Next visibility/online/retry will try again.
-              }
+            if (!cancelled && !closedForAuth) {
+              scheduleResume();
             }
           } finally {
             resumeInFlight = false;
@@ -363,6 +407,7 @@ export function useCollaborativeDocPartykit({
         retryConnectionRef.current = () => {
           if (closedForAuth || cancelled) return;
           consecutiveFailures = 0;
+          sessionRecoverAttempts = 0;
           void resumeWithFreshToken({ immediate: true });
         };
 
@@ -453,15 +498,41 @@ export function useCollaborativeDocPartykit({
           if (cancelled || closedForAuth) return;
 
           if (event === "SIGNED_OUT") {
-            failFatal(loginRequired());
+            // Auto-refresh can emit SIGNED_OUT while the laptop is waking.
+            // Keep the editor and try to recover; login only if refresh is
+            // actually dead. A live socket is left up — tearing it down made
+            // a false SIGNED_OUT look like a kick-out.
+            if (socketIsOpen(provider)) {
+              void ensureLiveAccessToken(supabase).then((result) => {
+                if (cancelled || closedForAuth) return;
+                if (result.status === "ok") {
+                  tokenRef.current = result.accessToken;
+                  sessionRecoverAttempts = 0;
+                  return;
+                }
+                if (result.status === "fatal") {
+                  failFatal(loginRequired());
+                }
+              });
+              return;
+            }
+            setConnection("disconnected");
+            provider.shouldConnect = false;
+            void resumeWithFreshToken({ immediate: true });
             return;
           }
 
-          if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
+          if (
+            (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") &&
+            nextSession?.access_token
+          ) {
             tokenRef.current = nextSession.access_token;
-            // Do not reconnect here. resumeWithFreshToken used to call
-            // refreshSession(), which re-emitted TOKEN_REFRESHED while the
-            // socket was down and looped until Supabase returned 429.
+            sessionRecoverAttempts = 0;
+            // Consume the new JWT only. Do not refreshSession here — that
+            // re-emitted TOKEN_REFRESHED while the socket was down and 429'd.
+            if (!socketIsOpen(provider)) {
+              provider.connect();
+            }
           }
         });
 
@@ -489,6 +560,7 @@ export function useCollaborativeDocPartykit({
           // y-partykit's idle timer so a frozen tab does not look dead.
           if (markSocketAlive(provider)) return;
           consecutiveFailures = 0;
+          sessionRecoverAttempts = 0;
           void resumeWithFreshToken({ immediate: true });
         };
 
@@ -496,6 +568,7 @@ export function useCollaborativeDocPartykit({
           if (cancelled || closedForAuth) return;
           if (isBrowserOffline()) return;
           consecutiveFailures = 0;
+          sessionRecoverAttempts = 0;
           if (markSocketAlive(provider)) return;
           void resumeWithFreshToken({ immediate: true });
         };
@@ -524,6 +597,12 @@ export function useCollaborativeDocPartykit({
               if (cancelled || closedForAuth) return;
               const accessError = accessErrorFromTrpc(err);
               if (!accessError) return;
+              // Prefetch 401 is a stale HTTP cookie, not "you cannot use this
+              // doc". PartyKit connect / resume will refresh the JWT.
+              if (accessError.code === "UNAUTHORIZED") {
+                void resumeWithFreshToken({ immediate: true });
+                return;
+              }
               failFatal(accessError);
             });
         }
@@ -532,6 +611,10 @@ export function useCollaborativeDocPartykit({
           cancelled = true;
           initializedRef.current = false;
           retryConnectionRef.current = null;
+          if (resumeTimer != null) {
+            window.clearTimeout(resumeTimer);
+            resumeTimer = null;
+          }
           if (publishWatchTimer != null) {
             window.clearTimeout(publishWatchTimer);
           }
