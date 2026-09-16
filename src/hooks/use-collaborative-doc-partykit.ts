@@ -390,6 +390,9 @@ export function useCollaborativeDocPartykit({
 
         provider.on("sync", (synced: boolean) => {
           setIsSynced(synced);
+          if (synced) {
+            consecutiveFailures = 0;
+          }
           if (synced && !closedForAuth && !isNew) {
             markReady();
           }
@@ -408,7 +411,10 @@ export function useCollaborativeDocPartykit({
             if (closedForAuth || cancelled) return;
             setConnection(status);
             if (status === "connected") {
-              consecutiveFailures = 0;
+              // Do not reset consecutiveFailures here. y-partykit fires
+              // "connected" on WebSocket upgrade, before PartyKit has
+              // finished /api/partykit/connect. A 4005 close after that
+              // would otherwise look like the first failure forever.
               setEverConnected(true);
               useCollaborativeDocStore.getState().setPersisted(true);
             }
