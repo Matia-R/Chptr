@@ -15,7 +15,6 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 - [UX Optimizations](#ux-optimizations)
 - [Caveats and Limitations](#caveats-and-limitations)
 - [Future Considerations: Multi-User Collaboration](#future-considerations-multi-user-collaboration)
-- [Data Migration](#data-migration)
 
 ---
 
@@ -23,26 +22,14 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 
 ### Why PartyKit?
 
-The previous architecture used `y-webrtc` for peer-to-peer sync between clients. This had several limitations:
-
-| Problem                   | Impact                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| **Mesh topology**         | N clients = N×(N-1)/2 connections. 5 users × 3 tabs = 105 WebRTC connections |
-| **Firewall failures**     | WebRTC P2P fails through corporate/strict firewalls with no fallback         |
-| **Redundant persistence** | Every client independently saves to database (N clients = N save streams)    |
-| **Complex compaction**    | Append-only log + snapshots + background compaction logic                    |
-| **Public signaling**      | Relied on public STUN/TURN servers for connection establishment              |
-
-### PartyKit Solution
-
-PartyKit provides a **server-mediated WebSocket architecture** running on Cloudflare's edge network:
+Real-time collaboration uses PartyKit for a **server-mediated WebSocket** architecture on Cloudflare's edge:
 
 | Benefit                    | Description                                            |
 | -------------------------- | ------------------------------------------------------ |
 | **Star topology**          | N clients = N connections (to central server)          |
 | **Universal connectivity** | WebSocket works through all firewalls                  |
 | **Single writer**          | Only PartyKit server persists to database              |
-| **Simple schema**          | One table, full state, no compaction                   |
+| **Simple schema**          | One table, full Y.Doc state per document               |
 | **Free tier**              | Cloudflare Workers free tier covers small-medium usage |
 
 ---
@@ -274,15 +261,7 @@ CREATE POLICY "Users can write document_state if they have write permission"
     );
 ```
 
-### Schema Comparison
-
-| Aspect           | Old (y-webrtc)                            | New (PartyKit)   |
-| ---------------- | ----------------------------------------- | ---------------- |
-| **Tables**       | `document_changes` + `document_snapshots` | `document_state` |
-| **Rows per doc** | Many (1 per change) + 1 snapshot          | 1                |
-| **Compaction**   | Required (when changes > 100)             | Not needed       |
-| **Storage**      | Incremental updates                       | Full state       |
-| **Complexity**   | High (compaction logic)                   | Low              |
+Each document has one `document_state` row storing the full Y.Doc (`Y.encodeStateAsUpdate`). PartyKit is the only writer; saves also bump `documents.last_updated`.
 
 ---
 
@@ -516,7 +495,7 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 
 ## Publish UI and New-Document Persistence
 
-The publish button lives in the app header (layout), not in the document page. The PartyKit Y.Doc is created in `useCollaborativeDocPartykit` on the page. Those two trees share state through `useCollaborativeDocStore` so the header can follow the live CRDT without owning the socket.
+The publish button lives in the app header (layout), not in the document page. The Y.Doc is created in `useCollaborativeDoc` on the page. Those two trees share state through `useCollaborativeDocStore` so the header can follow the live document without owning the socket.
 
 ### Why this exists
 
@@ -640,7 +619,7 @@ documents/layout.tsx
     DocumentActions        ──► same
 
 documents/[documentId]/page.tsx
-  useCollaborativeDocPartykit()
+  useCollaborativeDoc()
     bindDocument / setYdoc / setPersisted
     ydoc.on("update") → setYjsPublishState
 ```
@@ -653,7 +632,7 @@ The header is a **sibling** of the page and stays mounted across `/documents/{id
 
 | File                                                    | Role                                                            |
 | ------------------------------------------------------- | --------------------------------------------------------------- |
-| `src/hooks/use-collaborative-doc-partykit.ts`           | Bind store, persist on `connected`, observe Yjs for dirty       |
+| `src/hooks/use-collaborative-doc.ts`                    | Bind store, persist on `connected`, observe Yjs for dirty       |
 | `src/app/_components/editor/collaborative-doc-store.ts` | Cross-tree session (header ↔ page)                             |
 | `src/lib/yjs-publish-state.ts`                          | Hash + read/write `chptr-publish` map                           |
 | `src/hooks/use-document-publish.tsx`                    | Label, mutations, write hash after publish                      |
@@ -992,60 +971,6 @@ Future: Notify users when:
 
 ---
 
-## Data Migration
-
-### Migrating from Old Schema
-
-A migration script is provided to convert existing documents from the old `document_changes` + `document_snapshots` schema to the new `document_state` schema.
-
-**Location:** `scripts/migrate-to-partykit.ts`
-
-**What it does:**
-
-1. Scans for all documents with data in the old tables
-2. For each document:
-   - Loads the snapshot (if exists)
-   - Loads all changes after the snapshot cutoff (the "tail")
-   - Reconstructs the full Y.Doc by applying snapshot + tail
-   - Encodes the full state and inserts into `document_state`
-3. Provides detailed progress and error reporting
-
-**Usage:**
-
-```bash
-# First, do a dry run to see what would be migrated
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --dry-run
-
-# Run the actual migration
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts
-
-# Migrate a specific document
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --document-id=<uuid>
-```
-
-**Requirements:**
-
-- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (from Supabase Dashboard → Settings → API)
-
-**Notes:**
-
-- The script uses the service role key to bypass RLS and access all documents
-- Already-migrated documents are skipped (safe to re-run)
-- Old tables are not modified - you can run both systems side-by-side
-- The script processes documents in batches of 50 for efficiency
-
-### Rollback Procedure
-
-To revert to y-webrtc:
-
-1. Restore old hook import in `page.tsx`
-2. Restore `WebrtcProvider` type in `editor.tsx`
-3. Keep `document_state` table (no harm)
-4. Old `document_changes` and `document_snapshots` tables still exist
-
----
-
 ## Summary
 
 | Aspect               | Implementation                                                                               |
@@ -1062,4 +987,4 @@ To revert to y-webrtc:
 | **Offline**          | Limited (local Y.Doc only, no IndexedDB)                                                     |
 | **Cost**             | Free tier for small usage                                                                    |
 
-This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same CRDT.
+This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same document.

@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "~/app/_components/alert";
 import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skeleton";
 import { MotionFade } from "~/app/_components/motion-fade";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
-import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
+import { useCollaborativeDoc } from "~/hooks/use-collaborative-doc";
 import { useReportDocumentUnavailable } from "~/hooks/use-document-unavailable";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
@@ -98,7 +98,7 @@ export default function DocumentPage() {
   // Fetch user profile (non-blocking: editor shows with placeholder until loaded)
   const { data: userProfile } = useUserProfile();
 
-  // PartyKit-based collaborative doc - handles fetching and saving on server
+  // Collaborative doc — PartyKit handles sync; server persists Y.Doc state
   const {
     ydoc,
     provider,
@@ -107,7 +107,7 @@ export default function DocumentPage() {
     error: documentError,
     isReconnecting,
     isOffline,
-  } = useCollaborativeDocPartykit({
+  } = useCollaborativeDoc({
     documentId,
     isNew,
   });

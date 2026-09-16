@@ -18,12 +18,12 @@ import {
   getYjsPublishedContentHash,
 } from "~/lib/yjs-publish-state";
 
-interface UseCollaborativeDocPartykitOptions {
+interface UseCollaborativeDocOptions {
   documentId: string;
   isNew?: boolean;
 }
 
-interface UseCollaborativeDocPartykitResult {
+interface UseCollaborativeDocResult {
   ydoc: Y.Doc | null;
   provider: YPartyKitProvider | null;
   isReady: boolean;
@@ -129,10 +129,10 @@ function markSocketAlive(provider: YPartyKitProvider) {
   return true;
 }
 
-export function useCollaborativeDocPartykit({
+export function useCollaborativeDoc({
   documentId,
   isNew = false,
-}: UseCollaborativeDocPartykitOptions): UseCollaborativeDocPartykitResult {
+}: UseCollaborativeDocOptions): UseCollaborativeDocResult {
   const utils = api.useUtils();
   const [state, setState] = useState<{
     ydoc: Y.Doc;

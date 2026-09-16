@@ -48,6 +48,5 @@ UPDATE USING (
     )
 );
 
--- Optional: Drop old tables if migrating (uncomment when ready)
--- DROP TABLE IF EXISTS document_changes;
--- DROP TABLE IF EXISTS document_snapshots;
+-- Legacy document_changes / document_snapshots are dropped in
+-- drop_document_changes_and_snapshots.sql after migration to document_state.

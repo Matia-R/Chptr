@@ -3,18 +3,12 @@ import { TRPCError } from "@trpc/server";
 
 import type { AuthContext } from "~/server/db";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
-import { COMPACTION_TAIL_THRESHOLD } from "~/server/document-compaction";
 import {
   createDocument,
   getDocumentById,
   getLastUpdatedTimestamp,
   getDocumentIdsForUser as getDocumentsIdsForUser,
   updateDocumentName,
-  saveDocumentChange,
-  saveDocumentChanges,
-  getDocumentChanges,
-  getDocumentTailCount,
-  compactDocument,
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,
@@ -91,68 +85,6 @@ export const documentRouter = createTRPCRouter({
                 });
             }
             return { state: result.state };
-        }),
-
-    // =============================================================================
-    // CRDT-based document changes (new approach)
-    // =============================================================================
-
-    /**
-     * Save a single Yjs update to the changes table.
-     * Duplicates are ignored via unique constraint.
-     */
-    saveDocumentChange: protectedProcedure
-        .input(z.object({
-            documentId: z.string(),
-            clientId: z.string(),
-            clock: z.number(),
-            updateData: z.string(), // base64 encoded Yjs update
-        }))
-        .mutation(async ({ input, ctx }) => {
-            return saveDocumentChange(
-                input.documentId,
-                input.clientId,
-                input.clock,
-                input.updateData,
-                authFromCtx(ctx)
-            );
-        }),
-
-    /**
-     * Batch save multiple Yjs updates at once.
-     * More efficient for saving multiple changes.
-     */
-    saveDocumentChanges: protectedProcedure
-        .input(z.object({
-            documentId: z.string(),
-            changes: z.array(z.object({
-                clientId: z.string(),
-                clock: z.number(),
-                updateData: z.string(),
-            })),
-        }))
-        .mutation(async ({ input, ctx }) => {
-            const auth = authFromCtx(ctx);
-            const result = await saveDocumentChanges(input.documentId, input.changes, auth);
-            try {
-                const tailCount = await getDocumentTailCount(input.documentId, auth);
-                if (tailCount >= COMPACTION_TAIL_THRESHOLD) {
-                    await compactDocument(input.documentId, auth);
-                }
-            } catch (err) {
-                console.error("[saveDocumentChanges] Compaction failed (best-effort):", err);
-            }
-            return result;
-        }),
-
-    /**
-     * Get all changes for a document to rebuild CRDT state.
-     * Returns changes in order so they can be applied sequentially.
-     */
-    getDocumentChanges: protectedProcedure
-        .input(z.string())
-        .query(async ({ input, ctx }) => {
-            return getDocumentChanges(input, authFromCtx(ctx));
         }),
 
     getPublicationByDocumentId: protectedProcedure

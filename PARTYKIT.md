@@ -4,11 +4,11 @@ This document describes the PartyKit integration for real-time collaborative edi
 
 ## Overview
 
-PartyKit replaces the previous y-webrtc peer-to-peer sync with a server-mediated WebSocket architecture. This provides:
+Document sync uses a server-mediated WebSocket architecture on PartyKit (Cloudflare Workers):
 
-- **Reliable sync**: No more WebRTC connection failures through firewalls
-- **Single persistence point**: Only the PartyKit server writes to the database (no more duplicate saves from multiple clients)
-- **Better scalability**: Server handles coordination instead of mesh connections between clients
+- **Reliable sync**: WebSocket works through firewalls where peer-to-peer often fails
+- **Single persistence point**: Only the PartyKit server writes to the database
+- **Star topology**: Clients connect to the room server instead of meshing with each other
 - **Authorization on every connection**: Each WebSocket is checked against `document_permissions` before it can join the room
 
 ## Architecture
@@ -142,7 +142,7 @@ Note: For `env` commands, `npx partykit` is fine since it doesn't need to bundle
 
 ## Database Schema
 
-The PartyKit integration uses a simplified single-table schema:
+Collaborative documents use a single-table schema:
 
 ```sql
 CREATE TABLE document_state (
@@ -154,7 +154,7 @@ CREATE TABLE document_state (
 
 **To set up:** Run the migrations in `migrations/partykit_document_state.sql` and `migrations/document_exists_rpc.sql`.
 
-This replaces the old `document_changes` + `document_snapshots` tables with a single table. No more compaction needed since we always store the full state.
+Each save stores the full Y.Doc state (no change-log compaction). Saves also bump `documents.last_updated`.
 
 `document_exists(uuid)` is a `SECURITY DEFINER` RPC used by connect to distinguish missing documents from documents the caller cannot access.
 
@@ -164,7 +164,7 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `partykit.json`                                         | PartyKit configuration                                                                            |
 | `party/document.ts`                                     | PartyKit server (per-connection connect, Y.Doc, save token pool)                                  |
-| `src/hooks/use-collaborative-doc-partykit.ts`           | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
+| `src/hooks/use-collaborative-doc.ts`                    | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
 | `src/hooks/use-prefetch-document-state.ts`              | Sidebar/command-menu hover prefetch                                                               |
 | `src/hooks/use-document-publish.tsx`                    | Header publish button: queries gated on persist, Yjs hash after publish                           |
 | `src/hooks/use-new-document-flag.ts`                    | In-memory `isNew` for instant create (not a DB-exists signal)                                     |
@@ -184,7 +184,7 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 ### Client Connection
 
 1. Client gets Supabase session (`access_token`)
-2. `useCollaborativeDocPartykit` creates a Y.Doc and `YPartyKitProvider`
+2. `useCollaborativeDoc` creates a Y.Doc and `YPartyKitProvider`
 3. **New documents:** the editor is ready immediately (does not wait for PartyKit `sync`). Connect/create run in the background
 4. **Existing documents:** if `getDocumentState` is already cached (sidebar hover) or returns first, apply the snapshot and show the editor. Otherwise wait for PartyKit `sync`
 5. Provider connects to PartyKit with JWT + `isNew` in query params
@@ -208,7 +208,7 @@ This replaces the old `document_changes` + `document_snapshots` tables with a si
 
 - **Connect**: `getUser(jwt)` then `document_permissions`. Create only if `isNew` and `document_exists` is false. Return state in the same response
 - **Save**: Permission first, then upsert. RLS remains defense in depth
-- **Socket**: Failed connect never joins the CRDT room
+- **Socket**: Failed connect never joins the room
 - **Prefetch**: `getDocumentState` uses the same permission rules via tRPC (cookie session + RLS)
 
 ### Publish button (header)
@@ -232,17 +232,3 @@ PartyKit runs on Cloudflare Workers. Estimated costs:
 | 50-500   | ~$5            |
 | 500-2000 | ~$10-25        |
 | 2000+    | ~$25-100       |
-
-## Rollback
-
-To revert to y-webrtc:
-
-1. In `src/app/documents/[documentId]/page.tsx`:
-
-   - Change import back to `use-collaborative-doc-crdt`
-   - Change hook call back to `useCollaborativeDocCrdt`
-
-2. In `src/app/_components/editor/editor.tsx`:
-   - Change provider type back to `WebrtcProvider`
-
-**Note:** The PartyKit integration uses a new `document_state` table. The old `document_changes` and `document_snapshots` tables are still present but not used. If you have existing documents that were created with the old system, you may need to migrate the data or keep both systems available.

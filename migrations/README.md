@@ -11,5 +11,8 @@ Older tables in your project may have been created before this repo’s filename
 
 | File | Purpose |
 |------|--------|
+| `partykit_document_state.sql` | Collaborative editing: full Y.Doc state per document (`document_state`) + RLS |
+| `document_exists_rpc.sql` | Privileged existence check for PartyKit connect (403 vs 404) |
+| `drop_document_changes_and_snapshots.sql` | Removes legacy `document_changes` / `document_snapshots` tables |
 | `document_publications.sql` | Public published docs: `/[owner segment]/[slug]`, RLS |
 | `document_publication_redirects.sql` | Path redirects after username/slug changes; redirect-before-publication lookup |

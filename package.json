@@ -9,7 +9,6 @@
     "dev": "next dev --turbo",
     "dev:partykit": "partykit dev",
     "deploy:partykit": "partykit deploy",
-    "migrate:partykit": "tsx scripts/migrate-to-partykit.ts",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "lint": "next lint",
@@ -71,7 +70,6 @@
     "unified": "^11.0.5",
     "vaul": "^1.1.2",
     "y-partykit": "^0.0.33",
-    "y-webrtc": "^10.3.0",
     "yjs": "^13.6.27",
     "zod": "^3.23.8",
     "zustand": "^5.0.4"
@@ -85,14 +83,12 @@
     "@types/sanitize-html": "^2.16.1",
     "@typescript-eslint/eslint-plugin": "^8.1.0",
     "@typescript-eslint/parser": "^8.1.0",
-    "dotenv": "^17.4.2",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.0.1",
     "postcss": "^8.4.39",
     "prettier": "^3.3.2",
     "prettier-plugin-tailwindcss": "^0.6.5",
     "tailwindcss": "^3.4.3",
-    "tsx": "^4.23.12",
     "typescript": "^5.5.3"
   },
   "ct3aMetadata": {
