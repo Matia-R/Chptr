@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { createClient } from "~/utils/supabase/client";
-import { isProtectedRoute } from "~/utils/supabase/protected-routes";
+import { leaveProtectedSession } from "~/lib/leave-protected-session";
 
 /**
  * Cross-tab (and this-tab) sign-out: leave protected app chrome for /login.
@@ -26,9 +26,7 @@ export function AuthSessionListener() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
-      queryClient.clear();
-      if (!isProtectedRoute(pathnameRef.current)) return;
-      router.replace("/login");
+      leaveProtectedSession(queryClient, router, pathnameRef.current);
     });
 
     return () => subscription.unsubscribe();
