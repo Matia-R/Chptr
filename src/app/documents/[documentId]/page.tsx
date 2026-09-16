@@ -10,6 +10,7 @@ import { DocumentLoadingSkeleton } from "~/app/_components/document-loading-skel
 import { MotionFade } from "~/app/_components/motion-fade";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
 import { useCollaborativeDocPartykit } from "~/hooks/use-collaborative-doc-partykit";
+import { useReportDocumentUnavailable } from "~/hooks/use-document-unavailable";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
@@ -103,13 +104,15 @@ export default function DocumentPage() {
     provider,
     isReady,
     isLoading,
-    error,
+    error: documentError,
     isReconnecting,
     isOffline,
   } = useCollaborativeDocPartykit({
     documentId,
     isNew,
   });
+
+  const isUnavailable = useReportDocumentUnavailable(documentError);
 
   // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
   // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.
@@ -134,10 +137,15 @@ export default function DocumentPage() {
 
   // === RENDERING LOGIC ===
 
-  // 1. Fatal errors (no access, missing doc, real sign-out) replace the editor.
-  // Connection drops do not — they keep the local Y.Doc and show a banner.
-  if (error) {
-    const { title, message } = getDocumentErrorContent(error);
+  // 1. Missing / no-access docs use the shell empty state, not an error alert.
+  if (isUnavailable) {
+    return null;
+  }
+
+  // Fatal errors replace the editor. Connection drops do not —
+  // they keep the local Y.Doc and show a banner.
+  if (documentError) {
+    const { title, message } = getDocumentErrorContent(documentError);
     return (
       <MotionFade>
         <Alert variant="destructive">

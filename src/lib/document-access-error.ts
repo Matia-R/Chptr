@@ -39,3 +39,9 @@ export function getDocumentErrorCode(error: unknown): DocumentErrorCode | undefi
   }
   return undefined;
 }
+
+/** Signed in, but this document is missing or not shared with the caller. */
+export function isDocumentUnavailableError(error: unknown): boolean {
+  const code = getDocumentErrorCode(error);
+  return code === "FORBIDDEN" || code === "NOT_FOUND";
+}

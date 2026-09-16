@@ -8,12 +8,17 @@ import { DocumentActions } from "./document-actions";
 import { DocumentPublishButton } from "./document-publish-button";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "./save-feedback-label";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
+import { useDocumentUnavailableStore } from "~/hooks/use-document-unavailable";
 
 export function Header() {
   const pathname = usePathname();
   const isOffline = useBrowserOffline();
+  const isUnavailable = useDocumentUnavailableStore(
+    (state) => state.isUnavailable,
+  );
   const isDocumentPage =
     pathname.startsWith("/documents/") && pathname !== "/documents";
+  const showDocumentChrome = isDocumentPage && !isUnavailable;
 
   return (
     <header
@@ -22,14 +27,14 @@ export function Header() {
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger />
-        {isDocumentPage ? (
+        {showDocumentChrome ? (
           <div className="min-w-0 flex-1 overflow-hidden">
             <DocumentBreadcrumb />
           </div>
         ) : null}
       </div>
       <div className="ml-auto flex h-8 flex-shrink-0 items-center gap-2">
-        {isDocumentPage ? (
+        {showDocumentChrome ? (
           <AnimatePresence mode="wait" initial={false}>
             {isOffline ? null : (
               <motion.div

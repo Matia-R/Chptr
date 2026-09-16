@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import YPartyKitProvider from "y-partykit/provider";
-import { TRPCClientError } from "@trpc/client";
 import {
   DocumentAccessError,
   getDocumentErrorCode,
@@ -44,13 +43,6 @@ const MAX_RESUME_BACKOFF_MS = 5_000;
 const RECONNECT_UI_GRACE_MS = 2_000;
 /** Let BlockNote finish binding before treating Yjs updates as publish-dirty. */
 const YJS_PUBLISH_WATCH_DELAY_MS = 150;
-
-function loginRequired() {
-  return new DocumentAccessError(
-    "UNAUTHORIZED",
-    "Please sign in to your account to access this doc.",
-  );
-}
 
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64.trim());
@@ -103,15 +95,6 @@ function accessErrorFromTrpc(error: unknown): DocumentAccessError | null {
   if (code === "NOT_FOUND") {
     return new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist.");
   }
-  if (code === "UNAUTHORIZED") {
-    return new DocumentAccessError(
-      "UNAUTHORIZED",
-      "Please sign in to your account to access this doc.",
-    );
-  }
-  if (error instanceof TRPCClientError) {
-    return null;
-  }
   return null;
 }
 
@@ -126,6 +109,13 @@ function stopReconnect(provider: YPartyKitProvider) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Empty session is "not ready", never "logged out". SIGNED_OUT is the shell's job. */
+async function readAccessToken() {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
 }
 
 function socketIsOpen(provider: YPartyKitProvider) {
@@ -192,8 +182,7 @@ export function useCollaborativeDocPartykit({
       return;
     }
 
-    const down =
-      connection === "disconnected" || (everConnected && !recovered);
+    const down = connection === "disconnected" || (everConnected && !recovered);
     if (!down) {
       return;
     }
@@ -244,28 +233,23 @@ export function useCollaborativeDocPartykit({
 
     const setup = async () => {
       try {
-        const supabase = createClient();
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          throw new DocumentAccessError(
-            "INTERNAL_SERVER_ERROR",
-            `Failed to get session: ${sessionError.message}`,
+        let accessToken: string | null = null;
+        let tokenWaitAttempt = 0;
+        while (!cancelled && !accessToken) {
+          accessToken = await readAccessToken();
+          if (cancelled) return;
+          if (accessToken) break;
+          tokenWaitAttempt += 1;
+          await wait(
+            Math.min(100 * 2 ** (tokenWaitAttempt - 1), MAX_RESUME_BACKOFF_MS),
           );
         }
-
-        if (!session?.access_token) {
-          throw loginRequired();
-        }
-
-        if (cancelled) return;
+        if (cancelled || !accessToken) return;
 
         const ydoc = new Y.Doc();
         useCollaborativeDocStore.getState().setYdoc(ydoc);
-        const tokenRef = { current: session.access_token };
+        const tokenRef = { current: accessToken };
+        const supabase = createClient();
         let closedForAuth = false;
         let paintedFromPrefetch = false;
         let resumeInFlight = false;
@@ -333,16 +317,25 @@ export function useCollaborativeDocPartykit({
               if (cancelled || closedForAuth) return;
             }
 
-            const {
-              data: { session: currentSession },
-            } = await supabase.auth.getSession();
-
-            if (!currentSession?.access_token) {
-              failFatal(loginRequired());
+            const token = await readAccessToken();
+            if (!token) {
+              consecutiveFailures += 1;
+              if (!cancelled && !closedForAuth) {
+                window.setTimeout(
+                  () => {
+                    if (cancelled || closedForAuth) return;
+                    void resumeWithFreshToken();
+                  },
+                  Math.min(
+                    100 * 2 ** consecutiveFailures,
+                    MAX_RESUME_BACKOFF_MS,
+                  ),
+                );
+              }
               return;
             }
 
-            tokenRef.current = currentSession.access_token;
+            tokenRef.current = token;
             if (cancelled || closedForAuth) return;
             provider.connect();
           } catch (err) {
@@ -397,6 +390,9 @@ export function useCollaborativeDocPartykit({
 
         provider.on("sync", (synced: boolean) => {
           setIsSynced(synced);
+          if (synced) {
+            consecutiveFailures = 0;
+          }
           if (synced && !closedForAuth && !isNew) {
             markReady();
           }
@@ -415,7 +411,10 @@ export function useCollaborativeDocPartykit({
             if (closedForAuth || cancelled) return;
             setConnection(status);
             if (status === "connected") {
-              consecutiveFailures = 0;
+              // Do not reset consecutiveFailures here. y-partykit fires
+              // "connected" on WebSocket upgrade, before PartyKit has
+              // finished /api/partykit/connect. A 4005 close after that
+              // would otherwise look like the first failure forever.
               setEverConnected(true);
               useCollaborativeDocStore.getState().setPersisted(true);
             }
@@ -451,11 +450,6 @@ export function useCollaborativeDocPartykit({
           data: { subscription },
         } = supabase.auth.onAuthStateChange((event, nextSession) => {
           if (cancelled || closedForAuth) return;
-
-          if (event === "SIGNED_OUT") {
-            failFatal(loginRequired());
-            return;
-          }
 
           if (event === "TOKEN_REFRESHED" && nextSession?.access_token) {
             tokenRef.current = nextSession.access_token;
@@ -523,7 +517,12 @@ export function useCollaborativeDocPartykit({
             .catch((err: unknown) => {
               if (cancelled || closedForAuth) return;
               const accessError = accessErrorFromTrpc(err);
-              if (!accessError) return;
+              if (!accessError) {
+                if (getDocumentErrorCode(err) === "UNAUTHORIZED") {
+                  void resumeWithFreshToken({ immediate: true });
+                }
+                return;
+              }
               failFatal(accessError);
             });
         }

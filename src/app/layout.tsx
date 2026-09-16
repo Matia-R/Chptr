@@ -6,6 +6,7 @@ import { Inter, Lora, Noto_Serif } from "next/font/google";
 import { type Metadata, type Viewport } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import { AuthSessionListener } from "./_components/auth-session-listener";
 import { OverlayThemeSync } from "./_components/overlay-theme-sync";
 
 const lora = Lora({
@@ -66,6 +67,7 @@ export default function RootLayout({
       <body>
         <OverlayThemeSync />
         <TRPCReactProvider>
+          <AuthSessionListener />
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
