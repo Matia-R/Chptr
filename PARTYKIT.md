@@ -224,11 +224,8 @@ See [PARTYKIT_ARCHITECTURE.md](./PARTYKIT_ARCHITECTURE.md#publish-ui-and-new-doc
 
 ## Costs
 
-PartyKit runs on Cloudflare Workers. Estimated costs:
+This app deploys to PartyKit’s **managed Individual** plan (`chptr-collab.partykit.dev`), not Cloudflare Workers Free.
 
-| Users    | Monthly Cost   |
-| -------- | -------------- |
-| 0-50     | $0 (free tier) |
-| 50-500   | ~$5            |
-| 500-2000 | ~$10-25        |
-| 2000+    | ~$25-100       |
+Current Individual limits ([partykit.io](https://www.partykit.io/)): up to 10 live projects, PartyKit room storage cleared every 24 hours, intended for small projects. Document state is saved to Supabase, so the 24-hour room-storage clear does not drop `document_state`. Without hibernation, a room supports about 100 connections and ~128 MiB.
+
+Cloudflare Workers and Durable Objects request/CPU/duration limits apply **only** if you deploy PartyKit to your own Cloudflare account (cloud-prem). See [Deployment capacity](./PARTYKIT_ARCHITECTURE.md#deployment-capacity).
