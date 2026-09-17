@@ -79,7 +79,9 @@ export function useTrashDocument() {
   const { isNew } = useNewDocumentFlag();
   const isPersisted = useDocumentIsPersisted(documentId);
   const knownName = useKnownDocumentName(documentId);
-  const closeBothPanels = useDocumentPublishStore((s) => s.closeBothPanels);
+  const resetForNavigation = useDocumentPublishStore(
+    (s) => s.resetForNavigation,
+  );
   const [isPending, setIsPending] = useState(false);
 
   const trashMutation = api.document.trashDocument.useMutation();
@@ -97,7 +99,7 @@ export function useTrashDocument() {
     const next = list.find((doc) => doc.id !== documentId);
 
     setIsPending(true);
-    closeBothPanels();
+    resetForNavigation();
     markLocalDocumentTrash(documentId);
     if (persisted) {
       applyDocumentMovedToTrash(utils, documentId, name);
@@ -146,7 +148,6 @@ export function useTrashDocument() {
       setIsPending(false);
     }
   }, [
-    closeBothPanels,
     documentId,
     isNew,
     isOffline,
@@ -154,6 +155,7 @@ export function useTrashDocument() {
     isPersisted,
     knownName,
     pathname,
+    resetForNavigation,
     restore,
     router,
     toast,
