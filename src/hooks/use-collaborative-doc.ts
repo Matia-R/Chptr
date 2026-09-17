@@ -297,7 +297,10 @@ export function useCollaborativeDoc({
         const onDocumentMeta = (event: MessageEvent<DocumentMetaMessage>) => {
           const msg = event.data;
           if (!msg || typeof msg !== "object") return;
-          if (msg.type === "deleted" && msg.documentId === documentId) {
+          if (
+            (msg.type === "deleted" || msg.type === "trashed") &&
+            msg.documentId === documentId
+          ) {
             if (isLocalDocumentTrash(documentId)) return;
             failFatal(
               new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist."),
@@ -452,6 +455,11 @@ export function useCollaborativeDoc({
             ? accessErrorForCloseCode(event.code)
             : null;
           if (fatalError) {
+            if (isLocalDocumentTrash(documentId)) {
+              closedForAuth = true;
+              stopReconnect(provider);
+              return;
+            }
             failFatal(fatalError);
             return;
           }
@@ -537,6 +545,7 @@ export function useCollaborativeDoc({
             })
             .catch((err: unknown) => {
               if (cancelled || closedForAuth) return;
+              if (isLocalDocumentTrash(documentId)) return;
               const accessError = accessErrorFromTrpc(err);
               if (!accessError) {
                 if (getDocumentErrorCode(err) === "UNAUTHORIZED") {

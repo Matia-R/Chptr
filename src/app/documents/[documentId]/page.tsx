@@ -112,7 +112,7 @@ export default function DocumentPage() {
     isNew,
   });
 
-  const isUnavailable = useReportDocumentUnavailable(documentError);
+  const isUnavailable = useReportDocumentUnavailable(documentError, documentId);
 
   // Delayed skeleton: only show after SKELETON_DELAY_MS to avoid flicker on fast loads.
   // New docs skip the skeleton entirely — local Y.Doc is ready before PartyKit syncs.

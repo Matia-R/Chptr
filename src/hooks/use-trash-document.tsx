@@ -48,7 +48,6 @@ export function useRestoreDocument() {
         clearLocalDocumentTrash(id);
         applyDocumentCreated(utils, id, name);
         broadcastDocumentCreated(id, name);
-        void utils.document.getTrashedDocuments.invalidate();
         if (options?.openDocument === false) {
           toast({ title: "Document restored" });
         } else {
@@ -109,14 +108,13 @@ export function useTrashDocument() {
     }
     clearNewDocumentFlag(documentId);
 
+    if (pathname === `/documents/${documentId}`) {
+      router.replace(next ? `/documents/${next.id}` : "/documents");
+    }
+
     try {
       if (persisted) {
         await trashMutation.mutateAsync({ id: documentId });
-        void utils.document.getTrashedDocuments.invalidate();
-      }
-
-      if (pathname === `/documents/${documentId}`) {
-        router.push(next ? `/documents/${next.id}` : "/documents");
       }
 
       if (persisted) {

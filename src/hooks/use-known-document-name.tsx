@@ -1,31 +1,54 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { api } from "~/trpc/react";
 
 export type DocumentListItem = { id: string; name: string };
 
-const DocumentListSeedContext = createContext<DocumentListItem[]>([]);
+export type TrashedDocumentListItem = {
+  id: string;
+  name: string;
+  deletedAt: string;
+};
+
+type DocumentListSeed = {
+  documents: DocumentListItem[];
+  trashedDocuments: TrashedDocumentListItem[];
+};
+
+const EMPTY_SEED: DocumentListSeed = {
+  documents: [],
+  trashedDocuments: [],
+};
+
+const DocumentListSeedContext = createContext<DocumentListSeed>(EMPTY_SEED);
 
 export function DocumentListSeedProvider({
   documents,
+  trashedDocuments,
   children,
-}: {
-  documents: DocumentListItem[];
-  children: ReactNode;
-}) {
+}: DocumentListSeed & { children: ReactNode }) {
+  const value = useMemo(
+    () => ({ documents, trashedDocuments }),
+    [documents, trashedDocuments],
+  );
+
   return (
-    <DocumentListSeedContext.Provider value={documents}>
+    <DocumentListSeedContext.Provider value={value}>
       {children}
     </DocumentListSeedContext.Provider>
   );
 }
 
-function seededList(documents: DocumentListItem[]) {
-  return { success: true as const, documents };
+function seededList(seed: DocumentListSeed) {
+  return {
+    success: true as const,
+    documents: seed.documents,
+    trashedDocuments: seed.trashedDocuments,
+  };
 }
 
-/** Shared list query. Server seed keeps the sidebar painted on refresh. */
+/** Shared list query. Server seed keeps the sidebar and trash painted on refresh. */
 export function useDocumentList() {
   const seed = useContext(DocumentListSeedContext);
   const seeded = seededList(seed);
@@ -35,6 +58,11 @@ export function useDocumentList() {
     placeholderData: (previous) => previous ?? seeded,
     refetchOnMount: true,
   });
+}
+
+export function useTrashedDocuments() {
+  const { data } = useDocumentList();
+  return data?.trashedDocuments ?? [];
 }
 
 /**

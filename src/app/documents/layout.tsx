@@ -32,16 +32,19 @@ export const metadata: Metadata = {
   ],
 };
 
-async function getDocuments() {
+async function getDocumentListSeed() {
   const caller = await getTrpcCaller();
   const result = await caller.document.getDocumentIdsForAuthenticatedUser();
-  return result.documents ?? [];
+  return {
+    documents: result.documents ?? [],
+    trashedDocuments: result.trashedDocuments ?? [],
+  };
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const documents = await getDocuments();
+  const { documents, trashedDocuments } = await getDocumentListSeed();
 
   return (
     <TRPCReactProvider>
@@ -51,7 +54,10 @@ export default async function RootLayout({
         enableSystem
         disableTransitionOnChange
       >
-        <DocumentListSeedProvider documents={documents}>
+        <DocumentListSeedProvider
+          documents={documents}
+          trashedDocuments={trashedDocuments}
+        >
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>

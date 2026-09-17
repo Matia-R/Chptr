@@ -13,13 +13,12 @@ import {
   MobileMenuDrawer,
 } from "~/app/_components/mobile-drawer";
 import { PanelHeader } from "~/app/_components/panel-header";
-import { Skeleton } from "~/app/_components/skeleton";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useDocumentTrashStore } from "~/hooks/use-document-trash";
+import { useTrashedDocuments } from "~/hooks/use-known-document-name";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useRestoreDocument } from "~/hooks/use-trash-document";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react";
 
 export const TRASH_DISCLAIMER =
   "Documents in Trash are permanently deleted after 30 days unless you restore them.";
@@ -34,33 +33,17 @@ function formatTrashDeletedAt(iso: string): string {
 }
 
 function TrashDocumentsList({
-  enabled,
   insetClassName,
   restoringId,
   isOffline,
   onRestore,
 }: {
-  enabled: boolean;
   insetClassName: string;
   restoringId: string | null;
   isOffline: boolean;
   onRestore: (id: string, name: string) => void;
 }) {
-  const { data, isLoading } = api.document.getTrashedDocuments.useQuery(
-    undefined,
-    { enabled },
-  );
-  const documents = data?.documents ?? [];
-
-  if (!enabled || isLoading) {
-    return (
-      <div className={cn("space-y-3 py-4", insetClassName)}>
-        {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-10 w-full" />
-        ))}
-      </div>
-    );
-  }
+  const documents = useTrashedDocuments();
 
   if (documents.length === 0) {
     return (
@@ -150,7 +133,6 @@ function DocumentTrashDialog({
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <TrashDocumentsList
-          enabled={open}
           insetClassName="px-6"
           restoringId={restoringId}
           isOffline={isOffline}
@@ -181,7 +163,6 @@ function DocumentTrashDrawer({
         />
         <div className="max-h-[min(50vh,24rem)] overflow-y-auto">
           <TrashDocumentsList
-            enabled={open}
             insetClassName="px-4"
             restoringId={restoringId}
             isOffline={isOffline}

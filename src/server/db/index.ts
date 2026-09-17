@@ -13,7 +13,6 @@ export {
   getDocumentById,
   getLastUpdatedTimestamp,
   getDocumentIdsForUser,
-  getTrashedDocumentsForUser,
   updateDocumentName,
   trashDocument,
   restoreDocument,

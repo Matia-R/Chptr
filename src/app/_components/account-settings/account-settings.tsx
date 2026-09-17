@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AtSign, ChevronRight, Lock, LogOut, Moon, Sun, User } from "lucide-react";
+import { AtSign, ChevronRight, Lock, LogOut, Moon, Sun, Trash2, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
@@ -31,6 +31,7 @@ import {
   type AccountProfileField,
   type AccountSettingsView,
 } from "~/hooks/use-account-settings";
+import { useDocumentTrashStore } from "~/hooks/use-document-trash";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useUserProfile } from "~/hooks/use-user-profile";
@@ -384,6 +385,8 @@ function AccountSettingsDrawerBody({
 }) {
   const view = useAccountSettingsStore((state) => state.view);
   const setView = useAccountSettingsStore((state) => state.setView);
+  const closeAccount = useAccountSettingsStore((state) => state.close);
+  const openTrash = useDocumentTrashStore((state) => state.open);
 
   const stage = useMobileDrawerStage<AccountSettingsView>({
     view,
@@ -457,8 +460,6 @@ function AccountSettingsDrawerBody({
             trailing={<RowTrailing />}
             onClick={() => openSubView("password")}
           />
-        </MobileActionGroup>
-        <MobileActionGroup>
           <MobileActionButtonRow
             icon={theme === "dark" ? Sun : Moon}
             label={theme === "dark" ? "Light mode" : "Dark mode"}
@@ -466,6 +467,14 @@ function AccountSettingsDrawerBody({
           />
         </MobileActionGroup>
         <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={Trash2}
+            label="Trash"
+            onClick={() => {
+              openTrash();
+              window.setTimeout(() => closeAccount(), 0);
+            }}
+          />
           <MobileActionButtonRow
             icon={LogOut}
             label="Log out"

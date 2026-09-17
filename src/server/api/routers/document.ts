@@ -8,7 +8,6 @@ import {
   getDocumentById,
   getLastUpdatedTimestamp,
   getDocumentIdsForUser as getDocumentsIdsForUser,
-  getTrashedDocumentsForUser,
   updateDocumentName,
   trashDocument as trashDocumentRecord,
   restoreDocument as restoreDocumentRecord,
@@ -66,11 +65,6 @@ export const documentRouter = createTRPCRouter({
             return getDocumentsIdsForUser(
                 ctx.user && ctx.supabase ? authFromCtx(ctx as { user: { id: string }; supabase: AuthContext["supabase"] }) : undefined
             );
-        }),
-
-    getTrashedDocuments: protectedProcedure
-        .query(async ({ ctx }) => {
-            return getTrashedDocumentsForUser(authFromCtx(ctx));
         }),
 
     /**

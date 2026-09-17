@@ -30,6 +30,27 @@ export type DocumentMetaMessage =
 
 type TrpcUtils = ReturnType<typeof api.useUtils>;
 
+type DocumentListCache = {
+  documents: { id: string; name: string }[];
+  trashedDocuments: { id: string; name: string; deletedAt: string }[];
+};
+
+function patchDocumentList(
+  utils: TrpcUtils,
+  patch: (old: DocumentListCache) => DocumentListCache,
+) {
+  utils.document.getDocumentIdsForAuthenticatedUser.setData(
+    undefined,
+    (old: Partial<DocumentListCache> | undefined) => {
+      const next = patch({
+        documents: old?.documents ?? [],
+        trashedDocuments: old?.trashedDocuments ?? [],
+      });
+      return { success: true as const, ...next };
+    },
+  );
+}
+
 export function applyDocumentName(
   utils: TrpcUtils,
   documentId: string,
@@ -43,27 +64,22 @@ export function applyDocumentName(
     };
   });
 
-  utils.document.getDocumentIdsForAuthenticatedUser.setData(
-    undefined,
-    (old) => {
-      if (!old?.documents) {
-        return { success: true, documents: [{ id: documentId, name }] };
-      }
-      const exists = old.documents.some((doc) => doc.id === documentId);
-      if (exists) {
-        return {
-          ...old,
-          documents: old.documents.map((doc) =>
+  patchDocumentList(utils, ({ documents, trashedDocuments }) => {
+    const inList = documents.some((doc) => doc.id === documentId);
+    const inTrash = trashedDocuments.some((doc) => doc.id === documentId);
+    return {
+      documents: inList
+        ? documents.map((doc) =>
             doc.id === documentId ? { ...doc, name } : doc,
-          ),
-        };
-      }
-      return {
-        ...old,
-        documents: [{ id: documentId, name }, ...old.documents],
-      };
-    },
-  );
+          )
+        : inTrash
+          ? documents
+          : [{ id: documentId, name }, ...documents],
+      trashedDocuments: trashedDocuments.map((doc) =>
+        doc.id === documentId ? { ...doc, name } : doc,
+      ),
+    };
+  });
 }
 
 export function applyDocumentCreated(
@@ -71,39 +87,19 @@ export function applyDocumentCreated(
   documentId: string,
   name: string,
 ) {
-  utils.document.getDocumentIdsForAuthenticatedUser.setData(
-    undefined,
-    (old) => {
-      if (!old?.documents) {
-        return { success: true, documents: [{ id: documentId, name }] };
-      }
-      if (old.documents.some((doc) => doc.id === documentId)) return old;
-      return {
-        ...old,
-        documents: [{ id: documentId, name }, ...old.documents],
-      };
-    },
-  );
-  utils.document.getTrashedDocuments.setData(undefined, (old) => {
-    if (!old?.documents) return old;
-    return {
-      ...old,
-      documents: old.documents.filter((doc) => doc.id !== documentId),
-    };
-  });
+  patchDocumentList(utils, ({ documents, trashedDocuments }) => ({
+    documents: documents.some((doc) => doc.id === documentId)
+      ? documents
+      : [{ id: documentId, name }, ...documents],
+    trashedDocuments: trashedDocuments.filter((doc) => doc.id !== documentId),
+  }));
 }
 
 export function applyDocumentDeleted(utils: TrpcUtils, documentId: string) {
-  utils.document.getDocumentIdsForAuthenticatedUser.setData(
-    undefined,
-    (old) => {
-      if (!old?.documents) return old;
-      return {
-        ...old,
-        documents: old.documents.filter((doc) => doc.id !== documentId),
-      };
-    },
-  );
+  patchDocumentList(utils, ({ documents, trashedDocuments }) => ({
+    documents: documents.filter((doc) => doc.id !== documentId),
+    trashedDocuments,
+  }));
   utils.document.getDocumentById.setData(documentId, undefined);
   utils.document.getDocumentState.setData(documentId, undefined);
   utils.document.getPublicationByDocumentId.setData(documentId, null);
@@ -115,17 +111,15 @@ export function applyDocumentMovedToTrash(
   name: string,
   deletedAt = new Date().toISOString(),
 ) {
-  applyDocumentDeleted(utils, documentId);
-  utils.document.getTrashedDocuments.setData(undefined, (old) => {
-    const documents = old?.documents ?? [];
-    if (documents.some((doc) => doc.id === documentId)) {
-      return old ?? { success: true, documents };
-    }
-    return {
-      success: true,
-      documents: [{ id: documentId, name, deletedAt }, ...documents],
-    };
-  });
+  utils.document.getDocumentById.setData(documentId, undefined);
+  utils.document.getDocumentState.setData(documentId, undefined);
+  utils.document.getPublicationByDocumentId.setData(documentId, null);
+  patchDocumentList(utils, ({ documents, trashedDocuments }) => ({
+    documents: documents.filter((doc) => doc.id !== documentId),
+    trashedDocuments: trashedDocuments.some((doc) => doc.id === documentId)
+      ? trashedDocuments
+      : [{ id: documentId, name, deletedAt }, ...trashedDocuments],
+  }));
 }
 
 function postDocumentMeta(message: DocumentMetaMessage) {

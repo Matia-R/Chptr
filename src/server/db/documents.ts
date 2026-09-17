@@ -22,6 +22,18 @@ type DocumentPermissionSchema = {
 
 type NestedDocument = Pick<DocumentSchema, 'name' | 'last_updated' | 'deleted_at'>
 
+export type TrashedDocumentListItem = {
+  id: string
+  name: string
+  deletedAt: string
+}
+
+export type UserDocumentList = {
+  success: true
+  documents: { id: string; name: string }[]
+  trashedDocuments: TrashedDocumentListItem[]
+}
+
 type TrashPublicationPath = {
   owner_username: string
   slug: string
@@ -146,7 +158,9 @@ export async function getLastUpdatedTimestamp(
   return { success: true, lastUpdated: data?.last_updated }
 }
 
-export const getDocumentIdsForUser = async (auth?: AuthContext) => {
+export const getDocumentIdsForUser = async (
+  auth?: AuthContext,
+): Promise<UserDocumentList> => {
   let supabase: Awaited<ReturnType<typeof createClient>>
   let userId: string | undefined
   if (auth) {
@@ -158,13 +172,14 @@ export const getDocumentIdsForUser = async (auth?: AuthContext) => {
     userId = user?.id
   }
   if (!userId) {
-    return { success: true, documents: [] }
+    return { success: true, documents: [], trashedDocuments: [] }
   }
 
   const { data, error } = await supabase
     .from('document_permissions')
     .select(`
             document_id,
+            permission,
             documents:document_id (
                 name,
                 last_updated,
@@ -177,52 +192,32 @@ export const getDocumentIdsForUser = async (auth?: AuthContext) => {
       error: Error | null
     }
 
-  const documents = data?.flatMap((permission) => {
+  const documents: { id: string; name: string }[] = []
+  const trashedDocuments: TrashedDocumentListItem[] = []
+
+  for (const permission of data ?? []) {
     const doc = embedRow(permission.documents)
-    if (!doc || doc.deleted_at) return []
-    return [{ id: permission.document_id, name: doc.name ?? 'Untitled' }]
-  })
+    if (!doc) continue
+    if (doc.deleted_at) {
+      if (permission.permission === 'owner') {
+        trashedDocuments.push({
+          id: permission.document_id,
+          name: doc.name ?? 'Untitled',
+          deletedAt: doc.deleted_at,
+        })
+      }
+      continue
+    }
+    documents.push({
+      id: permission.document_id,
+      name: doc.name ?? 'Untitled',
+    })
+  }
+
+  trashedDocuments.sort((a, b) => Date.parse(b.deletedAt) - Date.parse(a.deletedAt))
 
   if (error) throw new Error(`Failed to fetch documents for user: ${error.message}`)
-  return { success: true, documents }
-}
-
-export type TrashedDocumentListItem = {
-  id: string
-  name: string
-  deletedAt: string
-}
-
-export const getTrashedDocumentsForUser = async (auth: AuthContext) => {
-  const { data, error } = await auth.supabase
-    .from('document_permissions')
-    .select(`
-            document_id,
-            documents:document_id (
-                name,
-                deleted_at
-            )
-        `)
-    .eq('user_id', auth.userId)
-    .eq('permission', 'owner') as {
-      data: (DocumentPermissionSchema & { documents: NestedDocument | NestedDocument[] | null })[] | null
-      error: Error | null
-    }
-
-  const documents = data
-    ?.flatMap((permission): TrashedDocumentListItem[] => {
-      const doc = embedRow(permission.documents)
-      if (!doc?.deleted_at) return []
-      return [{
-        id: permission.document_id,
-        name: doc.name ?? 'Untitled',
-        deletedAt: doc.deleted_at,
-      }]
-    })
-    .sort((a, b) => Date.parse(b.deletedAt) - Date.parse(a.deletedAt)) ?? []
-
-  if (error) throw new Error(`Failed to fetch trashed documents: ${error.message}`)
-  return { success: true, documents }
+  return { success: true, documents, trashedDocuments }
 }
 
 async function createDocumentWithPermission(
