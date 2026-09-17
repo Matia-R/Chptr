@@ -69,7 +69,9 @@ function TrashDocumentsList({
           )}
         >
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-sidebar-foreground">{doc.name}</p>
+            <p className="truncate text-sm text-sidebar-foreground">
+              {doc.name}
+            </p>
             <p className="text-xs text-muted-foreground">
               {formatTrashDeletedAt(doc.deletedAt)}
             </p>
@@ -157,10 +159,7 @@ function DocumentTrashDrawer({
   return (
     <MobileMenuDrawer open={open} onOpenChange={onOpenChange}>
       <div className="pb-6">
-        <MobileDrawerScreenHeader
-          title="Trash"
-          subtitle={TRASH_DISCLAIMER}
-        />
+        <MobileDrawerScreenHeader title="Trash" subtitle={TRASH_DISCLAIMER} />
         <div className="max-h-[min(50vh,24rem)] overflow-y-auto">
           <TrashDocumentsList
             insetClassName="px-4"

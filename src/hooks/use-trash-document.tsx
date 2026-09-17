@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { useDocumentIsPersisted } from "~/app/_components/editor/collaborative-doc-store";
+import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
 import { useDocumentPublishStore } from "~/app/_components/editor/document-publish-store";
 import { ToastAction } from "~/app/_components/toast";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
@@ -20,7 +20,7 @@ import {
 import { useKnownDocumentName } from "~/hooks/use-known-document-name";
 import {
   clearNewDocumentFlag,
-  useNewDocumentFlag,
+  isDocumentNew,
 } from "~/hooks/use-new-document-flag";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { useToast } from "~/hooks/use-toast";
@@ -69,16 +69,22 @@ export function useRestoreDocument() {
   return { restore };
 }
 
+function isPersistedDocument(id: string): boolean {
+  const live = useCollaborativeDocStore.getState();
+  if (live.documentId === id) {
+    return live.isPersisted || !isDocumentNew(id);
+  }
+  return true;
+}
+
 export function useTrashDocument() {
   const router = useRouter();
   const pathname = usePathname();
   const utils = api.useUtils();
   const { toast } = useToast();
   const isOffline = useBrowserOffline();
-  const documentId = useRouteDocumentId() ?? "";
-  const { isNew } = useNewDocumentFlag();
-  const isPersisted = useDocumentIsPersisted(documentId);
-  const knownName = useKnownDocumentName(documentId);
+  const routeDocumentId = useRouteDocumentId() ?? "";
+  const knownName = useKnownDocumentName(routeDocumentId);
   const resetForNavigation = useDocumentPublishStore(
     (s) => s.resetForNavigation,
   );
@@ -87,83 +93,91 @@ export function useTrashDocument() {
   const trashMutation = api.document.trashDocument.useMutation();
   const { restore } = useRestoreDocument();
 
-  const trashCurrent = useCallback(async () => {
-    if (!documentId || isOffline || isPending) return;
+  const trashDocument = useCallback(
+    async (id: string, name: string) => {
+      if (!id || isOffline || isPending) return;
 
-    const trimmedName = knownName?.trim();
-    const name = trimmedName && trimmedName.length > 0 ? trimmedName : "Untitled";
-    const persisted = !isNew || isPersisted;
-    const list =
-      utils.document.getDocumentIdsForAuthenticatedUser.getData()?.documents ??
-      [];
-    const next = list.find((doc) => doc.id !== documentId);
+      const trimmedName = name.trim();
+      const resolvedName = trimmedName.length > 0 ? trimmedName : "Untitled";
+      const persisted = isPersistedDocument(id);
+      const list =
+        utils.document.getDocumentIdsForAuthenticatedUser.getData()
+          ?.documents ?? [];
+      const next = list.find((doc) => doc.id !== id);
+      const isViewing = pathname === `/documents/${id}`;
 
-    setIsPending(true);
-    resetForNavigation();
-    markLocalDocumentTrash(documentId);
-    if (persisted) {
-      applyDocumentMovedToTrash(utils, documentId, name);
-      broadcastDocumentTrashed(documentId, name);
-    } else {
-      applyDocumentDeleted(utils, documentId);
-      broadcastDocumentDeleted(documentId);
-    }
-    clearNewDocumentFlag(documentId);
-
-    if (pathname === `/documents/${documentId}`) {
-      router.replace(next ? `/documents/${next.id}` : "/documents");
-    }
-
-    try {
+      setIsPending(true);
+      if (isViewing) {
+        resetForNavigation();
+      }
+      markLocalDocumentTrash(id);
       if (persisted) {
-        await trashMutation.mutateAsync({ id: documentId });
+        applyDocumentMovedToTrash(utils, id, resolvedName);
+        broadcastDocumentTrashed(id, resolvedName);
+      } else {
+        applyDocumentDeleted(utils, id);
+        broadcastDocumentDeleted(id);
+      }
+      clearNewDocumentFlag(id);
+
+      if (isViewing) {
+        router.replace(next ? `/documents/${next.id}` : "/documents");
       }
 
-      if (persisted) {
+      try {
+        if (persisted) {
+          await trashMutation.mutateAsync({ id });
+          toast({
+            title: "Moved to trash",
+            duration: 8000,
+            action: (
+              <ToastAction
+                altText="Undo"
+                onClick={() => {
+                  void restore(id, resolvedName);
+                }}
+              >
+                Undo
+              </ToastAction>
+            ),
+          });
+        }
+      } catch (err) {
+        clearLocalDocumentTrash(id);
+        applyDocumentCreated(utils, id, resolvedName);
+        broadcastDocumentCreated(id, resolvedName);
         toast({
-          title: "Moved to trash",
-          duration: 8000,
-          action: (
-            <ToastAction
-              altText="Undo"
-              onClick={() => {
-                void restore(documentId, name);
-              }}
-            >
-              Undo
-            </ToastAction>
-          ),
+          variant: "destructive",
+          title: "Could not move document to trash",
+          description: getErrorMessage(err),
         });
+      } finally {
+        setIsPending(false);
       }
-    } catch (err) {
-      clearLocalDocumentTrash(documentId);
-      applyDocumentCreated(utils, documentId, name);
-      broadcastDocumentCreated(documentId, name);
-      toast({
-        variant: "destructive",
-        title: "Could not move document to trash",
-        description: getErrorMessage(err),
-      });
-    } finally {
-      setIsPending(false);
-    }
-  }, [
-    documentId,
-    isNew,
-    isOffline,
-    isPending,
-    isPersisted,
-    knownName,
-    pathname,
-    resetForNavigation,
-    restore,
-    router,
-    toast,
-    trashMutation,
-    utils,
-  ]);
+    },
+    [
+      isOffline,
+      isPending,
+      pathname,
+      resetForNavigation,
+      restore,
+      router,
+      toast,
+      trashMutation,
+      utils,
+    ],
+  );
+
+  const trashCurrent = useCallback(async () => {
+    const trimmedName = knownName?.trim();
+    await trashDocument(
+      routeDocumentId,
+      trimmedName && trimmedName.length > 0 ? trimmedName : "Untitled",
+    );
+  }, [knownName, routeDocumentId, trashDocument]);
 
   return {
+    trashDocument,
     trashCurrent,
     isPending,
     isOffline,

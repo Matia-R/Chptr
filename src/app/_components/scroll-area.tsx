@@ -5,18 +5,35 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
 import { cn } from "~/lib/utils"
 
-// ... existing code ...
+type ScrollAreaProps = React.ComponentPropsWithoutRef<
+  typeof ScrollAreaPrimitive.Viewport
+> & {
+  className?: string
+  /**
+   * Reserve a column for the vertical scrollbar so it sits flush to the
+   * right of the content instead of overlaying it.
+   */
+  scrollbarGutter?: boolean
+  /** Radix visibility: `hover` (default), `scroll`, `always`, or `auto`. */
+  type?: React.ComponentPropsWithoutRef<
+    typeof ScrollAreaPrimitive.Root
+  >["type"]
+}
+
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Viewport>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Viewport> & { className?: string }
->(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root className={cn("relative overflow-hidden", className)}>
+  ScrollAreaProps
+>(({ className, children, scrollbarGutter = false, type, ...props }, ref) => (
+  <ScrollAreaPrimitive.Root
+    type={type}
+    className={cn("relative overflow-hidden", className)}
+  >
     <ScrollAreaPrimitive.Viewport
       ref={ref}
       {...props}
       className="h-full w-full rounded-[inherit]"
     >
-      {children}
+      {scrollbarGutter ? <div className="pr-2.5">{children}</div> : children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
     <ScrollAreaPrimitive.Corner />
