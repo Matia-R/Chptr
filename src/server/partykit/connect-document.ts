@@ -68,6 +68,10 @@ export async function connectDocument(options: {
 
   const permission = await getDocumentPermission(supabase, documentId, userId);
   if (permission) {
+    const active = await documentExists(supabase, documentId);
+    if (!active) {
+      return { ok: false, status: 404, error: "Document not found" };
+    }
     const state = await loadDocumentState(supabase, documentId);
     return { ok: true, permission, created: false, state };
   }

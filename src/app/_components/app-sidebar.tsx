@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PanelLeftClose, Plus, Search } from "lucide-react";
+import { PanelLeftClose, Plus, Search, Trash2 } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -22,6 +22,7 @@ import { Button } from "./button";
 import { NavUser } from "./nav-user";
 import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
+import { useDocumentTrashStore } from "~/hooks/use-document-trash";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
@@ -77,6 +78,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const utils = api.useUtils();
   const setOpen = useCommandMenuStore((state) => state.setOpen);
+  const openTrash = useDocumentTrashStore((state) => state.open);
   const { isMobile, setOpenMobile } = useSidebar();
   const prefetchDocumentState = usePrefetchDocumentState();
   const isOffline = useBrowserOffline();
@@ -141,6 +143,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     dismissMobileNav();
     setOpen(true);
   }, [dismissMobileNav, setOpen]);
+
+  const openTrashModal = React.useCallback(() => {
+    openTrash();
+    if (isMobile) {
+      window.setTimeout(() => setOpenMobile(false), 0);
+    }
+  }, [isMobile, openTrash, setOpenMobile]);
 
   const renderAccount = (triggerClassName?: string) =>
     footerLoading ? (
@@ -282,6 +291,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             <div className="min-h-0 flex-1 overflow-hidden pt-2">
               {documentScroll(mobileDocumentList)}
             </div>
+
+            <div className="shrink-0 pt-1">
+              <Button
+                variant="ghost"
+                className="h-auto min-h-12 w-full cursor-pointer justify-start gap-3 px-3 py-3 text-left text-[15px] font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent"
+                onClick={openTrashModal}
+              >
+                <Trash2 className="size-4 shrink-0" aria-hidden />
+                <span>Trash</span>
+              </Button>
+            </div>
           </section>
 
           {/* Utility bar */}
@@ -391,6 +411,21 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                   </SidebarGroup>
                 </SidebarContent>,
               )}
+            </div>
+
+            <div className="shrink-0 pt-1">
+              <SidebarMenu className="gap-0">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    type="button"
+                    className="h-9 cursor-pointer"
+                    onClick={openTrashModal}
+                  >
+                    <Trash2 />
+                    <span>Trash</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
             </div>
           </section>
 

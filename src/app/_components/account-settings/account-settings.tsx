@@ -6,13 +6,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
-import { Button } from "~/app/_components/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "~/app/_components/dialog";
+  AppModalFrame,
+  appModalHeaderClassName,
+} from "~/app/_components/app-modal";
+import { Button } from "~/app/_components/button";
+import { DialogTitle } from "~/app/_components/dialog";
 import {
   MobileActionButtonRow,
   MobileActionGroup,
@@ -90,14 +89,8 @@ const DIALOG_SECTIONS: readonly {
 const PROFILE_FORM_ID = "account-settings-profile-form";
 const PASSWORD_FORM_ID = "account-settings-password-form";
 
-/** Fixed shell — header/nav/footer stay put; only the content pane scrolls. */
-const DIALOG_SHELL_BASE =
-  "flex w-full max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-sidebar p-0 shadow-2xl";
-const DIALOG_SHELL_HEIGHT = "h-[min(85vh,32.1rem)]";
 /** +1% so the extra offline notice line fits without clipping. */
 const DIALOG_SHELL_HEIGHT_OFFLINE = "h-[min(85.85vh,32.421rem)]";
-
-const DIALOG_HEADER_CLASS = "shrink-0 py-5 pl-6 pr-12";
 
 const DIALOG_FOOTER_CLASS =
   "flex shrink-0 items-center justify-end gap-2 px-6 py-4";
@@ -230,7 +223,7 @@ function AccountSettingsDialogBody({
       <PanelHeader
         titleAs={DialogTitle}
         title="Account"
-        className={DIALOG_HEADER_CLASS}
+        className={appModalHeaderClassName}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -341,39 +334,33 @@ function AccountSettingsDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className={cn(
-          DIALOG_SHELL_BASE,
-          isOffline ? DIALOG_SHELL_HEIGHT_OFFLINE : DIALOG_SHELL_HEIGHT,
-        )}
-        onEscapeKeyDown={preventDismissWhileSaving}
-        onPointerDownOutside={preventDismissWhileSaving}
-        onInteractOutside={preventDismissWhileSaving}
-      >
-        <DialogDescription className="sr-only">
-          Manage your profile and password.
-        </DialogDescription>
-
-        {profile ? (
-          <AccountSettingsDialogBody
-            profile={profile}
-            onSavingChange={setIsSaving}
+    <AppModalFrame
+      open={open}
+      onOpenChange={handleOpenChange}
+      srDescription="Manage your profile and password."
+      className={isOffline ? DIALOG_SHELL_HEIGHT_OFFLINE : undefined}
+      onEscapeKeyDown={preventDismissWhileSaving}
+      onPointerDownOutside={preventDismissWhileSaving}
+      onInteractOutside={preventDismissWhileSaving}
+    >
+      {profile ? (
+        <AccountSettingsDialogBody
+          profile={profile}
+          onSavingChange={setIsSaving}
+        />
+      ) : (
+        <>
+          <PanelHeader
+            titleAs={DialogTitle}
+            title="Account"
+            className={appModalHeaderClassName}
           />
-        ) : (
-          <>
-            <PanelHeader
-              titleAs={DialogTitle}
-              title="Account"
-              className={DIALOG_HEADER_CLASS}
-            />
-            <div className="min-h-0 flex-1">
-              {isLoading ? <LoadingFields rows={3} /> : <UnavailableBody />}
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+          <div className="min-h-0 flex-1">
+            {isLoading ? <LoadingFields rows={3} /> : <UnavailableBody />}
+          </div>
+        </>
+      )}
+    </AppModalFrame>
   );
 }
 

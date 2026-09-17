@@ -16,3 +16,4 @@ Older tables in your project may have been created before this repo’s filename
 | `drop_document_changes_and_snapshots.sql` | Removes legacy `document_changes` / `document_snapshots` tables |
 | `document_publications.sql` | Public published docs: `/[owner segment]/[slug]`, RLS |
 | `document_publication_redirects.sql` | Path redirects after username/slug changes; redirect-before-publication lookup |
+| `document_soft_delete.sql` | `documents.deleted_at`, trash/restore RPCs, hide trashed from `document_exists` |

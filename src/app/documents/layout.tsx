@@ -10,6 +10,7 @@ import { Toaster } from "../_components/ui/toaster";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
 import { AccountSettings } from "../_components/account-settings";
+import { DocumentTrash } from "../_components/document-trash";
 import { Header } from "../_components/header";
 import { DocumentsMain } from "../_components/document-unavailable-state";
 import { DocumentListSeedProvider } from "~/hooks/use-known-document-name";
@@ -63,6 +64,7 @@ export default async function RootLayout({
           </SidebarProvider>
           <CommandMenu />
           <AccountSettings />
+          <DocumentTrash />
         </DocumentListSeedProvider>
       </ThemeProvider>
     </TRPCReactProvider>

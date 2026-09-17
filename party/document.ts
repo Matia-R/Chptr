@@ -130,6 +130,49 @@ export default class DocumentParty implements Party.Server {
     }
   }
 
+  kickAll(reason = "Document not found"): void {
+    for (const conn of this.room.getConnections()) {
+      try {
+        conn.close(4004, reason);
+      } catch {
+        // Connection may already be closing.
+      }
+    }
+    this.authorizedByConnection.clear();
+    this.loadedDoc = null;
+    this.isLoaded = false;
+  }
+
+  async onRequest(req: Party.Request): Promise<Response> {
+    const secret = req.headers.get("X-Partykit-Secret");
+    if (!this.partykitSecret || secret !== this.partykitSecret) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+    if (req.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
+    }
+
+    let body: { type?: string } = {};
+    try {
+      const parsed: unknown = await req.json();
+      if (parsed && typeof parsed === "object" && "type" in parsed) {
+        const type = (parsed as { type?: unknown }).type;
+        body = { type: typeof type === "string" ? type : undefined };
+      }
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    if (body.type !== "trash") {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    this.kickAll();
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   pickSaveToken(): string | null {
     let fallback: string | null = null;
     for (const client of this.authorizedByConnection.values()) {
@@ -168,6 +211,9 @@ export default class DocumentParty implements Party.Server {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 403) {
+          this.kickAll();
+        }
         throw new Error(`Failed to save document: ${response.status}`);
       }
 

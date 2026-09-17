@@ -445,6 +445,7 @@ export async function getPublicationOwnerPathSegmentForDocument(
     .from('documents')
     .select('creator_id')
     .eq('id', documentId)
+    .is('deleted_at', null)
     .maybeSingle()
 
   if (docResult.error) {
@@ -520,6 +521,7 @@ export async function publishDocument(
     .from('documents')
     .select('id, creator_id, name')
     .eq('id', input.documentId)
+    .is('deleted_at', null)
     .single()
 
   if (docResult.error) {
