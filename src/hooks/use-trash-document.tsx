@@ -31,25 +31,40 @@ function getErrorMessage(err: unknown): string {
   return "An unexpected error occurred";
 }
 
+type RestoreDocumentOptions = {
+  openDocument?: boolean;
+  /** When false, the caller reveals the doc in the sidebar after success UI. */
+  updateList?: boolean;
+  /** Toast on success. Default true when not navigating to the document. */
+  notify?: boolean;
+};
+
 export function useRestoreDocument() {
   const router = useRouter();
   const utils = api.useUtils();
   const { toast } = useToast();
   const restoreMutation = api.document.restoreDocument.useMutation();
 
+  const revealInList = useCallback(
+    (id: string, name: string) => {
+      clearLocalDocumentTrash(id);
+      applyDocumentCreated(utils, id, name);
+      broadcastDocumentCreated(id, name);
+    },
+    [utils],
+  );
+
   const restore = useCallback(
-    async (
-      id: string,
-      name: string,
-      options?: { openDocument?: boolean },
-    ) => {
+    async (id: string, name: string, options?: RestoreDocumentOptions) => {
       try {
         await restoreMutation.mutateAsync({ id });
-        clearLocalDocumentTrash(id);
-        applyDocumentCreated(utils, id, name);
-        broadcastDocumentCreated(id, name);
+        if (options?.updateList !== false) {
+          revealInList(id, name);
+        }
         if (options?.openDocument === false) {
-          toast({ title: "Document restored" });
+          if (options.notify !== false) {
+            toast({ title: "Document restored" });
+          }
         } else {
           router.push(`/documents/${id}`);
         }
@@ -63,10 +78,10 @@ export function useRestoreDocument() {
         return false;
       }
     },
-    [restoreMutation, router, toast, utils],
+    [restoreMutation, revealInList, router, toast],
   );
 
-  return { restore };
+  return { restore, revealInList };
 }
 
 function isPersistedDocument(id: string): boolean {

@@ -13,10 +13,16 @@ import {
   MobileMenuDrawer,
 } from "~/app/_components/mobile-drawer";
 import { PanelHeader } from "~/app/_components/panel-header";
+import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useDocumentTrashStore } from "~/hooks/use-document-trash";
 import { useTrashedDocuments } from "~/hooks/use-known-document-name";
 import { useIsMobile } from "~/hooks/use-mobile";
+import {
+  SAVE_FEEDBACK_SETTLE_MS,
+  useSaveFeedback,
+  type SaveFeedbackState,
+} from "~/hooks/use-save-feedback";
 import { useRestoreDocument } from "~/hooks/use-trash-document";
 import { cn } from "~/lib/utils";
 
@@ -35,11 +41,13 @@ function formatTrashDeletedAt(iso: string): string {
 function TrashDocumentsList({
   insetClassName,
   restoringId,
+  restoreState,
   isOffline,
   onRestore,
 }: {
   insetClassName: string;
   restoringId: string | null;
+  restoreState: SaveFeedbackState;
   isOffline: boolean;
   onRestore: (id: string, name: string) => void;
 }) {
@@ -80,13 +88,23 @@ function TrashDocumentsList({
             type="button"
             variant="ghost"
             size="sm"
-            className="shrink-0 cursor-pointer"
-            disabled={isOffline || restoringId === doc.id}
+            className={cn(
+              "shrink-0 min-w-[5.75rem] cursor-pointer",
+              restoringId === doc.id &&
+                restoreState !== "idle" &&
+                "disabled:opacity-100",
+            )}
+            disabled={isOffline || restoringId !== null}
             onClick={() => {
               onRestore(doc.id, doc.name);
             }}
           >
-            {restoringId === doc.id ? "Restoring..." : "Restore"}
+            <SaveFeedbackLabel
+              state={restoringId === doc.id ? restoreState : "idle"}
+              idleLabel="Restore"
+              savingLabel="Restoring"
+              savedLabel="Restored"
+            />
           </Button>
         </li>
       ))}
@@ -95,21 +113,37 @@ function TrashDocumentsList({
 }
 
 function useTrashRestore() {
-  const { restore } = useRestoreDocument();
+  const { restore, revealInList } = useRestoreDocument();
   const isOffline = useBrowserOffline();
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const feedback = useSaveFeedback();
 
   const onRestore = async (id: string, name: string) => {
     if (isOffline || restoringId) return;
     setRestoringId(id);
-    try {
-      await restore(id, name, { openDocument: false });
-    } finally {
+    feedback.start();
+    const ok = await restore(id, name, {
+      openDocument: false,
+      updateList: false,
+      notify: false,
+    });
+    await feedback.settle(ok ? "saved" : "failed");
+    if (!ok) {
       setRestoringId(null);
+      return;
     }
+    window.setTimeout(() => {
+      revealInList(id, name);
+      setRestoringId(null);
+    }, SAVE_FEEDBACK_SETTLE_MS);
   };
 
-  return { isOffline, restoringId, onRestore };
+  return {
+    isOffline,
+    restoringId,
+    restoreState: feedback.state,
+    onRestore,
+  };
 }
 
 function DocumentTrashDialog({
@@ -119,7 +153,7 @@ function DocumentTrashDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { isOffline, restoringId, onRestore } = useTrashRestore();
+  const { isOffline, restoringId, restoreState, onRestore } = useTrashRestore();
 
   return (
     <AppModalFrame
@@ -137,6 +171,7 @@ function DocumentTrashDialog({
         <TrashDocumentsList
           insetClassName="px-6"
           restoringId={restoringId}
+          restoreState={restoreState}
           isOffline={isOffline}
           onRestore={(id, name) => {
             void onRestore(id, name);
@@ -154,7 +189,7 @@ function DocumentTrashDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { isOffline, restoringId, onRestore } = useTrashRestore();
+  const { isOffline, restoringId, restoreState, onRestore } = useTrashRestore();
 
   return (
     <MobileMenuDrawer open={open} onOpenChange={onOpenChange}>
@@ -164,6 +199,7 @@ function DocumentTrashDrawer({
           <TrashDocumentsList
             insetClassName="px-4"
             restoringId={restoringId}
+            restoreState={restoreState}
             isOffline={isOffline}
             onRestore={(id, name) => {
               void onRestore(id, name);
