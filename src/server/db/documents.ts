@@ -122,58 +122,6 @@ async function createDocumentWithPermission(
   }
 }
 
-/**
- * Ensures the user has permission to mutate the document (e.g. save changes).
- * If the document does not exist, creates it and an owner permission for the user.
- * If the document exists but the user has no permission, throws FORBIDDEN.
- * Exported for use by document-changes module.
- */
-export async function ensureCanMutateDocument(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  documentId: string,
-  userId: string
-) {
-  const { data: permission, error: permError } = await supabase
-    .from('document_permissions')
-    .select('id')
-    .eq('document_id', documentId)
-    .eq('user_id', userId)
-    .single()
-
-  if (permError && permError.code !== 'PGRST116') {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to check document permission',
-      cause: permError,
-    })
-  }
-
-  if (permission) return
-
-  const { data: existingDoc, error: docError } = await supabase
-    .from('documents')
-    .select('id')
-    .eq('id', documentId)
-    .single()
-
-  if (docError && docError.code !== 'PGRST116') {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to check document existence',
-      cause: docError,
-    })
-  }
-
-  if (existingDoc) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'You do not have permission to access this document',
-    })
-  }
-
-  await createDocumentWithPermission(supabase, documentId, userId, 'Untitled')
-}
-
 export async function updateDocumentName(
   documentId: string,
   name: string,

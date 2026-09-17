@@ -27,7 +27,7 @@ const UNIQUE_VIOLATION = '23505'
 
 /**
  * Returns the current authenticated user. Throws UNAUTHORIZED if not logged in.
- * Exported for use by documents and document-changes modules.
+ * Exported for use by documents and related modules.
  */
 export async function getAuthenticatedUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user }, error } = await supabase.auth.getUser()

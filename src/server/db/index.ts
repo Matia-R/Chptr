@@ -16,13 +16,6 @@ export {
   updateDocumentName,
 } from './documents'
 export {
-  saveDocumentChange,
-  saveDocumentChanges,
-  getDocumentChanges,
-  getDocumentTailCount,
-  compactDocument,
-} from './document-changes'
-export {
   authorDisplayLabel,
   getPublicationByUsernameSlug,
   getPublicationWithAuthorByUsernameSlug,

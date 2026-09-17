@@ -14,8 +14,8 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 - [Edge Cases](#edge-cases)
 - [UX Optimizations](#ux-optimizations)
 - [Caveats and Limitations](#caveats-and-limitations)
+- [Deployment capacity](#deployment-capacity)
 - [Future Considerations: Multi-User Collaboration](#future-considerations-multi-user-collaboration)
-- [Data Migration](#data-migration)
 
 ---
 
@@ -23,27 +23,17 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 
 ### Why PartyKit?
 
-The previous architecture used `y-webrtc` for peer-to-peer sync between clients. This had several limitations:
-
-| Problem                   | Impact                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| **Mesh topology**         | N clients = N×(N-1)/2 connections. 5 users × 3 tabs = 105 WebRTC connections |
-| **Firewall failures**     | WebRTC P2P fails through corporate/strict firewalls with no fallback         |
-| **Redundant persistence** | Every client independently saves to database (N clients = N save streams)    |
-| **Complex compaction**    | Append-only log + snapshots + background compaction logic                    |
-| **Public signaling**      | Relied on public STUN/TURN servers for connection establishment              |
-
-### PartyKit Solution
-
-PartyKit provides a **server-mediated WebSocket architecture** running on Cloudflare's edge network:
+Real-time collaboration uses PartyKit for a **server-mediated WebSocket** architecture on Cloudflare's edge:
 
 | Benefit                    | Description                                            |
 | -------------------------- | ------------------------------------------------------ |
 | **Star topology**          | N clients = N connections (to central server)          |
 | **Universal connectivity** | WebSocket works through all firewalls                  |
 | **Single writer**          | Only PartyKit server persists to database              |
-| **Simple schema**          | One table, full state, no compaction                   |
-| **Free tier**              | Cloudflare Workers free tier covers small-medium usage |
+| **Simple schema**          | One table, full Y.Doc state per document               |
+| **Free tier**              | PartyKit Individual (managed `*.partykit.dev`): 10 live projects; room storage cleared every 24h; small workloads only |
+
+Those are PartyKit **managed-plan** limits, not Cloudflare Workers Free quotas. This repo deploys one project (`chptr-collab`) to that runtime. See [Deployment capacity](#deployment-capacity).
 
 ---
 
@@ -274,15 +264,7 @@ CREATE POLICY "Users can write document_state if they have write permission"
     );
 ```
 
-### Schema Comparison
-
-| Aspect           | Old (y-webrtc)                            | New (PartyKit)   |
-| ---------------- | ----------------------------------------- | ---------------- |
-| **Tables**       | `document_changes` + `document_snapshots` | `document_state` |
-| **Rows per doc** | Many (1 per change) + 1 snapshot          | 1                |
-| **Compaction**   | Required (when changes > 100)             | Not needed       |
-| **Storage**      | Incremental updates                       | Full state       |
-| **Complexity**   | High (compaction logic)                   | Low              |
+Each document has one `document_state` row storing the full Y.Doc (`Y.encodeStateAsUpdate`). PartyKit is the only writer; saves also bump `documents.last_updated`.
 
 ---
 
@@ -516,7 +498,7 @@ Authorization is **per connection**. The in-memory Y.Doc is cached after the fir
 
 ## Publish UI and New-Document Persistence
 
-The publish button lives in the app header (layout), not in the document page. The PartyKit Y.Doc is created in `useCollaborativeDocPartykit` on the page. Those two trees share state through `useCollaborativeDocStore` so the header can follow the live CRDT without owning the socket.
+The publish button lives in the app header (layout), not in the document page. The Y.Doc is created in `useCollaborativeDoc` on the page. Those two trees share state through `useCollaborativeDocStore` so the header can follow the live document without owning the socket.
 
 ### Why this exists
 
@@ -640,7 +622,7 @@ documents/layout.tsx
     DocumentActions        ──► same
 
 documents/[documentId]/page.tsx
-  useCollaborativeDocPartykit()
+  useCollaborativeDoc()
     bindDocument / setYdoc / setPersisted
     ydoc.on("update") → setYjsPublishState
 ```
@@ -653,7 +635,7 @@ The header is a **sibling** of the page and stays mounted across `/documents/{id
 
 | File                                                    | Role                                                            |
 | ------------------------------------------------------- | --------------------------------------------------------------- |
-| `src/hooks/use-collaborative-doc-partykit.ts`           | Bind store, persist on `connected`, observe Yjs for dirty       |
+| `src/hooks/use-collaborative-doc.ts`                    | Bind store, persist on `connected`, observe Yjs for dirty       |
 | `src/app/_components/editor/collaborative-doc-store.ts` | Cross-tree session (header ↔ page)                             |
 | `src/lib/yjs-publish-state.ts`                          | Hash + read/write `chptr-publish` map                           |
 | `src/hooks/use-document-publish.tsx`                    | Label, mutations, write hash after publish                      |
@@ -900,6 +882,43 @@ New document creation feels instant because:
 
 ---
 
+## Deployment capacity
+
+Capacity depends on **where** PartyKit is hosted. Do not treat Cloudflare Workers Free (100,000 requests/day, 10 ms CPU/invocation) or Durable Objects Free (100,000 requests/day, 13,000 GB-s/day) as quotas for the managed PartyKit runtime.
+
+### Managed PartyKit (this deployment)
+
+`npm run deploy:partykit` publishes to PartyKit’s Individual plan at `chptr-collab.partykit.dev` ([partykit.io](https://www.partykit.io/)):
+
+| Limit                         | Current Individual plan                          |
+| ----------------------------- | ------------------------------------------------ |
+| Price                         | Free                                             |
+| Live projects                 | Up to 10 (this app uses 1: `chptr-collab`)       |
+| PartyKit room storage         | Cleared every 24 hours                           |
+| Stated fit                    | Small projects                                   |
+| Connections per room          | ~100 without hibernation (this server)           |
+| Memory per room               | ~128 MiB                                         |
+
+That is suitable only for a **small** collaboration workload: one managed project, document state in Postgres, and well under 100 sockets per open document. Grow past that (many concurrent editors on one doc, many always-on rooms, or production SLAs) by moving off Individual — typically to PartyKit Commercial / [cloud-prem](https://docs.partykit.io/guides/deploy-to-cloudflare/) on your own Cloudflare account.
+
+### Self-managed Cloudflare (cloud-prem) only
+
+If you deploy with `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` onto your own account, the PartyKit **platform fee is $0**. Usage is then limited and billed by Cloudflare, not by PartyKit’s Individual caps. Current Workers Free / Durable Objects Free allotments (reset 00:00 UTC; confirm on Cloudflare’s pages before planning):
+
+| Resource                         | Workers / DO Free (self-managed) | Paid (self-managed)                                      |
+| -------------------------------- | -------------------------------- | -------------------------------------------------------- |
+| Worker requests                  | 100,000 / day                    | 10 million / month included, then usage rates            |
+| Worker CPU / invocation          | 10 ms                            | Default 30 s, configurable up to 5 min                   |
+| Durable Object requests          | 100,000 / day                    | 1 million / month included; WebSocket messages included  |
+| Durable Object duration          | 13,000 GB-s / day                | 400,000 GB-s / month included                            |
+| Durable Object SQL storage       | 5 GB total; 5M row reads / 100k writes per day | Higher monthly inclusions                          |
+
+Sources: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/), [Durable Objects limits](https://developers.cloudflare.com/durable-objects/platform/limits/). WebSocket **upgrade** counts as a Worker request; on Durable Objects, incoming WebSocket **messages** count toward DO requests (Cloudflare applies a 20:1 billing ratio for message size). This collaboration server keeps the Y.Doc in memory and cannot hibernate, so DO duration can accrue while sockets stay connected.
+
+These Cloudflare numbers are **not** the capacity of `*.partykit.dev`.
+
+---
+
 ## Future Considerations: Multi-User Collaboration
 
 ### Sharing Flow Design
@@ -992,60 +1011,6 @@ Future: Notify users when:
 
 ---
 
-## Data Migration
-
-### Migrating from Old Schema
-
-A migration script is provided to convert existing documents from the old `document_changes` + `document_snapshots` schema to the new `document_state` schema.
-
-**Location:** `scripts/migrate-to-partykit.ts`
-
-**What it does:**
-
-1. Scans for all documents with data in the old tables
-2. For each document:
-   - Loads the snapshot (if exists)
-   - Loads all changes after the snapshot cutoff (the "tail")
-   - Reconstructs the full Y.Doc by applying snapshot + tail
-   - Encodes the full state and inserts into `document_state`
-3. Provides detailed progress and error reporting
-
-**Usage:**
-
-```bash
-# First, do a dry run to see what would be migrated
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --dry-run
-
-# Run the actual migration
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts
-
-# Migrate a specific document
-SUPABASE_SERVICE_ROLE_KEY="your-key" npx tsx scripts/migrate-to-partykit.ts --document-id=<uuid>
-```
-
-**Requirements:**
-
-- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (from Supabase Dashboard → Settings → API)
-
-**Notes:**
-
-- The script uses the service role key to bypass RLS and access all documents
-- Already-migrated documents are skipped (safe to re-run)
-- Old tables are not modified - you can run both systems side-by-side
-- The script processes documents in batches of 50 for efficiency
-
-### Rollback Procedure
-
-To revert to y-webrtc:
-
-1. Restore old hook import in `page.tsx`
-2. Restore `WebrtcProvider` type in `editor.tsx`
-3. Keep `document_state` table (no harm)
-4. Old `document_changes` and `document_snapshots` tables still exist
-
----
-
 ## Summary
 
 | Aspect               | Implementation                                                                               |
@@ -1060,6 +1025,6 @@ To revert to y-webrtc:
 | **Publish / Update** | Shared Yjs `contentHash` in `chptr-publish`; all connected clients see the same button state |
 | **Multi-tab**        | Fully supported via PartyKit sync (including publish dirty)                                  |
 | **Offline**          | Limited (local Y.Doc only, no IndexedDB)                                                     |
-| **Cost**             | Free tier for small usage                                                                    |
+| **Cost / capacity**  | PartyKit Individual: free for a small managed workload (10 projects, 24h room storage); Workers/DO limits only if self-hosted on Cloudflare |
 
-This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same CRDT.
+This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same document.
