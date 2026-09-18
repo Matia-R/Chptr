@@ -4,3 +4,7 @@ const WRITE_PERMISSIONS = new Set(["editor", "owner"]);
 export function canWrite(permission: string | null | undefined): boolean {
   return permission != null && WRITE_PERMISSIONS.has(permission);
 }
+
+export function canDelete(permission: string | null | undefined): boolean {
+  return permission === "owner";
+}

@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -152,15 +153,14 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     (s) => s.resetForNavigation,
   );
 
-  /** Reset panel state in render so the first paint of the new route is clean. */
-  const prevDocumentIdForResetRef = useRef<string | undefined>(undefined);
-  if (prevDocumentIdForResetRef.current !== documentId) {
-    const prev = prevDocumentIdForResetRef.current;
+  // Zustand subscribers include DocumentActions and the publish button. Reset
+  // after commit (before paint) so a document switch cannot setState during render.
+  const prevDocumentIdForResetRef = useRef(documentId);
+  useLayoutEffect(() => {
+    if (prevDocumentIdForResetRef.current === documentId) return;
     prevDocumentIdForResetRef.current = documentId;
-    if (prev !== undefined) {
-      resetForNavigation();
-    }
-  }
+    resetForNavigation();
+  }, [documentId, resetForNavigation]);
 
   const utils = api.useUtils();
 

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "./button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Skeleton } from "./skeleton";
@@ -23,6 +25,7 @@ import { useDocumentPublishStore } from "./editor/document-publish-store";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useDocumentIsPersisted } from "./editor/collaborative-doc-store";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { useTrashDocument } from "~/hooks/use-trash-document";
 
 function formatPublicationDate(iso: string): string {
   const d = new Date(iso);
@@ -40,6 +43,8 @@ export function DocumentActions() {
   const isMobile = useIsMobile();
   const publishCtx = useDocumentPublish();
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
+  const { trashCurrent, isPending, isOffline: trashOffline } =
+    useTrashDocument();
 
   const drawerOpen = publishCtx?.mobileDrawerOpen ?? localDrawerOpen;
   const setDrawerOpen = (next: boolean) => {
@@ -163,6 +168,17 @@ export function DocumentActions() {
       <DropdownMenuTrigger asChild>{triggerButton}</DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <div className="px-2 py-1.5">{statusText}</div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={trashOffline || isPending}
+          className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+          onSelect={() => {
+            void trashCurrent();
+          }}
+        >
+          <Trash2 />
+          Move to trash
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -3,6 +3,7 @@ import { canWrite } from "~/lib/document-permission";
 import {
   authenticatePartykitUser,
   getDocumentPermission,
+  isDocumentActive,
 } from "~/server/partykit/auth";
 
 function base64ToBytea(base64: string): string {
@@ -36,6 +37,11 @@ export async function POST(request: Request) {
     );
     if (!canWrite(permission)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const active = await isDocumentActive(auth.supabase, documentId);
+    if (!active) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
     const { error: upsertError } = await auth.supabase

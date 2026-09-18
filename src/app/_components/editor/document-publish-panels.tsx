@@ -9,6 +9,7 @@ import {
   GlobeOff,
   Link as LinkIcon,
   Loader2,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -42,6 +43,7 @@ import {
   type MobileDrawerView,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
+import { useTrashDocument } from "~/hooks/use-trash-document";
 
 function getMobilePublishActionRow(
   publishFeedback: PublishFeedbackState,
@@ -157,9 +159,13 @@ function MobilePublishEditUrlView({
 
 function MobilePublishMainView({
   onEditUrl,
+  onMoveToTrash,
+  moveToTrashDisabled,
   statusRow,
 }: {
   onEditUrl: () => void;
+  onMoveToTrash: () => void;
+  moveToTrashDisabled: boolean;
   statusRow: ReactNode;
 }) {
   const ctx = useDocumentPublish();
@@ -264,6 +270,16 @@ function MobilePublishMainView({
               onClick={unpublish}
             />
           </MobileActionGroup>
+
+          <MobileActionGroup>
+            <MobileActionButtonRow
+              icon={Trash2}
+              label="Move to trash"
+              destructive
+              disabled={moveToTrashDisabled}
+              onClick={onMoveToTrash}
+            />
+          </MobileActionGroup>
         </div>
       </div>
     );
@@ -297,6 +313,15 @@ function MobilePublishMainView({
             }}
           />
         </MobileActionGroup>
+        <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={Trash2}
+            label="Move to trash"
+            destructive
+            disabled={moveToTrashDisabled}
+            onClick={onMoveToTrash}
+          />
+        </MobileActionGroup>
       </div>
     </div>
   );
@@ -311,6 +336,7 @@ export function DocumentPublishMobileDrawer({
   const ctx = useDocumentPublish();
   const view = useDocumentPublishStore((s) => s.mobileDrawerView);
   const setView = useDocumentPublishStore((s) => s.setMobileDrawerView);
+  const { trashCurrent, isPending, isOffline } = useTrashDocument();
 
   const showPublishedPopoverActions = ctx?.showPublishedPopoverActions;
   const publicationSlug = ctx?.publication?.slug;
@@ -331,6 +357,8 @@ export function DocumentPublishMobileDrawer({
 
   if (!ctx) return null;
 
+  const moveToTrashDisabled = isOffline || isPending || ctx.busy;
+
   return (
     <MobileDrawerViewStack
       view={view}
@@ -339,25 +367,32 @@ export function DocumentPublishMobileDrawer({
       stageIsMeasured={stage.stageIsMeasured}
       stageRef={stage.stageRef}
       getMotionRef={stage.getMotionRef}
-      renderView={(currentView) =>
-        currentView === "edit-url" ? (
-          <MobilePublishEditUrlView
-            buildUrlSlugCluster={ctx.buildUrlSlugCluster}
-            ownerPreview={ctx.ownerPreview}
-            busy={ctx.busy}
-            onBack={stage.returnToMainView}
-            onDone={stage.returnToMainView}
-          />
-        ) : (
+      renderView={(currentView) => {
+        if (currentView === "edit-url") {
+          return (
+            <MobilePublishEditUrlView
+              buildUrlSlugCluster={ctx.buildUrlSlugCluster}
+              ownerPreview={ctx.ownerPreview}
+              busy={ctx.busy}
+              onBack={stage.returnToMainView}
+              onDone={stage.returnToMainView}
+            />
+          );
+        }
+        return (
           <MobilePublishMainView
             statusRow={statusRow}
             onEditUrl={() => {
               stage.measureMainStage();
               stage.goToView("edit-url", 1);
             }}
+            onMoveToTrash={() => {
+              void trashCurrent();
+            }}
+            moveToTrashDisabled={moveToTrashDisabled}
           />
-        )
-      }
+        );
+      }}
     />
   );
 }

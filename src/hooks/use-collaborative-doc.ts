@@ -17,6 +17,11 @@ import {
   getYjsContentHash,
   getYjsPublishedContentHash,
 } from "~/lib/yjs-publish-state";
+import {
+  DOCUMENT_META_CHANNEL,
+  isLocalDocumentTrash,
+  type DocumentMetaMessage,
+} from "~/hooks/use-document-meta-sync";
 
 interface UseCollaborativeDocOptions {
   documentId: string;
@@ -289,6 +294,25 @@ export function useCollaborativeDoc({
           setIsLoading(false);
         };
 
+        const onDocumentMeta = (event: MessageEvent<DocumentMetaMessage>) => {
+          const msg = event.data;
+          if (!msg || typeof msg !== "object") return;
+          if (
+            (msg.type === "deleted" || msg.type === "trashed") &&
+            msg.documentId === documentId
+          ) {
+            if (isLocalDocumentTrash(documentId)) return;
+            failFatal(
+              new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist."),
+            );
+          }
+        };
+        let metaChannel: BroadcastChannel | null = null;
+        if (typeof BroadcastChannel !== "undefined") {
+          metaChannel = new BroadcastChannel(DOCUMENT_META_CHANNEL);
+          metaChannel.addEventListener("message", onDocumentMeta);
+        }
+
         // y-partykit's built-in retry calls setupWS with the URL from the last
         // connect(), so a sleep/wake reconnect would reuse an expired JWT.
         // Pause that retry and reconnect through provider.connect() so params()
@@ -431,6 +455,11 @@ export function useCollaborativeDoc({
             ? accessErrorForCloseCode(event.code)
             : null;
           if (fatalError) {
+            if (isLocalDocumentTrash(documentId)) {
+              closedForAuth = true;
+              stopReconnect(provider);
+              return;
+            }
             failFatal(fatalError);
             return;
           }
@@ -516,6 +545,7 @@ export function useCollaborativeDoc({
             })
             .catch((err: unknown) => {
               if (cancelled || closedForAuth) return;
+              if (isLocalDocumentTrash(documentId)) return;
               const accessError = accessErrorFromTrpc(err);
               if (!accessError) {
                 if (getDocumentErrorCode(err) === "UNAUTHORIZED") {
@@ -534,6 +564,8 @@ export function useCollaborativeDoc({
           if (publishWatchTimer != null) {
             window.clearTimeout(publishWatchTimer);
           }
+          metaChannel?.removeEventListener("message", onDocumentMeta);
+          metaChannel?.close();
           ydoc.off("update", onYjsUpdate);
           subscription.unsubscribe();
           document.removeEventListener("visibilitychange", onVisible);

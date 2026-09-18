@@ -57,7 +57,7 @@ export function MobileActionButtonRow({
       onClick={onClick}
       onPointerDown={onPointerDown}
       className={cn(
-        "flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+        "flex min-h-[44px] w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors",
         "border-t border-sidebar-border/55 first:border-t-0 dark:border-white/[0.08]",
         "active:bg-sidebar-accent dark:active:bg-white/[0.06]",
         "disabled:pointer-events-none disabled:opacity-45",

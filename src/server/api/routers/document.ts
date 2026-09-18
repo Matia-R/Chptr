@@ -9,6 +9,8 @@ import {
   getLastUpdatedTimestamp,
   getDocumentIdsForUser as getDocumentsIdsForUser,
   updateDocumentName,
+  trashDocument as trashDocumentRecord,
+  restoreDocument as restoreDocumentRecord,
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,
@@ -127,5 +129,17 @@ export const documentRouter = createTRPCRouter({
         .input(z.string().uuid())
         .mutation(async ({ input, ctx }) => {
             return unpublishDocument(input, authFromCtx(ctx));
+        }),
+
+    trashDocument: protectedProcedure
+        .input(z.object({ id: z.string().uuid() }))
+        .mutation(async ({ input, ctx }) => {
+            return trashDocumentRecord(input.id, authFromCtx(ctx));
+        }),
+
+    restoreDocument: protectedProcedure
+        .input(z.object({ id: z.string().uuid() }))
+        .mutation(async ({ input, ctx }) => {
+            return restoreDocumentRecord(input.id, authFromCtx(ctx));
         }),
 });

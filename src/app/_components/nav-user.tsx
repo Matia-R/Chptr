@@ -7,6 +7,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Trash2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -31,6 +32,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "~/utils/supabase/client";
 import { Skeleton } from "~/app/_components/skeleton";
 import { useAccountSettingsStore } from "~/hooks/use-account-settings";
+import { useDocumentTrashStore } from "~/hooks/use-document-trash";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { cn } from "~/lib/utils";
 
@@ -55,6 +57,7 @@ export function NavUser({
   const router = useRouter();
   const queryClient = useQueryClient();
   const openAccountSettings = useAccountSettingsStore((state) => state.open);
+  const openTrash = useDocumentTrashStore((state) => state.open);
   const isOffline = useBrowserOffline();
 
   // On mobile the nav itself is a drawer; dismiss it before opening the
@@ -217,27 +220,40 @@ export function NavUser({
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+              >
+                {theme === "dark" ? (
+                  <Sun className="size-4" />
+                ) : (
+                  <Moon className="size-4" />
+                )}
+                {theme === "dark" ? "Light" : "Dark"} mode
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator className="dark:bg-white/10" />
-            <DropdownMenuItem
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
-            >
-              {theme === "dark" ? (
-                <Sun className="size-4" />
-              ) : (
-                <Moon className="size-4" />
-              )}
-              {theme === "dark" ? "Light" : "Dark"} mode
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
-              disabled={isOffline}
-              onClick={handleSignOut}
-            >
-              <LogOut />
-              Log out
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+                onSelect={() => {
+                  openTrash();
+                }}
+              >
+                <Trash2 />
+                Trash
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+                disabled={isOffline}
+                onSelect={() => {
+                  void handleSignOut();
+                }}
+              >
+                <LogOut />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
