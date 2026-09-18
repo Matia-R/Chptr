@@ -1,12 +1,9 @@
 -- Soft-delete documents: trash sets deleted_at, restore clears it.
 -- Active docs are deleted_at IS NULL. Purge (hard DELETE) is a later job.
+-- Recency index: documents_active_last_updated_idx.sql (CONCURRENTLY, not apply_migration).
 
 ALTER TABLE public.documents
   ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
-
-CREATE INDEX IF NOT EXISTS documents_active_last_updated_idx
-  ON public.documents (last_updated DESC)
-  WHERE deleted_at IS NULL;
 
 -- Existence for PartyKit 403 vs 404: trashed docs look missing.
 CREATE OR REPLACE FUNCTION public.document_exists(p_document_id uuid)
