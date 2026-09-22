@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import {
   AppModalFrame,
@@ -28,6 +28,9 @@ import { cn } from "~/lib/utils";
 
 export const TRASH_DISCLAIMER =
   "Documents in Trash are permanently deleted after 30 days unless you restore them.";
+
+/** Title + date + py-3 + row rule. Same slide as the sidebar document list. */
+const TRASH_DOC_ROW_STRIDE = 61;
 
 function formatTrashDeletedAt(iso: string): string {
   const deleted = new Date(iso);
@@ -67,14 +70,29 @@ function TrashDocumentsList({
   }
 
   return (
-    <ul className="flex flex-col">
-      {documents.map((doc) => (
+    <ul
+      className="relative"
+      style={
+        {
+          "--item-count": documents.length,
+          "--row-stride": `${TRASH_DOC_ROW_STRIDE}px`,
+          height: "calc(var(--item-count) * var(--row-stride))",
+        } as CSSProperties
+      }
+    >
+      {documents.map((doc, index) => (
         <li
           key={doc.id}
           className={cn(
-            "flex items-center gap-3 border-b border-sidebar-border/60 py-3 last:border-b-0",
+            "ease-[cubic-bezier(0.4,0,0.2,1)] absolute inset-x-0 top-0 flex h-[var(--row-stride)] items-center gap-3 border-b border-sidebar-border/60 py-3 last:border-b-0 transform transition-transform duration-300",
             insetClassName,
           )}
+          style={
+            {
+              "--index": index,
+              transform: "translateY(calc(var(--index) * var(--row-stride)))",
+            } as CSSProperties
+          }
         >
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-sidebar-foreground">
