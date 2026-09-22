@@ -158,6 +158,7 @@ export function useCollaborativeDoc({
   const reconnectGraceTimerRef = useRef<number | null>(null);
   const isOffline = useBrowserOffline();
   const [showReconnectUi, setShowReconnectUi] = useState(false);
+  const [liveSession, setLiveSession] = useState(0);
 
   const retryConnection = useCallback(() => {
     retryConnectionRef.current?.();
@@ -297,14 +298,16 @@ export function useCollaborativeDoc({
         const onDocumentMeta = (event: MessageEvent<DocumentMetaMessage>) => {
           const msg = event.data;
           if (!msg || typeof msg !== "object") return;
-          if (
-            (msg.type === "deleted" || msg.type === "trashed") &&
-            msg.documentId === documentId
-          ) {
+          if (msg.documentId !== documentId) return;
+          if (msg.type === "deleted" || msg.type === "trashed") {
             if (isLocalDocumentTrash(documentId)) return;
             failFatal(
               new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist."),
             );
+            return;
+          }
+          if (msg.type === "created" && closedForAuth) {
+            setLiveSession((n) => n + 1);
           }
         };
         let metaChannel: BroadcastChannel | null = null;
@@ -602,7 +605,7 @@ export function useCollaborativeDoc({
     };
     // utils is a stable tRPC client; including it retriggers setup and tears down the room.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentId, isNew]);
+  }, [documentId, isNew, liveSession]);
 
   return {
     ydoc: state?.ydoc ?? null,
