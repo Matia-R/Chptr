@@ -77,6 +77,25 @@ export async function getDocumentPermission(
   return (data?.permission as string | undefined) ?? null;
 }
 
+/** False for missing and trashed documents. */
+export async function isDocumentActive(
+  supabase: PartykitSupabase,
+  documentId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("deleted_at")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[PartyKit] Active-document lookup failed:", error);
+    throw error;
+  }
+
+  return data != null && (data as { deleted_at: string | null }).deleted_at == null;
+}
+
 /**
  * Privileged existence check. RLS would hide other users' documents as
  * "not found"; this RPC only returns a boolean so we can distinguish 403 vs 404.

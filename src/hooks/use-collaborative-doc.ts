@@ -13,10 +13,16 @@ import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
+import { clearNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import {
   getYjsContentHash,
   getYjsPublishedContentHash,
 } from "~/lib/yjs-publish-state";
+import {
+  DOCUMENT_META_CHANNEL,
+  isLocalDocumentTrash,
+  type DocumentMetaMessage,
+} from "~/hooks/use-document-meta-sync";
 
 interface UseCollaborativeDocOptions {
   documentId: string;
@@ -153,6 +159,7 @@ export function useCollaborativeDoc({
   const reconnectGraceTimerRef = useRef<number | null>(null);
   const isOffline = useBrowserOffline();
   const [showReconnectUi, setShowReconnectUi] = useState(false);
+  const [liveSession, setLiveSession] = useState(0);
 
   const retryConnection = useCallback(() => {
     retryConnectionRef.current?.();
@@ -289,6 +296,27 @@ export function useCollaborativeDoc({
           setIsLoading(false);
         };
 
+        const onDocumentMeta = (event: MessageEvent<DocumentMetaMessage>) => {
+          const msg = event.data;
+          if (!msg || typeof msg !== "object") return;
+          if (msg.documentId !== documentId) return;
+          if (msg.type === "deleted" || msg.type === "trashed") {
+            if (isLocalDocumentTrash(documentId)) return;
+            failFatal(
+              new DocumentAccessError("NOT_FOUND", "This doc doesn’t exist."),
+            );
+            return;
+          }
+          if (msg.type === "created" && closedForAuth) {
+            setLiveSession((n) => n + 1);
+          }
+        };
+        let metaChannel: BroadcastChannel | null = null;
+        if (typeof BroadcastChannel !== "undefined") {
+          metaChannel = new BroadcastChannel(DOCUMENT_META_CHANNEL);
+          metaChannel.addEventListener("message", onDocumentMeta);
+        }
+
         // y-partykit's built-in retry calls setupWS with the URL from the last
         // connect(), so a sleep/wake reconnect would reuse an expired JWT.
         // Pause that retry and reconnect through provider.connect() so params()
@@ -417,6 +445,7 @@ export function useCollaborativeDoc({
               // would otherwise look like the first failure forever.
               setEverConnected(true);
               useCollaborativeDocStore.getState().setPersisted(true);
+              clearNewDocumentFlag(documentId);
             }
             if (status === "disconnected") {
               setIsSynced(false);
@@ -431,6 +460,11 @@ export function useCollaborativeDoc({
             ? accessErrorForCloseCode(event.code)
             : null;
           if (fatalError) {
+            if (isLocalDocumentTrash(documentId)) {
+              closedForAuth = true;
+              stopReconnect(provider);
+              return;
+            }
             failFatal(fatalError);
             return;
           }
@@ -516,6 +550,7 @@ export function useCollaborativeDoc({
             })
             .catch((err: unknown) => {
               if (cancelled || closedForAuth) return;
+              if (isLocalDocumentTrash(documentId)) return;
               const accessError = accessErrorFromTrpc(err);
               if (!accessError) {
                 if (getDocumentErrorCode(err) === "UNAUTHORIZED") {
@@ -534,6 +569,8 @@ export function useCollaborativeDoc({
           if (publishWatchTimer != null) {
             window.clearTimeout(publishWatchTimer);
           }
+          metaChannel?.removeEventListener("message", onDocumentMeta);
+          metaChannel?.close();
           ydoc.off("update", onYjsUpdate);
           subscription.unsubscribe();
           document.removeEventListener("visibilitychange", onVisible);
@@ -570,7 +607,7 @@ export function useCollaborativeDoc({
     };
     // utils is a stable tRPC client; including it retriggers setup and tears down the room.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentId, isNew]);
+  }, [documentId, isNew, liveSession]);
 
   return {
     ydoc: state?.ydoc ?? null,

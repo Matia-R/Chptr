@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { isDocumentUnavailableError } from "~/lib/document-access-error";
+import { isLocalDocumentTrash } from "~/hooks/use-document-meta-sync";
 
 type DocumentUnavailableState = {
   isUnavailable: boolean;
@@ -17,11 +18,16 @@ export const useDocumentUnavailableStore = create<DocumentUnavailableState>(
 );
 
 /** Publish missing/no-access load errors to the documents shell empty state. */
-export function useReportDocumentUnavailable(error: unknown): boolean {
+export function useReportDocumentUnavailable(
+  error: unknown,
+  documentId?: string,
+): boolean {
   const setUnavailable = useDocumentUnavailableStore(
     (state) => state.setUnavailable,
   );
-  const isUnavailable = isDocumentUnavailableError(error);
+  const isUnavailable =
+    isDocumentUnavailableError(error) &&
+    !(documentId != null && isLocalDocumentTrash(documentId));
 
   useEffect(() => {
     setUnavailable(isUnavailable);

@@ -14,6 +14,8 @@ export {
   getLastUpdatedTimestamp,
   getDocumentIdsForUser,
   updateDocumentName,
+  trashDocument,
+  restoreDocument,
 } from './documents'
 export {
   authorDisplayLabel,

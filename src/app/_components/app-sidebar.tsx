@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PanelLeftClose, Plus, Search } from "lucide-react";
+import { MoreHorizontal, PanelLeftClose, Plus, Search, Trash2 } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -13,12 +13,19 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
   useSidebar,
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/app/_components/dropdown-menu";
 import { NavUser } from "./nav-user";
 import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
@@ -27,6 +34,7 @@ import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useDocumentList } from "~/hooks/use-known-document-name";
+import { useTrashDocument } from "~/hooks/use-trash-document";
 import {
   applyDocumentCreated,
   broadcastDocumentCreated,
@@ -72,6 +80,49 @@ const DESKTOP_DOC_ROW_HEIGHT = 36;
 const DESKTOP_DOC_ROW_GAP = 4;
 const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
 
+const TRASH_MENU_ITEM_CLASSNAME =
+  "cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive";
+
+function DocumentRowMenu({
+  disabled,
+  onTrash,
+  trigger,
+}: {
+  disabled: boolean;
+  onTrash: () => void;
+  trigger: React.ReactNode;
+}) {
+  return (
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) return;
+        // Closing leaves focus on the trigger; showOnHover would keep the
+        // ellipsis visible via group-focus-within.
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement) focused.blur();
+      }}
+    >
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="right"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <DropdownMenuItem
+          disabled={disabled}
+          className={TRASH_MENU_ITEM_CLASSNAME}
+          onSelect={onTrash}
+        >
+          <Trash2 />
+          Move to trash
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -80,6 +131,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { isMobile, setOpenMobile } = useSidebar();
   const prefetchDocumentState = usePrefetchDocumentState();
   const isOffline = useBrowserOffline();
+  const { trashDocument, isPending: trashPending } = useTrashDocument();
   useDocumentMetaSync();
 
   // State to track scroll position for shadow indicators
@@ -199,7 +251,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarMenuButton
         asChild
         isActive={pathname === `/documents/${doc.id}`}
-        className="h-9 data-[active=true]:font-normal"
+        className="h-9 pr-2 data-[active=true]:font-normal group-has-[[data-sidebar=menu-action]]/menu-item:pr-2 group-hover/menu-item:!pr-8 group-has-[[data-state=open]]/menu-item:!pr-8 group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-accent-foreground group-has-[[data-state=open]]/menu-item:bg-sidebar-accent group-has-[[data-state=open]]/menu-item:text-sidebar-accent-foreground"
       >
         <Link
           href={`/documents/${doc.id}`}
@@ -207,9 +259,25 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           onMouseEnter={() => prefetchDocumentState(doc.id)}
           onPointerDown={() => prefetchDocumentState(doc.id)}
         >
-          <span className="truncate">{doc.name}</span>
+          <span className="min-w-0 w-full truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
+      <DocumentRowMenu
+        disabled={isOffline || trashPending}
+        onTrash={() => {
+          void trashDocument(doc.id, doc.name);
+        }}
+        trigger={
+          <SidebarMenuAction
+            showOnHover
+            type="button"
+            aria-label="Open menu"
+            className="!top-0 right-1 h-9 w-7 aspect-auto translate-y-0 cursor-pointer bg-transparent text-muted-foreground hover:bg-transparent hover:!text-sidebar-accent-foreground focus-visible:bg-transparent focus-visible:ring-0 focus-visible:!text-sidebar-accent-foreground peer-hover/menu-button:text-muted-foreground peer-data-[active=true]/menu-button:text-muted-foreground"
+          >
+            <MoreHorizontal />
+          </SidebarMenuAction>
+        }
+      />
     </SidebarMenuItem>
   ));
 
@@ -219,6 +287,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         className="h-full"
         ref={scrollAreaRef}
         onScroll={handleScroll}
+        scrollbarGutter
+        type="scroll"
       >
         {showTopShadow && (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 border-t bg-gradient-to-b from-border/20 to-transparent" />

@@ -10,6 +10,7 @@ import { Toaster } from "../_components/ui/toaster";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
 import { AccountSettings } from "../_components/account-settings";
+import { DocumentTrash } from "../_components/document-trash";
 import { Header } from "../_components/header";
 import { DocumentsMain } from "../_components/document-unavailable-state";
 import { DocumentListSeedProvider } from "~/hooks/use-known-document-name";
@@ -31,16 +32,19 @@ export const metadata: Metadata = {
   ],
 };
 
-async function getDocuments() {
+async function getDocumentListSeed() {
   const caller = await getTrpcCaller();
   const result = await caller.document.getDocumentIdsForAuthenticatedUser();
-  return result.documents ?? [];
+  return {
+    documents: result.documents ?? [],
+    trashedDocuments: result.trashedDocuments ?? [],
+  };
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const documents = await getDocuments();
+  const { documents, trashedDocuments } = await getDocumentListSeed();
 
   return (
     <TRPCReactProvider>
@@ -50,7 +54,10 @@ export default async function RootLayout({
         enableSystem
         disableTransitionOnChange
       >
-        <DocumentListSeedProvider documents={documents}>
+        <DocumentListSeedProvider
+          documents={documents}
+          trashedDocuments={trashedDocuments}
+        >
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
@@ -63,6 +70,7 @@ export default async function RootLayout({
           </SidebarProvider>
           <CommandMenu />
           <AccountSettings />
+          <DocumentTrash />
         </DocumentListSeedProvider>
       </ThemeProvider>
     </TRPCReactProvider>

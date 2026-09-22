@@ -1,0 +1,54 @@
+---
+description: Spinner and motion for save, publish, restore, and other async action buttons
+globs: src/**/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Async action feedback
+
+Any control that commits something (save, publish, restore, update password, etc.) must play the shared idle → pending → success (or failed) sequence. Do not swap the label to “Saving…” with no spinner, and do not skip success just because the request was fast.
+
+## Use these primitives
+
+- Timing: `useSaveFeedback` in `~/hooks/use-save-feedback`
+- Button content: `SaveFeedbackLabel` in `~/app/_components/save-feedback-label`
+- Motion: `SAVE_FEEDBACK_CONTENT_TRANSITION` (`duration: 0.18`, ease `[0.22, 1, 0.36, 1]`). Previous content fades out; the next state fades and slides in from `y: -6`.
+
+Do not invent a second spinner, check icon, or Framer transition for this.
+
+## Timing
+
+| Token | Value | Role |
+|---|---|---|
+| `SAVE_FEEDBACK_MIN_SAVING_MS` | 500 | Minimum spinner time, even if the server returns instantly |
+| `SAVE_FEEDBACK_RESULT_MS` | 1200 | How long Saved / Failed stays before idle |
+| `SAVE_FEEDBACK_SETTLE_MS` | 700 | Delay before close, navigate, or removing the row |
+
+`start()` before the request. `await settle("saved" | "failed")` after. Use `runAfterResult` (or an equivalent timeout) for navigation/list updates so success is visible first.
+
+## Button
+
+- Idle / pending / success labels (e.g. Restore → Restoring → Restored)
+- Spinner (`Loader2`) while pending; check (`Check`) on success
+- Keep contrast while feedback plays: `disabled:opacity-100`
+- Errors: toast is fine; the button may return to idle (or `failedLabel`)
+
+```tsx
+feedback.start();
+const ok = await doThing();
+await feedback.settle(ok ? "saved" : "failed");
+if (ok) {
+  window.setTimeout(reveal, SAVE_FEEDBACK_SETTLE_MS);
+}
+
+<SaveFeedbackLabel
+  state={feedback.state}
+  idleLabel="Restore"
+  savingLabel="Restoring"
+  savedLabel="Restored"
+/>
+```
+
+## Reference
+
+Account save, document publish, Trash restore.
