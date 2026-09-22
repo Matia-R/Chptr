@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PanelLeftClose, Plus, Search, Trash2 } from "lucide-react";
+import { MoreHorizontal, PanelLeftClose, Plus, Search, Trash2 } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -20,6 +20,12 @@ import {
   useSidebar,
 } from "~/app/_components/sidebar";
 import { Button } from "./button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/app/_components/dropdown-menu";
 import { NavUser } from "./nav-user";
 import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
@@ -73,6 +79,49 @@ const DESKTOP_SIDEBAR = {
 const DESKTOP_DOC_ROW_HEIGHT = 36;
 const DESKTOP_DOC_ROW_GAP = 4;
 const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
+
+const TRASH_MENU_ITEM_CLASSNAME =
+  "cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive";
+
+function DocumentRowMenu({
+  disabled,
+  onTrash,
+  trigger,
+}: {
+  disabled: boolean;
+  onTrash: () => void;
+  trigger: React.ReactNode;
+}) {
+  return (
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) return;
+        // Closing leaves focus on the trigger; showOnHover would keep the
+        // ellipsis visible via group-focus-within.
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement) focused.blur();
+      }}
+    >
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="right"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <DropdownMenuItem
+          disabled={disabled}
+          className={TRASH_MENU_ITEM_CLASSNAME}
+          onSelect={onTrash}
+        >
+          <Trash2 />
+          Move to trash
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
@@ -202,7 +251,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarMenuButton
         asChild
         isActive={pathname === `/documents/${doc.id}`}
-        className="h-9 pr-2 data-[active=true]:font-normal group-has-[[data-sidebar=menu-action]]/menu-item:pr-2 group-hover/menu-item:!pr-8 group-focus-within/menu-item:!pr-8 group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-accent-foreground"
+        className="h-9 pr-2 data-[active=true]:font-normal group-has-[[data-sidebar=menu-action]]/menu-item:pr-2 group-hover/menu-item:!pr-8 group-has-[[data-state=open]]/menu-item:!pr-8 group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-accent-foreground group-has-[[data-state=open]]/menu-item:bg-sidebar-accent group-has-[[data-state=open]]/menu-item:text-sidebar-accent-foreground"
       >
         <Link
           href={`/documents/${doc.id}`}
@@ -213,20 +262,22 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <span className="min-w-0 w-full truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
-      <SidebarMenuAction
-        showOnHover
-        type="button"
-        aria-label="Move to trash"
+      <DocumentRowMenu
         disabled={isOffline || trashPending}
-        className="!top-0 right-1 h-9 w-7 aspect-auto translate-y-0 cursor-pointer bg-transparent text-muted-foreground hover:bg-transparent hover:!text-sidebar-accent-foreground focus-visible:bg-transparent focus-visible:ring-0 focus-visible:!text-sidebar-accent-foreground peer-hover/menu-button:text-muted-foreground peer-data-[active=true]/menu-button:text-muted-foreground"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
+        onTrash={() => {
           void trashDocument(doc.id, doc.name);
         }}
-      >
-        <Trash2 />
-      </SidebarMenuAction>
+        trigger={
+          <SidebarMenuAction
+            showOnHover
+            type="button"
+            aria-label="Open menu"
+            className="!top-0 right-1 h-9 w-7 aspect-auto translate-y-0 cursor-pointer bg-transparent text-muted-foreground hover:bg-transparent hover:!text-sidebar-accent-foreground focus-visible:bg-transparent focus-visible:ring-0 focus-visible:!text-sidebar-accent-foreground peer-hover/menu-button:text-muted-foreground peer-data-[active=true]/menu-button:text-muted-foreground"
+          >
+            <MoreHorizontal />
+          </SidebarMenuAction>
+        }
+      />
     </SidebarMenuItem>
   ));
 

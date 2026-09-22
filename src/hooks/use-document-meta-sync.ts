@@ -87,6 +87,8 @@ export function applyDocumentCreated(
   documentId: string,
   name: string,
 ) {
+  // Trash deletes the snapshot; don't keep a stale "Live" publication for 30s.
+  utils.document.getPublicationByDocumentId.setData(documentId, null);
   patchDocumentList(utils, ({ documents, trashedDocuments }) => ({
     documents: documents.some((doc) => doc.id === documentId)
       ? documents
