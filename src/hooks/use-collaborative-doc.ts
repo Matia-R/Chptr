@@ -13,6 +13,7 @@ import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
+import { clearNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import {
   getYjsContentHash,
   getYjsPublishedContentHash,
@@ -444,6 +445,7 @@ export function useCollaborativeDoc({
               // would otherwise look like the first failure forever.
               setEverConnected(true);
               useCollaborativeDocStore.getState().setPersisted(true);
+              clearNewDocumentFlag(documentId);
             }
             if (status === "disconnected") {
               setIsSynced(false);

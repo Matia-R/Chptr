@@ -89,7 +89,7 @@ function isPersistedDocument(id: string): boolean {
   if (live.documentId === id) {
     return live.isPersisted || !isDocumentNew(id);
   }
-  return true;
+  return !isDocumentNew(id);
 }
 
 export function useTrashDocument() {
