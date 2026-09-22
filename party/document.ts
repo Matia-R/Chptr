@@ -143,6 +143,20 @@ export default class DocumentParty implements Party.Server {
     this.isLoaded = false;
   }
 
+  /** Close only sockets that used this save token (lost write access). */
+  invalidateTokenSessions(token: string): void {
+    for (const conn of this.room.getConnections()) {
+      const client = this.authorizedByConnection.get(conn.id);
+      if (!client || client.token !== token) continue;
+      try {
+        conn.close(4003, "Access denied");
+      } catch {
+        // Connection may already be closing.
+      }
+      this.authorizedByConnection.delete(conn.id);
+    }
+  }
+
   async onRequest(req: Party.Request): Promise<Response> {
     const secret = req.headers.get("X-Partykit-Secret");
     if (!this.partykitSecret || secret !== this.partykitSecret) {
@@ -211,8 +225,10 @@ export default class DocumentParty implements Party.Server {
       });
 
       if (!response.ok) {
-        if (response.status === 404 || response.status === 403) {
+        if (response.status === 404) {
           this.kickAll();
+        } else if (response.status === 403) {
+          this.invalidateTokenSessions(token);
         }
         throw new Error(`Failed to save document: ${response.status}`);
       }
