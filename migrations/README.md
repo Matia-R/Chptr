@@ -8,7 +8,7 @@ When you add a new `.sql` file:
 
 1. Keep it in this folder (reviewable, versioned).
 2. Apply transactional files through Supabase **`apply_migration`** with a `snake_case` name (e.g. `document_publications`) and the full file body.
-3. Apply `documents_active_last_updated_idx.sql` as a single `execute_sql` (or psql autocommit) statement. If that errors with `cannot run inside a transaction block`, use `psql` instead.
+3. Apply `documents_active_last_updated_idx.sql` and `documents_trashed_deleted_at_idx.sql` as a single `execute_sql` (or psql autocommit) statement. If that errors with `cannot run inside a transaction block`, use `psql` instead.
 
 Older tables in your project may have been created before this repo’s filenames lined up with migration names; duplicate `CREATE POLICY` statements will fail if you re-run a file blindly—prefer **one migration per change** going forward.
 
@@ -21,3 +21,6 @@ Older tables in your project may have been created before this repo’s filename
 | `document_publication_redirects.sql` | Path redirects after username/slug changes; redirect-before-publication lookup |
 | `document_soft_delete.sql` | `documents.deleted_at`, trash/restore RPCs, hide trashed from `document_exists` |
 | `documents_active_last_updated_idx.sql` | Partial recency index on active `documents` — **not** via `apply_migration` |
+| `purge_expired_trash.sql` | 30-day hard delete: `purge_expired_trash()`, id-only audit log, `pg_cron` job |
+| `purge_expired_trash_batch.sql` | Hourly schedule, 5,000 expired documents per run |
+| `documents_trashed_deleted_at_idx.sql` | Partial index on trashed `documents.deleted_at` — **not** via `apply_migration` |

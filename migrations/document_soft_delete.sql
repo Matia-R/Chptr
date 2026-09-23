@@ -1,5 +1,5 @@
 -- Soft-delete documents: trash sets deleted_at, restore clears it.
--- Active docs are deleted_at IS NULL. Purge (hard DELETE) is a later job.
+-- Active docs are deleted_at IS NULL. Hard delete is purge_expired_trash().
 -- Recency index: documents_active_last_updated_idx.sql (CONCURRENTLY, not apply_migration).
 
 ALTER TABLE public.documents
