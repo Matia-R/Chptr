@@ -5,7 +5,16 @@ import { ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
+import type { SaveFeedbackState } from "~/hooks/use-save-feedback";
 import { cn } from "~/lib/utils";
+
+const MOBILE_ACTION_ROW_CLASS = cn(
+  "flex min-h-[44px] w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors",
+  "border-t border-sidebar-border/55 first:border-t-0 dark:border-white/[0.08]",
+  "active:bg-sidebar-accent dark:active:bg-white/[0.06]",
+  "disabled:pointer-events-none disabled:opacity-45",
+);
 
 /** Rounded grouped container (Notion / iOS-style settings sheet). */
 export function MobileActionGroup({
@@ -57,10 +66,7 @@ export function MobileActionButtonRow({
       onClick={onClick}
       onPointerDown={onPointerDown}
       className={cn(
-        "flex min-h-[44px] w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors",
-        "border-t border-sidebar-border/55 first:border-t-0 dark:border-white/[0.08]",
-        "active:bg-sidebar-accent dark:active:bg-white/[0.06]",
-        "disabled:pointer-events-none disabled:opacity-45",
+        MOBILE_ACTION_ROW_CLASS,
         destructive
           ? "text-[hsl(var(--destructive))]"
           : "text-sidebar-foreground",
@@ -80,6 +86,67 @@ export function MobileActionButtonRow({
       {trailing ? (
         <span className="shrink-0 text-muted-foreground">{trailing}</span>
       ) : null}
+    </button>
+  );
+}
+
+/**
+ * Action row whose icon and label transition together through idle → pending →
+ * success. Use this for every multi-state commit control in a mobile list.
+ */
+export function MobileActionFeedbackRow({
+  state,
+  idleLabel,
+  savingLabel,
+  savedLabel,
+  failedLabel,
+  idleIcon,
+  failedIcon,
+  destructive,
+  disabled,
+  onClick,
+  onPointerDown,
+}: {
+  state: SaveFeedbackState;
+  idleLabel: string;
+  savingLabel: string;
+  savedLabel: string;
+  failedLabel?: string;
+  idleIcon: LucideIcon;
+  failedIcon?: LucideIcon;
+  destructive?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+}) {
+  const showingFeedback = state !== "idle";
+
+  return (
+    <button
+      type="button"
+      disabled={(disabled ?? false) || state === "saving" || state === "saved"}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      className={cn(
+        MOBILE_ACTION_ROW_CLASS,
+        destructive
+          ? "text-[hsl(var(--destructive))]"
+          : "text-sidebar-foreground",
+        showingFeedback && "disabled:opacity-100",
+      )}
+    >
+      <SaveFeedbackLabel
+        state={state}
+        idleLabel={idleLabel}
+        savingLabel={savingLabel}
+        savedLabel={savedLabel}
+        failedLabel={failedLabel}
+        idleIcon={idleIcon}
+        failedIcon={failedIcon}
+        layout="row"
+        animateLabelChanges
+        className="min-w-0 flex-1"
+      />
     </button>
   );
 }

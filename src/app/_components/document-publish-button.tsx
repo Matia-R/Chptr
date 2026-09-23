@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Globe, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "~/app/_components/button";
 import {
@@ -12,7 +11,7 @@ import {
   DocumentPublishPopoverPanel,
   useDocumentPublish,
 } from "~/app/_components/editor/document-publish";
-import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "~/app/_components/save-feedback-label";
+import { SaveFeedbackContent } from "~/app/_components/save-feedback-label";
 import { Skeleton } from "~/app/_components/skeleton";
 import { cn } from "~/lib/utils";
 
@@ -141,25 +140,19 @@ export function DocumentPublishButton() {
             )}
             disabled={busy}
           >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={triggerLabel}
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
-                className="inline-flex items-center gap-1"
-              >
-                <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
-                  {isProgress ? (
-                    <Loader2 className="animate-spin" aria-hidden />
-                  ) : (
-                    <TriggerIcon aria-hidden />
-                  )}
-                </span>
-                <span className="whitespace-nowrap">{triggerLabel}</span>
-              </motion.span>
-            </AnimatePresence>
+            <SaveFeedbackContent
+              motionKey={triggerLabel}
+              contentClassName="gap-1"
+            >
+              <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+                {isProgress ? (
+                  <Loader2 className="animate-spin" aria-hidden />
+                ) : (
+                  <TriggerIcon aria-hidden />
+                )}
+              </span>
+              <span className="whitespace-nowrap">{triggerLabel}</span>
+            </SaveFeedbackContent>
             <ChevronDown aria-hidden />
           </Button>
         </PopoverTrigger>

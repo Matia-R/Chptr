@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Check,
   CloudUpload,
   ExternalLink,
   X,
@@ -31,6 +30,7 @@ import {
 
 import {
   MobileActionButtonRow,
+  MobileActionFeedbackRow,
   MobileActionGroup,
   MobileActionLinkRow,
 } from "~/app/_components/mobile-action-rows";
@@ -41,52 +41,53 @@ import {
 import {
   useDocumentPublishStore,
   type MobileDrawerView,
-  type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
 import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 
-function getMobilePublishActionRow(
-  publishFeedback: PublishFeedbackState,
-  options: {
-    showPublishedPopoverActions: boolean;
-    hasChangesToPublish: boolean;
-    firstPublishLabel?: string;
-  },
-) {
-  const label =
-    publishFeedback === "publishing"
-      ? "Publishing..."
-      : publishFeedback === "published"
-        ? "Published"
-        : publishFeedback === "failed"
-          ? "Failed to publish"
-          : options.showPublishedPopoverActions
-            ? options.hasChangesToPublish
-              ? "Update"
-              : "Published"
-            : (options.firstPublishLabel ?? "Publish");
+function MobilePublishActionRow({
+  extraDisabled = false,
+}: {
+  extraDisabled?: boolean;
+}) {
+  const ctx = useDocumentPublish();
+  if (!ctx) return null;
 
-  const icon: LucideIcon =
-    publishFeedback === "publishing"
-      ? Loader2
-      : publishFeedback === "published"
-        ? Check
-        : publishFeedback === "failed"
-          ? X
-          : CloudUpload;
+  const {
+    editor,
+    busy,
+    publishFeedback,
+    handlePublish,
+    hasChangesToPublish,
+    showPublishedPopoverActions,
+  } = ctx;
 
-  const iconClassName =
-    publishFeedback === "publishing"
-      ? "animate-spin"
-      : publishFeedback === "failed"
-        ? "text-destructive"
-        : undefined;
-
-  const disabledWhenIdle =
-    !options.hasChangesToPublish && publishFeedback === "idle";
-
-  return { label, icon, iconClassName, disabledWhenIdle };
+  return (
+    <MobileActionFeedbackRow
+      state={publishFeedbackToSaveState(publishFeedback)}
+      idleIcon={CloudUpload}
+      failedIcon={X}
+      idleLabel={
+        showPublishedPopoverActions
+          ? hasChangesToPublish
+            ? "Update"
+            : "Published"
+          : "Publish"
+      }
+      savingLabel="Publishing..."
+      savedLabel="Published"
+      failedLabel="Failed to publish"
+      disabled={
+        extraDisabled ||
+        busy ||
+        !editor ||
+        (!hasChangesToPublish && publishFeedback === "idle")
+      }
+      onClick={() => {
+        void handlePublish();
+      }}
+    />
+  );
 }
 
 function formatPublicationDate(iso: string): string {
@@ -175,13 +176,9 @@ function MobilePublishMainView({
 
   const {
     documentId,
-    editor,
     busy,
     publicationLoading,
     publication,
-    publishFeedback,
-    handlePublish,
-    hasChangesToPublish,
     showPublishedPopoverActions,
     ownerPreview,
     copyPublicUrl,
@@ -192,10 +189,6 @@ function MobilePublishMainView({
 
   if (!documentId) return null;
 
-  const publishAction = getMobilePublishActionRow(publishFeedback, {
-    showPublishedPopoverActions,
-    hasChangesToPublish,
-  });
   const pub = publication;
 
   const header = (
@@ -240,20 +233,7 @@ function MobilePublishMainView({
           ) : null}
 
           <MobileActionGroup>
-            <MobileActionButtonRow
-              icon={publishAction.icon}
-              iconClassName={publishAction.iconClassName}
-              label={publishAction.label}
-              disabled={
-                busy ||
-                !editor ||
-                publicationLoading ||
-                publishAction.disabledWhenIdle
-              }
-              onClick={() => {
-                void handlePublish();
-              }}
-            />
+            <MobilePublishActionRow extraDisabled={publicationLoading} />
           </MobileActionGroup>
 
           <MobileActionGroup>
@@ -311,15 +291,7 @@ function MobilePublishMainView({
           </p>
         ) : null}
         <MobileActionGroup>
-          <MobileActionButtonRow
-            icon={publishAction.icon}
-            iconClassName={publishAction.iconClassName}
-            label={publishAction.label}
-            disabled={busy || !editor || publishAction.disabledWhenIdle}
-            onClick={() => {
-              void handlePublish();
-            }}
-          />
+          <MobilePublishActionRow />
         </MobileActionGroup>
         <MobileActionGroup>
           <MobileActionButtonRow

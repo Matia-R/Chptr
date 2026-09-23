@@ -12,7 +12,8 @@ Any control that commits something (save, publish, restore, update password, etc
 
 - Timing: `useSaveFeedback` in `~/hooks/use-save-feedback`
 - Button content: `SaveFeedbackLabel` in `~/app/_components/save-feedback-label`
-- Motion: `SAVE_FEEDBACK_CONTENT_TRANSITION` (`duration: 0.18`, ease `[0.22, 1, 0.36, 1]`). Previous content fades out; the next state fades and slides in from `y: -6`.
+- Motion: `SaveFeedbackContent` / `SAVE_FEEDBACK_CONTENT_TRANSITION` (`duration: 0.18`, ease `[0.22, 1, 0.36, 1]`). Previous content fades out; the next state fades and slides in from `y: -6`.
+- Mobile list rows: `MobileActionFeedbackRow` in `~/app/_components/mobile-action-rows`. It uses `SaveFeedbackLabel` with `layout="row"` so the icon and label transition together. Do not swap a row's `icon` and `label` to show pending or success.
 
 Do not invent a second spinner, check icon, or Framer transition for this.
 
@@ -49,6 +50,8 @@ if (ok) {
 />
 ```
 
+Mobile list rows use the same states through `MobileActionFeedbackRow` (`idleIcon` is the resting glyph; pending and success icons come from `SaveFeedbackLabel`).
+
 ## Reference
 
-Account save, document publish, Trash restore.
+Account save, document publish (desktop trigger, popover, and mobile row), Trash restore.
