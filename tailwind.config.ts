@@ -25,6 +25,20 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			keyframes: {
+				'toast-in': {
+					from: { opacity: '0', transform: 'translateY(6px) scale(0.95)' },
+					to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+				},
+				'toast-out': {
+					from: { opacity: '1', transform: 'translateY(0) scale(1)' },
+					to: { opacity: '0', transform: 'translateY(6px) scale(0.95)' },
+				},
+			},
+			animation: {
+				'toast-in': 'toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
+				'toast-out': 'toast-out 180ms cubic-bezier(0.22, 1, 0.36, 1) both',
+			},
 			colors: {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',

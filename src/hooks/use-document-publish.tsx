@@ -7,8 +7,7 @@
  */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- tRPC React Query hooks */
 
-import { Check, Loader2, Undo2 } from "lucide-react";
-import Link from "next/link";
+import { Check, ExternalLink, Loader2, Undo2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -21,6 +20,7 @@ import {
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 
 import { Button } from "~/app/_components/button";
+import { ToastAction } from "~/app/_components/toast";
 import { Input } from "~/app/_components/input";
 import {
   SAVE_FEEDBACK_MIN_SAVING_MS,
@@ -196,16 +196,17 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
       toast({
         title: "Changes published",
-        description: (
-          <span>
-            Live at{" "}
-            <Link
-              href={result.publicPath}
-              className="font-medium underline underline-offset-2"
-            >
-              {result.publicPath}
-            </Link>
-          </span>
+        action: (
+          <ToastAction
+            altText="View page"
+            className="gap-1.5"
+            onClick={() => {
+              window.open(result.publicPath, "_blank", "noopener,noreferrer");
+            }}
+          >
+            View page
+            <ExternalLink className="size-3.5" aria-hidden />
+          </ToastAction>
         ),
       });
     },
