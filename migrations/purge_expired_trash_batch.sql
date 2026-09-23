@@ -1,5 +1,6 @@
--- One batched delete per pg_cron run, scheduled hourly.
--- 5,000 matches Supabase's large-delete batch. The schedule drains the queue.
+-- One batched delete per pg_cron run, hourly at minute 15.
+-- 1,000 parent rows per run limits cascading deletes.
+-- Raise this cron frequency later if trash volume needs a faster drain.
 -- Same function, same predicate, still no arguments and no API grants.
 
 CREATE OR REPLACE FUNCTION public.purge_expired_trash()
@@ -12,7 +13,6 @@ DECLARE
   purged integer;
 BEGIN
   PERFORM set_config('lock_timeout', '5s', true);
-  PERFORM set_config('statement_timeout', '60s', true);
 
   WITH locked AS (
     SELECT id
@@ -20,7 +20,7 @@ BEGIN
     WHERE deleted_at IS NOT NULL
       AND deleted_at < now() - interval '30 days'
     ORDER BY deleted_at
-    LIMIT 5000
+    LIMIT 1000
     FOR UPDATE SKIP LOCKED
   ),
   removed AS (
@@ -43,7 +43,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.purge_expired_trash() IS
-  'Hard-deletes up to 5000 documents whose deleted_at is older than 30 days. No arguments. Not granted to API roles. Invoked hourly by pg_cron.';
+  'Hard-deletes up to 1000 documents whose deleted_at is older than 30 days. No arguments. Not granted to API roles. Invoked hourly by pg_cron. Raise the cron frequency if trash volume needs a faster drain.';
 
 REVOKE ALL ON FUNCTION public.purge_expired_trash() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.purge_expired_trash() FROM anon, authenticated, service_role;
@@ -57,8 +57,10 @@ BEGIN
   END IF;
 END $$;
 
+-- Session timeout is set before the purge statement. set_config inside the
+-- function does not bound that statement on PostgreSQL before 13.
 SELECT cron.schedule(
   'purge-expired-trash',
   '15 * * * *',
-  $cron$SELECT public.purge_expired_trash()$cron$
+  $cron$SET statement_timeout = '60s'; SELECT public.purge_expired_trash();$cron$
 );

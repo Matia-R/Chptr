@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
 GRANT USAGE ON SCHEMA cron TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
 
-CREATE TABLE public.document_purge_log (
+CREATE TABLE IF NOT EXISTS public.document_purge_log (
   document_id uuid PRIMARY KEY,
   purged_at timestamptz NOT NULL DEFAULT now()
 );

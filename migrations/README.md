@@ -22,5 +22,5 @@ Older tables in your project may have been created before this repo’s filename
 | `document_soft_delete.sql` | `documents.deleted_at`, trash/restore RPCs, hide trashed from `document_exists` |
 | `documents_active_last_updated_idx.sql` | Partial recency index on active `documents` — **not** via `apply_migration` |
 | `purge_expired_trash.sql` | 30-day hard delete: `purge_expired_trash()`, id-only audit log, `pg_cron` job |
-| `purge_expired_trash_batch.sql` | Hourly schedule, 5,000 expired documents per run |
+| `purge_expired_trash_batch.sql` | Hourly, 1,000 expired documents per run. Raise the cron frequency later if trash volume needs a faster drain. |
 | `documents_trashed_deleted_at_idx.sql` | Partial index on trashed `documents.deleted_at` — **not** via `apply_migration` |
