@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "~/trpc/react";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
-import { MoreVertical, Trash2 } from "lucide-react";
+import { Link as LinkIcon, MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "./button";
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ import { useDocumentPublishStore } from "./editor/document-publish-store";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useDocumentIsPersisted } from "./editor/collaborative-doc-store";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 
 function formatPublicationDate(iso: string): string {
@@ -45,6 +46,7 @@ export function DocumentActions() {
   const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
   const { trashCurrent, isPending, isOffline: trashOffline } =
     useTrashDocument();
+  const copyDocumentLink = useCopyDocumentLink();
 
   const drawerOpen = publishCtx?.mobileDrawerOpen ?? localDrawerOpen;
   const setDrawerOpen = (next: boolean) => {
@@ -166,12 +168,25 @@ export function DocumentActions() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{triggerButton}</DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        className="border-sidebar-border bg-sidebar text-sidebar-foreground"
+      >
         <div className="px-2 py-1.5">{statusText}</div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          disabled={!documentId}
+          className="cursor-pointer data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+          onSelect={() => {
+            void copyDocumentLink(documentId);
+          }}
+        >
+          <LinkIcon />
+          Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem
           disabled={trashOffline || isPending}
-          className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+          className="cursor-pointer focus:bg-sidebar-accent focus:text-destructive data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-destructive"
           onSelect={() => {
             void trashCurrent();
           }}

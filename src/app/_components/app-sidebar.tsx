@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { MoreHorizontal, PanelLeftClose, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Link as LinkIcon,
+  MoreHorizontal,
+  PanelLeftClose,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -34,6 +41,7 @@ import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useDocumentList } from "~/hooks/use-known-document-name";
+import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 import {
   applyDocumentCreated,
@@ -81,14 +89,16 @@ const DESKTOP_DOC_ROW_GAP = 4;
 const DESKTOP_DOC_ROW_STRIDE = DESKTOP_DOC_ROW_HEIGHT + DESKTOP_DOC_ROW_GAP;
 
 const TRASH_MENU_ITEM_CLASSNAME =
-  "cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive";
+  "cursor-pointer focus:bg-sidebar-accent focus:text-destructive data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-destructive";
 
 function DocumentRowMenu({
   disabled,
+  onCopyLink,
   onTrash,
   trigger,
 }: {
   disabled: boolean;
+  onCopyLink: () => void;
   onTrash: () => void;
   trigger: React.ReactNode;
 }) {
@@ -106,10 +116,18 @@ function DocumentRowMenu({
       <DropdownMenuContent
         align="start"
         side="right"
+        className="border-sidebar-border bg-sidebar text-sidebar-foreground"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
         }}
       >
+        <DropdownMenuItem
+          className="cursor-pointer data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+          onSelect={onCopyLink}
+        >
+          <LinkIcon />
+          Copy link
+        </DropdownMenuItem>
         <DropdownMenuItem
           disabled={disabled}
           className={TRASH_MENU_ITEM_CLASSNAME}
@@ -132,6 +150,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const prefetchDocumentState = usePrefetchDocumentState();
   const isOffline = useBrowserOffline();
   const { trashDocument, isPending: trashPending } = useTrashDocument();
+  const copyDocumentLink = useCopyDocumentLink();
   useDocumentMetaSync();
 
   // State to track scroll position for shadow indicators
@@ -264,6 +283,9 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       </SidebarMenuButton>
       <DocumentRowMenu
         disabled={isOffline || trashPending}
+        onCopyLink={() => {
+          void copyDocumentLink(doc.id);
+        }}
         onTrash={() => {
           void trashDocument(doc.id, doc.name);
         }}

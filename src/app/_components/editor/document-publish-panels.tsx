@@ -43,6 +43,7 @@ import {
   type MobileDrawerView,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
+import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 
 function getMobilePublishActionRow(
@@ -169,6 +170,7 @@ function MobilePublishMainView({
   statusRow: ReactNode;
 }) {
   const ctx = useDocumentPublish();
+  const copyDocumentLink = useCopyDocumentLink();
   if (!ctx) return null;
 
   const {
@@ -185,6 +187,7 @@ function MobilePublishMainView({
     copyPublicUrl,
     unpublish,
     unpublishPending,
+    setMobileDrawerOpen,
   } = ctx;
 
   if (!documentId) return null;
@@ -257,7 +260,6 @@ function MobilePublishMainView({
             <MobileActionButtonRow
               icon={GlobeOff as LucideIcon}
               label="Unpublish"
-              destructive
               disabled={busy || publicationLoading}
               trailing={
                 unpublishPending ? (
@@ -269,9 +271,6 @@ function MobilePublishMainView({
               }
               onClick={unpublish}
             />
-          </MobileActionGroup>
-
-          <MobileActionGroup>
             <MobileActionButtonRow
               icon={Trash2}
               label="Move to trash"
@@ -290,6 +289,15 @@ function MobilePublishMainView({
       {header}
       <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
         <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={LinkIcon}
+            label="Copy link"
+            disabled={!documentId}
+            onClick={() => {
+              void copyDocumentLink(documentId);
+              setMobileDrawerOpen(false);
+            }}
+          />
           <MobileActionButtonRow
             icon={Globe}
             label="Edit URL"
