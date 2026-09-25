@@ -53,7 +53,7 @@ export function PublishedDocumentTitleSection({
 
   return (
     <section className="mx-auto max-w-3xl px-4 pt-10 md:pt-14">
-      <h1 className="mb-6 break-words font-serif text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+      <h1 className="mb-6 break-words font-sans text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
         {title}
       </h1>
       <div className="mb-10 flex items-center gap-3 border-b pb-4">

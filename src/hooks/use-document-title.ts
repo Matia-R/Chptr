@@ -40,6 +40,8 @@ export function useDocumentTitle() {
   const { toast } = useToast();
   const knownName = useKnownDocumentName(documentId);
   const persistTimer = useRef<number | null>(null);
+  /** Name to restore if this edit is cleared before it should stick. */
+  const editBaselineRef = useRef<string | null>(null);
 
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
@@ -98,7 +100,10 @@ export function useDocumentTitle() {
     persistTimer.current = null;
   }, []);
 
-  useEffect(() => clearPersistTimer, [clearPersistTimer, documentId]);
+  useEffect(() => {
+    editBaselineRef.current = null;
+    return clearPersistTimer;
+  }, [clearPersistTimer, documentId]);
 
   const persistName = useCallback(
     (trimmedName: string) => {
@@ -109,17 +114,24 @@ export function useDocumentTitle() {
     [clearFlag, documentId, isNew, isOffline, updateName],
   );
 
+  const restoreBaseline = useCallback(() => {
+    const baseline = editBaselineRef.current ?? name ?? "Untitled";
+    applyDocumentName(utils, documentId, baseline);
+    broadcastDocumentName(documentId, baseline);
+    return baseline;
+  }, [documentId, name, utils]);
+
   const commitTitle = useCallback(
     (nextName: string) => {
       clearPersistTimer();
       const trimmedName = nextName.trim();
-      const currentName = name ?? "Untitled";
+      const baseline = editBaselineRef.current ?? name ?? "Untitled";
+      editBaselineRef.current = null;
 
-      if (!trimmedName || trimmedName === currentName) {
-        if (trimmedName !== nextName) {
-          applyDocumentName(utils, documentId, currentName);
-        }
-        return currentName;
+      if (!trimmedName || trimmedName === baseline) {
+        applyDocumentName(utils, documentId, baseline);
+        broadcastDocumentName(documentId, baseline);
+        return baseline;
       }
 
       persistName(trimmedName);
@@ -132,17 +144,26 @@ export function useDocumentTitle() {
   const previewTitle = useCallback(
     (nextName: string) => {
       if (!documentId || isOffline) return;
+      if (editBaselineRef.current == null) {
+        editBaselineRef.current = name ?? "Untitled";
+      }
+
+      clearPersistTimer();
+      const trimmedName = nextName.trim();
+      if (!trimmedName) {
+        restoreBaseline();
+        return;
+      }
+
       applyDocumentName(utils, documentId, nextName);
       broadcastDocumentName(documentId, nextName);
-      clearPersistTimer();
       persistTimer.current = window.setTimeout(() => {
         persistTimer.current = null;
-        const trimmedName = nextName.trim();
-        if (!trimmedName) return;
+        editBaselineRef.current = trimmedName;
         persistName(trimmedName);
       }, 400);
     },
-    [clearPersistTimer, documentId, isOffline, persistName, utils],
+    [clearPersistTimer, documentId, isOffline, name, persistName, restoreBaseline, utils],
   );
 
   return {
