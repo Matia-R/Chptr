@@ -24,6 +24,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
+import { DocumentEditorTitle } from "./document-editor-title";
 import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
@@ -178,6 +179,14 @@ export default function Editor({
 
   return (
     <div ref={editorContainerRef} className="contents">
+      <div
+        className="box-border w-full"
+        style={{
+          paddingInline: "var(--document-content-inline-padding, 44px)",
+        }}
+      >
+        <DocumentEditorTitle />
+      </div>
       <BlockNoteView
         editor={editor}
         editable={editable}
