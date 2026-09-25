@@ -1,3 +1,5 @@
+import { Toaster } from "~/app/_components/ui/toaster";
+
 import "~/app/_components/article/article.css";
 import "./published-document.css";
 
@@ -6,5 +8,10 @@ export default function PublishedDocumentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
 }

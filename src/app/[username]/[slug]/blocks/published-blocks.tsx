@@ -5,6 +5,7 @@ import { cn } from "~/lib/utils";
 
 import type { HighlightedCode, HighlightedToken } from "./highlight-code";
 import { inlineToPlainText, type PublishedBlock } from "./parse";
+import { PublishedCodeBlock } from "./published-code-block";
 
 const TEXT_COLORS = new Set([
   "gray",
@@ -302,11 +303,9 @@ function PublishedBlockView({
       const highlighted = code.get(block.id);
       const source = inlineToPlainText(block.content);
       return (
-        <pre className="published-code my-3 overflow-x-auto rounded-md p-4 font-mono text-sm leading-relaxed">
-          <code>
-            {highlighted ? <CodeTokens lines={highlighted.lines} /> : source}
-          </code>
-        </pre>
+        <PublishedCodeBlock source={source}>
+          {highlighted ? <CodeTokens lines={highlighted.lines} /> : source}
+        </PublishedCodeBlock>
       );
     }
     case "image":
