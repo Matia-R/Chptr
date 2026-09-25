@@ -987,7 +987,7 @@
 
 .bn-container[data-color-scheme="dark"] {
   --bn-colors-editor-text: #cfcfcf;
-  --bn-colors-editor-background: #1f1f1f;
+  --bn-colors-editor-background: hsl(var(--background));
   --bn-colors-menu-text: #cfcfcf;
   --bn-colors-menu-background: #1f1f1f;
   --bn-colors-tooltip-text: #cfcfcf;
@@ -1764,7 +1764,7 @@
 }
 
 .bn-shadcn.dark {
-  --background: 0 0% 10%;
+  --background: 0 0% 9.803921568627451%;
   --foreground: 0 0% 98%;
   --card: 0 0% 3.9%;
   --card-foreground: 0 0% 98%;
@@ -1795,7 +1795,7 @@
 }
 
 .bn-shadcn .bn-editor {
-  background-color: var(--background);
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 

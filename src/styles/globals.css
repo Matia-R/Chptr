@@ -64,7 +64,8 @@ body {
   }
 
   .dark {
-    --background: 0 0% 10%;
+    /* 25/255. 10% is 25.5 and dithers into visible stripes on large dark areas. */
+    --background: 0 0% 9.803921568627451%;
     --foreground: 0 0% 98%;
     --card: 0 0% 10%;
     --card-foreground: 0 0% 98%;
