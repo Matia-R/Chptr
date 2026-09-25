@@ -89,17 +89,17 @@ export function DocumentBreadcrumb() {
   }, [isOffline]);
 
   const sharedStyles =
-    "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
+    "min-w-0 max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
 
-  if (isLoading && !isNew && !resolvedName) {
+  if (isLoading) {
     return (
-      <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
-        <BreadcrumbList className="min-w-0 flex-nowrap">
-          <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
+      <Breadcrumb className="inline-flex min-w-0 max-w-[25%] overflow-hidden">
+        <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
+          <BreadcrumbItem className="min-w-0 max-w-full">
             <div
               className={cn(
                 sharedStyles,
-                "h-4 w-full max-w-[24rem] animate-pulse bg-accent",
+                "h-4 w-24 max-w-full animate-pulse bg-accent",
               )}
             />
           </BreadcrumbItem>
@@ -119,7 +119,7 @@ export function DocumentBreadcrumb() {
       disabled={isOffline}
       className={cn(
         sharedStyles,
-        "flex w-full min-w-0 items-center gap-2 pr-2 text-left",
+        "flex min-w-0 max-w-full items-center gap-2 pr-2 text-left",
         !isOffline && "hover:bg-accent hover:text-accent-foreground",
         isOffline && "cursor-default disabled:opacity-100",
       )}
@@ -137,12 +137,12 @@ export function DocumentBreadcrumb() {
   );
 
   return (
-    <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
-      <BreadcrumbList className="min-w-0 flex-nowrap">
-        <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
+    <Breadcrumb className="inline-flex min-w-0 max-w-[25%] overflow-hidden">
+      <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
+        <BreadcrumbItem className="min-w-0 max-w-full">
           {isMobile ? (
             <>
-              <div className="group relative min-w-0">{titleTrigger}</div>
+              <div className="group relative min-w-0 max-w-full">{titleTrigger}</div>
               <MobileFormDrawer
                 open={drawerOpen}
                 onOpenChange={(open) => {
@@ -179,7 +179,7 @@ export function DocumentBreadcrumb() {
                 setPopoverOpen(false);
               }}
             >
-              <div className="group relative min-w-0">
+              <div className="group relative min-w-0 max-w-full">
                 <PopoverTrigger asChild>{titleTrigger}</PopoverTrigger>
               </div>
 

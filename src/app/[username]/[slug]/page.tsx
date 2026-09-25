@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { PublishedDocumentTitleSection } from "~/app/_components/published-document-title-section";
 
+import { PublishedCodeCopy } from "./blocks/published-code-block";
 import { renderPublishedArticle } from "./blocks/render-article";
 import {
   authorDisplayLabel,
@@ -96,7 +97,9 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-24">
-        <article>{article}</article>
+        <article>
+          <PublishedCodeCopy>{article}</PublishedCodeCopy>
+        </article>
       </main>
     </div>
   );

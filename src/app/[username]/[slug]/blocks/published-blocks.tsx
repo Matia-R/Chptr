@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { AlertView } from "~/app/_components/article/alert-view";
 import { cn } from "~/lib/utils";
 
+import { Button } from "~/app/_components/button";
+
 import type { HighlightedCode, HighlightedToken } from "./highlight-code";
 import { inlineToPlainText, type PublishedBlock } from "./parse";
-import { PublishedCodeBlock } from "./published-code-block";
 
 const TEXT_COLORS = new Set([
   "gray",
@@ -303,9 +304,33 @@ function PublishedBlockView({
       const highlighted = code.get(block.id);
       const source = inlineToPlainText(block.content);
       return (
-        <PublishedCodeBlock source={source}>
-          {highlighted ? <CodeTokens lines={highlighted.lines} /> : source}
-        </PublishedCodeBlock>
+        <div className="published-code relative my-3 rounded-md">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            data-copy-code=""
+            className="absolute right-1.5 top-1.5 size-7 text-[hsl(var(--code-block-foreground))] opacity-40 hover:bg-transparent hover:opacity-80"
+            aria-label="Copy"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-3.5"
+              aria-hidden
+            >
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+          </Button>
+          <pre className="overflow-x-auto p-4 pr-10 font-mono text-sm leading-relaxed">
+            <code>{highlighted ? <CodeTokens lines={highlighted.lines} /> : source}</code>
+          </pre>
+        </div>
       );
     }
     case "image":

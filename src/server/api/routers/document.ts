@@ -22,6 +22,7 @@ import {
 } from "~/server/db";
 import type { PartykitSupabase } from "~/server/partykit/auth";
 import { connectDocument } from "~/server/partykit/connect-document";
+import { DOCUMENT_TITLE_MAX_LENGTH } from "~/lib/document-title";
 
 function authFromCtx(ctx: {
   user: { id: string };
@@ -44,7 +45,7 @@ export const documentRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        name: z.string(),
+        name: z.string().max(DOCUMENT_TITLE_MAX_LENGTH),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -126,7 +127,7 @@ export const documentRouter = createTRPCRouter({
     .input(
       z.object({
         documentId: z.string().uuid(),
-        title: z.string().min(1).max(500),
+        title: z.string().min(1).max(DOCUMENT_TITLE_MAX_LENGTH),
         blocksJson: z.string().min(2).max(8_000_000),
         slug: z.string().min(1).max(200).optional(),
       }),
