@@ -90,10 +90,12 @@ export function DocumentBreadcrumb() {
 
   const sharedStyles =
     "min-w-0 max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
+  const titleWidth =
+    "inline-flex min-w-0 max-w-full overflow-hidden sm:max-w-[75%] md:max-w-[50%] lg:max-w-[40%]";
 
   if (isLoading) {
     return (
-      <Breadcrumb className="inline-flex min-w-0 max-w-[25%] overflow-hidden">
+      <Breadcrumb className={titleWidth}>
         <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
           <BreadcrumbItem className="min-w-0 max-w-full">
             <div
@@ -137,7 +139,7 @@ export function DocumentBreadcrumb() {
   );
 
   return (
-    <Breadcrumb className="inline-flex min-w-0 max-w-[25%] overflow-hidden">
+    <Breadcrumb className={titleWidth}>
       <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
         <BreadcrumbItem className="min-w-0 max-w-full">
           {isMobile ? (
