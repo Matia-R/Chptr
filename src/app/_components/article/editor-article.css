@@ -68,3 +68,13 @@
 .bn-editor .bn-block-group .bn-block-group {
   margin-left: var(--article-list-indent);
 }
+
+/* The language menu is white in BlockNote's stylesheet, which disappears on the light code background. */
+.bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: hsl(var(--code-block-foreground));
+}
+
+/* Token colors are inline github-light, with the dark color in --shiki-dark. */
+.dark .bn-editor .shiki {
+  color: var(--shiki-dark) !important;
+}

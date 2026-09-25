@@ -73,33 +73,43 @@ type TokenStyle = {
   fontStyle?: number;
 };
 
-function readStyle(
+function tokenColor(
   token: {
     color?: string;
-    fontStyle?: number;
+    htmlStyle?: Record<string, string> | string;
     variants?: Record<string, TokenStyle>;
   },
   theme: "light" | "dark",
-): TokenStyle {
-  return token.variants?.[theme] ?? (theme === "light" ? token : {});
+): string | undefined {
+  const htmlStyle =
+    token.htmlStyle && typeof token.htmlStyle === "object"
+      ? token.htmlStyle
+      : undefined;
+  if (theme === "dark" && htmlStyle?.["--shiki-dark"]) {
+    return htmlStyle["--shiki-dark"];
+  }
+  if (theme === "light" && htmlStyle?.color) return htmlStyle.color;
+
+  const variant = token.variants?.[theme]?.color;
+  if (variant) return variant;
+  if (theme === "light") return token.color;
+  return undefined;
 }
 
 function toHighlightedToken(token: {
   content: string;
   color?: string;
   fontStyle?: number;
+  htmlStyle?: Record<string, string> | string;
   variants?: Record<string, TokenStyle>;
 }): HighlightedToken {
-  const light = readStyle(token, "light");
-  const dark = readStyle(token, "dark");
-  const fontStyle = light.fontStyle ?? dark.fontStyle ?? 0;
   return {
     text: token.content,
-    lightClass: tokenClass("l", light.color),
-    darkClass: tokenClass("d", dark.color),
-    italic: (fontStyle & 1) === 1,
-    bold: (fontStyle & 2) === 2,
-    underline: (fontStyle & 4) === 4,
+    lightClass: tokenClass("l", tokenColor(token, "light")),
+    darkClass: tokenClass("d", tokenColor(token, "dark")),
+    italic: ((token.fontStyle ?? 0) & 1) === 1,
+    bold: ((token.fontStyle ?? 0) & 2) === 2,
+    underline: ((token.fontStyle ?? 0) & 4) === 4,
   };
 }
 
