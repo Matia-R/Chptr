@@ -1,0 +1,70 @@
+/*
+ * Point BlockNote's reading styles at the shared article tokens.
+ * Loaded after editor/style.css so these win. Editor chrome is untouched.
+ */
+.bn-shadcn,
+.bn-shadcn.dark {
+  --bn-colors-highlights-gray-text: var(--article-fg-gray);
+  --bn-colors-highlights-gray-background: var(--article-bg-gray);
+  --bn-colors-highlights-brown-text: var(--article-fg-brown);
+  --bn-colors-highlights-brown-background: var(--article-bg-brown);
+  --bn-colors-highlights-red-text: var(--article-fg-red);
+  --bn-colors-highlights-red-background: var(--article-bg-red);
+  --bn-colors-highlights-orange-text: var(--article-fg-orange);
+  --bn-colors-highlights-orange-background: var(--article-bg-orange);
+  --bn-colors-highlights-yellow-text: var(--article-fg-yellow);
+  --bn-colors-highlights-yellow-background: var(--article-bg-yellow);
+  --bn-colors-highlights-green-text: var(--article-fg-green);
+  --bn-colors-highlights-green-background: var(--article-bg-green);
+  --bn-colors-highlights-blue-text: var(--article-fg-blue);
+  --bn-colors-highlights-blue-background: var(--article-bg-blue);
+  --bn-colors-highlights-purple-text: var(--article-fg-purple);
+  --bn-colors-highlights-purple-background: var(--article-bg-purple);
+  --bn-colors-highlights-pink-text: var(--article-fg-pink);
+  --bn-colors-highlights-pink-background: var(--article-bg-pink);
+}
+
+.bn-editor [data-content-type="heading"] {
+  --level: var(--article-heading-1);
+}
+
+.bn-editor [data-content-type="heading"][data-level="2"] {
+  --level: var(--article-heading-2);
+}
+
+.bn-editor [data-content-type="heading"][data-level="3"] {
+  --level: var(--article-heading-3);
+}
+
+.bn-editor [data-content-type="heading"][data-level="4"] {
+  --level: var(--article-heading-4);
+}
+
+.bn-editor [data-content-type="heading"][data-level="5"] {
+  --level: var(--article-heading-5);
+}
+
+.bn-editor [data-content-type="heading"][data-level="6"] {
+  --level: var(--article-heading-6);
+}
+
+.bn-editor [data-prev-level="1"] { --prev-level: var(--article-heading-1); }
+.bn-editor [data-prev-level="2"] { --prev-level: var(--article-heading-2); }
+.bn-editor [data-prev-level="3"] { --prev-level: var(--article-heading-3); }
+.bn-editor [data-prev-level="4"] { --prev-level: var(--article-heading-4); }
+.bn-editor [data-prev-level="5"] { --prev-level: var(--article-heading-5); }
+.bn-editor [data-prev-level="6"] { --prev-level: var(--article-heading-6); }
+
+.bn-editor .bn-block-content[data-content-type="bulletListItem"],
+.bn-editor .bn-block-content[data-content-type="numberedListItem"],
+.bn-editor .bn-block-content[data-content-type="checkListItem"] > div > div > input {
+  gap: var(--article-list-gap);
+}
+
+.bn-editor .bn-block-content[data-content-type="checkListItem"] > div > div > input {
+  margin-inline-end: var(--article-list-gap);
+}
+
+.bn-editor .bn-block-group .bn-block-group {
+  margin-left: var(--article-list-indent);
+}

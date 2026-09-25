@@ -2,7 +2,8 @@ import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { PublishedDocumentTitleSection } from "~/app/_components/published-document-title-section";
-import { sanitizePublishedHtml } from "~/lib/published-html";
+
+import { renderPublishedArticle } from "./blocks/render-article";
 import {
   authorDisplayLabel,
   getCachedPublicationRedirectByUsernameSlug,
@@ -18,7 +19,7 @@ type PageProps = {
 async function resolveRedirectOrContinue(username: string, slug: string) {
   const redirect = await getCachedPublicationRedirectByUsernameSlug(
     username,
-    slug
+    slug,
   );
   if (redirect) {
     permanentRedirect(`/${redirect.toOwnerUsername}/${redirect.toSlug}`);
@@ -71,7 +72,7 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
   }
 
   const { publication, authorProfile } = data;
-  const safeHtml = sanitizePublishedHtml(publication.body_html);
+  const article = await renderPublishedArticle(publication.blocks_json);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -95,10 +96,7 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-24">
-        <article
-          className="bn-shadcn published-document-content text-[1.05rem] leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: safeHtml }}
-        />
+        <article>{article}</article>
       </main>
     </div>
   );

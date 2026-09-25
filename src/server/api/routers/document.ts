@@ -2,7 +2,11 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
 import type { AuthContext } from "~/server/db";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import {
   createDocument,
   getDocumentById,
@@ -19,127 +23,141 @@ import {
 import type { PartykitSupabase } from "~/server/partykit/auth";
 import { connectDocument } from "~/server/partykit/connect-document";
 
-function authFromCtx(ctx: { user: { id: string }; supabase: AuthContext["supabase"] }): AuthContext {
+function authFromCtx(ctx: {
+  user: { id: string };
+  supabase: AuthContext["supabase"];
+}): AuthContext {
   return { supabase: ctx.supabase, userId: ctx.user.id };
 }
 
 export interface Document {
-    id: string,
-    name: string,
-    lastUpdated: Date,
+  id: string;
+  name: string;
+  lastUpdated: Date;
 }
 
 export const documentRouter = createTRPCRouter({
-    createDocument: protectedProcedure
-        .mutation(async ({ ctx }) => {
-            return createDocument(authFromCtx(ctx));
-        }),
-    updateDocumentName: protectedProcedure
-        .input(z.object({
-            id: z.string(),
-            name: z.string(),
-        }))
-        .mutation(async ({ input, ctx }) => {
-            return updateDocumentName(input.id, input.name, authFromCtx(ctx));
-        }),
-    getDocumentById: publicProcedure
-        .input(z.string())
-        .query(async ({ input, ctx }) => {
-            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
-            return getDocumentById(input, supabase != null ? { supabase } : undefined);
-        }),
-    getDocumentLastUpdated: publicProcedure
-        .input(z.string())
-        .query(async ({ input, ctx }) => {
-            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
-            return getLastUpdatedTimestamp(input, supabase != null ? { supabase } : undefined);
-        }),
-    getLastUpdatedTimestamp: publicProcedure
-        .input(z.string())
-        .query(async ({ input, ctx }) => {
-            const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
-            return getLastUpdatedTimestamp(input, supabase != null ? { supabase } : undefined);
-        }),
-    getDocumentIdsForAuthenticatedUser: publicProcedure
-        .query(async ({ ctx }) => {
-            return getDocumentsIdsForUser(
-                ctx.user && ctx.supabase ? authFromCtx(ctx as { user: { id: string }; supabase: AuthContext["supabase"] }) : undefined
-            );
-        }),
+  createDocument: protectedProcedure.mutation(async ({ ctx }) => {
+    return createDocument(authFromCtx(ctx));
+  }),
+  updateDocumentName: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      return updateDocumentName(input.id, input.name, authFromCtx(ctx));
+    }),
+  getDocumentById: publicProcedure
+    .input(z.string())
+    .query(async ({ input, ctx }) => {
+      const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+      return getDocumentById(
+        input,
+        supabase != null ? { supabase } : undefined,
+      );
+    }),
+  getDocumentLastUpdated: publicProcedure
+    .input(z.string())
+    .query(async ({ input, ctx }) => {
+      const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+      return getLastUpdatedTimestamp(
+        input,
+        supabase != null ? { supabase } : undefined,
+      );
+    }),
+  getLastUpdatedTimestamp: publicProcedure
+    .input(z.string())
+    .query(async ({ input, ctx }) => {
+      const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
+      return getLastUpdatedTimestamp(
+        input,
+        supabase != null ? { supabase } : undefined,
+      );
+    }),
+  getDocumentIdsForAuthenticatedUser: publicProcedure.query(async ({ ctx }) => {
+    return getDocumentsIdsForUser(
+      ctx.user && ctx.supabase
+        ? authFromCtx(
+            ctx as { user: { id: string }; supabase: AuthContext["supabase"] },
+          )
+        : undefined,
+    );
+  }),
 
-    /**
-     * Snapshot of Y.Doc state for a document the caller can access.
-     * Used to paint the editor before PartyKit sync (sidebar hover prefetch).
-     */
-    getDocumentState: protectedProcedure
-        .input(z.string().uuid())
-        .query(async ({ input, ctx }) => {
-            const result = await connectDocument({
-                supabase: ctx.supabase as unknown as PartykitSupabase,
-                userId: ctx.user.id,
-                documentId: input,
-                isNew: false,
-            });
-            if (!result.ok) {
-                throw new TRPCError({
-                    code: result.status === 403 ? "FORBIDDEN" : "NOT_FOUND",
-                    message: result.error,
-                });
-            }
-            return { state: result.state };
-        }),
+  /**
+   * Snapshot of Y.Doc state for a document the caller can access.
+   * Used to paint the editor before PartyKit sync (sidebar hover prefetch).
+   */
+  getDocumentState: protectedProcedure
+    .input(z.string().uuid())
+    .query(async ({ input, ctx }) => {
+      const result = await connectDocument({
+        supabase: ctx.supabase as unknown as PartykitSupabase,
+        userId: ctx.user.id,
+        documentId: input,
+        isNew: false,
+      });
+      if (!result.ok) {
+        throw new TRPCError({
+          code: result.status === 403 ? "FORBIDDEN" : "NOT_FOUND",
+          message: result.error,
+        });
+      }
+      return { state: result.state };
+    }),
 
-    getPublicationByDocumentId: protectedProcedure
-        .input(z.string().uuid())
-        .query(async ({ input, ctx }) => {
-            return getPublicationByDocumentId(input, authFromCtx(ctx));
-        }),
+  getPublicationByDocumentId: protectedProcedure
+    .input(z.string().uuid())
+    .query(async ({ input, ctx }) => {
+      return getPublicationByDocumentId(input, authFromCtx(ctx));
+    }),
 
-    /** Owner's URL prefix: `username` if set, else `firstname`+`lastname` (document owner, not current user). */
-    getPublicationOwnerPathSegment: protectedProcedure
-        .input(z.string().uuid())
-        .query(async ({ input, ctx }) => {
-            return getPublicationOwnerPathSegmentForDocument(input, authFromCtx(ctx));
-        }),
+  /** Owner's URL prefix: `username` if set, else `firstname`+`lastname` (document owner, not current user). */
+  getPublicationOwnerPathSegment: protectedProcedure
+    .input(z.string().uuid())
+    .query(async ({ input, ctx }) => {
+      return getPublicationOwnerPathSegmentForDocument(input, authFromCtx(ctx));
+    }),
 
-    publishDocument: protectedProcedure
-        .input(
-            z.object({
-                documentId: z.string().uuid(),
-                title: z.string().min(1).max(500),
-                bodyHtml: z.string().min(1).max(3_000_000),
-                blocksJson: z.string().max(8_000_000),
-                slug: z.string().min(1).max(200).optional(),
-            }),
-        )
-        .mutation(async ({ input, ctx }) => {
-            return publishDocument(
-                {
-                    documentId: input.documentId,
-                    title: input.title,
-                    bodyHtml: input.bodyHtml,
-                    blocksJson: input.blocksJson,
-                    slug: input.slug,
-                },
-                authFromCtx(ctx),
-            );
-        }),
+  publishDocument: protectedProcedure
+    .input(
+      z.object({
+        documentId: z.string().uuid(),
+        title: z.string().min(1).max(500),
+        blocksJson: z.string().min(2).max(8_000_000),
+        slug: z.string().min(1).max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      return publishDocument(
+        {
+          documentId: input.documentId,
+          title: input.title,
+          blocksJson: input.blocksJson,
+          slug: input.slug,
+        },
+        authFromCtx(ctx),
+      );
+    }),
 
-    unpublishDocument: protectedProcedure
-        .input(z.string().uuid())
-        .mutation(async ({ input, ctx }) => {
-            return unpublishDocument(input, authFromCtx(ctx));
-        }),
+  unpublishDocument: protectedProcedure
+    .input(z.string().uuid())
+    .mutation(async ({ input, ctx }) => {
+      return unpublishDocument(input, authFromCtx(ctx));
+    }),
 
-    trashDocument: protectedProcedure
-        .input(z.object({ id: z.string().uuid() }))
-        .mutation(async ({ input, ctx }) => {
-            return trashDocumentRecord(input.id, authFromCtx(ctx));
-        }),
+  trashDocument: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      return trashDocumentRecord(input.id, authFromCtx(ctx));
+    }),
 
-    restoreDocument: protectedProcedure
-        .input(z.object({ id: z.string().uuid() }))
-        .mutation(async ({ input, ctx }) => {
-            return restoreDocumentRecord(input.id, authFromCtx(ctx));
-        }),
+  restoreDocument: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      return restoreDocumentRecord(input.id, authFromCtx(ctx));
+    }),
 });

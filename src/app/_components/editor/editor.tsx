@@ -2,7 +2,9 @@
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
+import "~/app/_components/article/article.css";
 import "./style.css";
+import "~/app/_components/article/editor-article.css";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";

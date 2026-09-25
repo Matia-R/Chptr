@@ -1,23 +1,140 @@
 /**
- * Published article HTML is BlockNote export: empty blocks render as
- * <p class="bn-inline-content"></p> (or headings) with no text, which collapse
- * to 0 height in browsers. Match a normal line box (~26px at default scale).
+ * Published articles are rendered from the block tree. Token colors are
+ * classes so the page does not need inline highlighter styles.
  */
-.published-document-content .bn-block-content
-  :is(p, h1, h2, h3, h4, h5, h6).bn-inline-content:empty {
-  display: block;
-  min-height: 1.625em;
+.published-document a[href] {
+  color: var(--article-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-/**
- * Match the editor: `.bn-shadcn a` uses color/text-decoration inherit (Tailwind reset).
- * Inside `.bn-editor`, links use `revert` for default link styling. Published HTML has no
- * `.bn-editor` wrapper, so links looked like plain text — restore UA link appearance.
- * (See editor/style.css `.bn-shadcn .bn-editor a`.)
- */
-.published-document-content a[href] {
-  color: revert;
-  -webkit-text-decoration: revert;
-  text-decoration: revert;
-  cursor: pointer;
+.published-document .published-code {
+  background: hsl(var(--code-block-background));
+  color: hsl(var(--code-block-foreground));
+  border-radius: 8px;
 }
+
+.published-document .tok-l-f9826c { color: #f9826c; }
+.published-document .tok-l-ffffff { color: #ffffff; }
+.published-document .tok-l-e1e4e8 { color: #e1e4e8; }
+.published-document .tok-l-2f363d { color: #2f363d; }
+.published-document .tok-l-959da5 { color: #959da5; }
+.published-document .tok-l-2188ff { color: #2188ff; }
+.published-document .tok-l-dbedff { color: #dbedff; }
+.published-document .tok-l-005cc5 { color: #005cc5; }
+.published-document .tok-l-586069 { color: #586069; }
+.published-document .tok-l-6a737d { color: #6a737d; }
+.published-document .tok-l-fafbfc { color: #fafbfc; }
+.published-document .tok-l-159739 { color: #159739; }
+.published-document .tok-l-138934 { color: #138934; }
+.published-document .tok-l-1b1f23 { color: #1b1f23; }
+.published-document .tok-l-d1d5da { color: #d1d5da; }
+.published-document .tok-l-34d05822 { color: #34d05822; }
+.published-document .tok-l-d73a4922 { color: #d73a4922; }
+.published-document .tok-l-ffdf5d { color: #ffdf5d; }
+.published-document .tok-l-ffdf5d66 { color: #ffdf5d66; }
+.published-document .tok-l-28a74525 { color: #28a74525; }
+.published-document .tok-l-d1d5da11 { color: #d1d5da11; }
+.published-document .tok-l-24292e { color: #24292e; }
+.published-document .tok-l-0366d611 { color: #0366d611; }
+.published-document .tok-l-f6f8fa { color: #f6f8fa; }
+.published-document .tok-l-0366d625 { color: #0366d625; }
+.published-document .tok-l-34d05840 { color: #34d05840; }
+.published-document .tok-l-34d05800 { color: #34d05800; }
+.published-document .tok-l-ffd33d33 { color: #ffd33d33; }
+.published-document .tok-l-24943e99 { color: #24943e99; }
+.published-document .tok-l-24943e50 { color: #24943e50; }
+.published-document .tok-l-e36209 { color: #e36209; }
+.published-document .tok-l-5a32a3 { color: #5a32a3; }
+.published-document .tok-l-044289 { color: #044289; }
+.published-document .tok-l-cb2431 { color: #cb2431; }
+.published-document .tok-l-28a745 { color: #28a745; }
+.published-document .tok-l-d73a49 { color: #d73a49; }
+.published-document .tok-l-d7dbe0 { color: #d7dbe0; }
+.published-document .tok-l-eff2f6 { color: #eff2f6; }
+.published-document .tok-l-1b1f234d { color: #1b1f234d; }
+.published-document .tok-l-f9c513 { color: #f9c513; }
+.published-document .tok-l-444d56 { color: #444d56; }
+.published-document .tok-l-e2e5e9 { color: #e2e5e9; }
+.published-document .tok-l-cce5ff { color: #cce5ff; }
+.published-document .tok-l-ebf0f4 { color: #ebf0f4; }
+.published-document .tok-l-e8eaed { color: #e8eaed; }
+.published-document .tok-l-6a737d33 { color: #6a737d33; }
+.published-document .tok-l-959da588 { color: #959da588; }
+.published-document .tok-l-959da533 { color: #959da533; }
+.published-document .tok-l-959da544 { color: #959da544; }
+.published-document .tok-l-0366d6 { color: #0366d6; }
+.published-document .tok-l-3192aa { color: #3192aa; }
+.published-document .tok-l-22863a { color: #22863a; }
+.published-document .tok-l-b08800 { color: #b08800; }
+.published-document .tok-l-1b7c83 { color: #1b7c83; }
+.published-document .tok-l-dbab09 { color: #dbab09; }
+.published-document .tok-l-6f42c1 { color: #6f42c1; }
+.published-document .tok-l-032f62 { color: #032f62; }
+.published-document .tok-l-b31d28 { color: #b31d28; }
+.published-document .tok-l-ffeef0 { color: #ffeef0; }
+.published-document .tok-l-f0fff4 { color: #f0fff4; }
+.published-document .tok-l-ffebda { color: #ffebda; }
+.dark .published-document .tok-d-f9826c { color: #f9826c; }
+.dark .published-document .tok-d-24292e { color: #24292e; }
+.dark .published-document .tok-d-1b1f23 { color: #1b1f23; }
+.dark .published-document .tok-d-e1e4e8 { color: #e1e4e8; }
+.dark .published-document .tok-d-6a737d { color: #6a737d; }
+.dark .published-document .tok-d-0366d6 { color: #0366d6; }
+.dark .published-document .tok-d-ffffff { color: #ffffff; }
+.dark .published-document .tok-d-044289 { color: #044289; }
+.dark .published-document .tok-d-c8e1ff { color: #c8e1ff; }
+.dark .published-document .tok-d-d1d5da { color: #d1d5da; }
+.dark .published-document .tok-d-959da5 { color: #959da5; }
+.dark .published-document .tok-d-2b3036 { color: #2b3036; }
+.dark .published-document .tok-d-176f2c { color: #176f2c; }
+.dark .published-document .tok-d-dcffe4 { color: #dcffe4; }
+.dark .published-document .tok-d-22863a { color: #22863a; }
+.dark .published-document .tok-d-444d56 { color: #444d56; }
+.dark .published-document .tok-d-586069 { color: #586069; }
+.dark .published-document .tok-d-28a74530 { color: #28a74530; }
+.dark .published-document .tok-d-d73a4930 { color: #d73a4930; }
+.dark .published-document .tok-d-2f363d { color: #2f363d; }
+.dark .published-document .tok-d-ffd33d44 { color: #ffd33d44; }
+.dark .published-document .tok-d-ffd33d22 { color: #ffd33d22; }
+.dark .published-document .tok-d-2b6a3033 { color: #2b6a3033; }
+.dark .published-document .tok-d-58606915 { color: #58606915; }
+.dark .published-document .tok-d-3392ff22 { color: #3392ff22; }
+.dark .published-document .tok-d-3392ff44 { color: #3392ff44; }
+.dark .published-document .tok-d-17e5e633 { color: #17e5e633; }
+.dark .published-document .tok-d-17e5e600 { color: #17e5e600; }
+.dark .published-document .tok-d-c6902625 { color: #c6902625; }
+.dark .published-document .tok-d-17e5e699 { color: #17e5e699; }
+.dark .published-document .tok-d-17e5e666 { color: #17e5e666; }
+.dark .published-document .tok-d-79b8ff { color: #79b8ff; }
+.dark .published-document .tok-d-ffab70 { color: #ffab70; }
+.dark .published-document .tok-d-b392f0 { color: #b392f0; }
+.dark .published-document .tok-d-17e5e650 { color: #17e5e650; }
+.dark .published-document .tok-d-f97583 { color: #f97583; }
+.dark .published-document .tok-d-1f2428 { color: #1f2428; }
+.dark .published-document .tok-d-28a745 { color: #28a745; }
+.dark .published-document .tok-d-ea4a5a { color: #ea4a5a; }
+.dark .published-document .tok-d-2188ff { color: #2188ff; }
+.dark .published-document .tok-d-ffea7f { color: #ffea7f; }
+.dark .published-document .tok-d-005cc5 { color: #005cc5; }
+.dark .published-document .tok-d-34d058 { color: #34d058; }
+.dark .published-document .tok-d-39414a { color: #39414a; }
+.dark .published-document .tok-d-282e34 { color: #282e34; }
+.dark .published-document .tok-d-1d2d3e { color: #1d2d3e; }
+.dark .published-document .tok-d-1f242888 { color: #1f242888; }
+.dark .published-document .tok-d-ffd33d33 { color: #ffd33d33; }
+.dark .published-document .tok-d-00000088 { color: #00000088; }
+.dark .published-document .tok-d-6a737d88 { color: #6a737d88; }
+.dark .published-document .tok-d-6a737d33 { color: #6a737d33; }
+.dark .published-document .tok-d-6a737d44 { color: #6a737d44; }
+.dark .published-document .tok-d-931c06 { color: #931c06; }
+.dark .published-document .tok-d-56d4dd { color: #56d4dd; }
+.dark .published-document .tok-d-85e89d { color: #85e89d; }
+.dark .published-document .tok-d-fafbfc { color: #fafbfc; }
+.dark .published-document .tok-d-39c5cf { color: #39c5cf; }
+.dark .published-document .tok-d-9ecbff { color: #9ecbff; }
+.dark .published-document .tok-d-fdaeb7 { color: #fdaeb7; }
+.dark .published-document .tok-d-dbedff { color: #dbedff; }
+.dark .published-document .tok-d-86181d { color: #86181d; }
+.dark .published-document .tok-d-144620 { color: #144620; }
+.dark .published-document .tok-d-c24e00 { color: #c24e00; }
