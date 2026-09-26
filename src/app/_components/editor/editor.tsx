@@ -2,7 +2,9 @@
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/shadcn";
+import "~/app/_components/article/article.css";
 import "./style.css";
+import "~/app/_components/article/editor-article.css";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
@@ -22,6 +24,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "~/app/_components/popover";
+import { DocumentEditorTitle } from "./document-editor-title";
 import { useDocumentEditorStore } from "./document-editor-store";
 
 type Theme = "light" | "dark" | "system";
@@ -175,18 +178,28 @@ export default function Editor({
   };
 
   return (
-    <div ref={editorContainerRef} className="contents">
-      <BlockNoteView
-        editor={editor}
-        editable={editable}
-        theme={currentTheme as "light" | "dark"}
-        shadCNComponents={shadCNComponents}
+    <>
+      <div
+        className="box-border w-full"
+        style={{
+          paddingInline: "var(--document-content-inline-padding, 44px)",
+        }}
       >
-        <SuggestionMenuController
-          triggerCharacter="@"
-          getItems={async () => []} // placeholder
-        />
-      </BlockNoteView>
-    </div>
+        <DocumentEditorTitle editable={editable} />
+      </div>
+      <div ref={editorContainerRef} className="contents">
+        <BlockNoteView
+          editor={editor}
+          editable={editable}
+          theme={currentTheme as "light" | "dark"}
+          shadCNComponents={shadCNComponents}
+        >
+          <SuggestionMenuController
+            triggerCharacter="@"
+            getItems={async () => []} // placeholder
+          />
+        </BlockNoteView>
+      </div>
+    </>
   );
 }

@@ -62,12 +62,6 @@ function formatUsernameSegmentForDisplay(username: string): string {
   return username.length <= MAX_USERNAME_DISPLAY_CHARS ? username : "...";
 }
 
-async function blockNoteEditorToExportHtml(
-  editor: AppBlockNoteEditor,
-): Promise<string> {
-  return editor.blocksToFullHTML(editor.document);
-}
-
 export type DocumentPublishValue = {
   documentId: string;
   editor: AppBlockNoteEditor | null;
@@ -372,13 +366,11 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     setPublishFeedback("publishing");
 
     try {
-      const bodyHtml = await blockNoteEditorToExportHtml(editor);
       const blocksJson = JSON.stringify(editor.document);
 
       await publishMutation.mutateAsync({
         documentId,
         title,
-        bodyHtml,
         blocksJson,
         slug: slugOverride.trim() || undefined,
       });

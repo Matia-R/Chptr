@@ -14,8 +14,10 @@ const RESERVED_FIRST_SEGMENTS = new Set([
 ]);
 
 /**
- * Published docs are public, user-supplied HTML (sanitized). Add CSP + hardening headers.
- * Next.js still needs script-src inline/eval for the app bundle; XSS is primarily stopped by DOMPurify.
+ * Published docs render a React tree from the stored block snapshot.
+ * Next.js still needs script-src inline/eval for the app bundle. Article text
+ * is escaped by React, and highlighter colors are classes, so style-src stays
+ * limited to same-origin stylesheets.
  */
 function isSecureRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get("x-forwarded-proto");
@@ -35,7 +37,7 @@ function buildPublishedDocumentCsp({ secure }: { secure: boolean }): string {
     "frame-ancestors 'none'",
     "frame-src 'self' https: data:",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self'",
     "img-src 'self' https: data: blob:",
     "font-src 'self' data: https:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",

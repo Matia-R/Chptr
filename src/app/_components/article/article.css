@@ -1,0 +1,121 @@
+/*
+ * Reading-surface measurements shared by the editor and published pages.
+ * Change a value here, then both surfaces pick it up: the editor through
+ * editor-article.css, the published page through the classes below.
+ */
+:root {
+  --article-list-gap: 0.5em;
+  --article-list-indent: 1.5em;
+  --article-block-gap: 3px;
+  --article-heading-weight: 700;
+  --article-heading-1: 3em;
+  --article-heading-2: 2em;
+  --article-heading-3: 1.3em;
+  --article-heading-4: 1.15em;
+  --article-heading-5: 1em;
+  --article-heading-6: 0.9em;
+  --article-link: #0b6e99;
+  --article-fg-gray: #9b9a97;
+  --article-bg-gray: #ebeced;
+  --article-fg-brown: #64473a;
+  --article-bg-brown: #e9e5e3;
+  --article-fg-red: #e03e3e;
+  --article-bg-red: #fbe4e4;
+  --article-fg-orange: #d9730d;
+  --article-bg-orange: #f6e9d9;
+  --article-fg-yellow: #dfab01;
+  --article-bg-yellow: #fbf3db;
+  --article-fg-green: #4d6461;
+  --article-bg-green: #ddedea;
+  --article-fg-blue: #0b6e99;
+  --article-bg-blue: #ddebf1;
+  --article-fg-purple: #6940a5;
+  --article-bg-purple: #eae4f2;
+  --article-fg-pink: #ad1a72;
+  --article-bg-pink: #f4dfeb;
+}
+
+.dark {
+  --article-link: #0e87bc;
+  --article-fg-gray: #bebdb8;
+  --article-bg-gray: #9b9a97;
+  --article-fg-brown: #8e6552;
+  --article-bg-brown: #64473a;
+  --article-fg-red: #ec4040;
+  --article-bg-red: #be3434;
+  --article-fg-orange: #e3790d;
+  --article-bg-orange: #b7600a;
+  --article-fg-yellow: #dfab01;
+  --article-bg-yellow: #b58b00;
+  --article-fg-green: #6b8b87;
+  --article-bg-green: #4d6461;
+  --article-fg-blue: #0e87bc;
+  --article-bg-blue: #0b6e99;
+  --article-fg-purple: #8552d7;
+  --article-bg-purple: #6940a5;
+  --article-fg-pink: #da208f;
+  --article-bg-pink: #ad1a72;
+}
+
+.article-heading {
+  font-weight: var(--article-heading-weight);
+}
+
+.article-heading-1 { font-size: var(--article-heading-1); }
+.article-heading-2 { font-size: var(--article-heading-2); }
+.article-heading-3 { font-size: var(--article-heading-3); }
+.article-heading-4 { font-size: var(--article-heading-4); }
+.article-heading-5 { font-size: var(--article-heading-5); }
+.article-heading-6 { font-size: var(--article-heading-6); }
+
+.article-block {
+  padding: var(--article-block-gap) 0;
+}
+
+.article-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One indent per nesting level, matching BlockNote's nested block group. */
+.article-nested {
+  margin-left: var(--article-list-indent);
+}
+
+.article-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--article-list-gap);
+}
+
+.article-marker-bullet::before {
+  content: "•";
+}
+
+.article-list .article-list > .article-list-item > .article-marker-bullet::before {
+  content: "◦";
+}
+
+.article-list .article-list .article-list > .article-list-item > .article-marker-bullet::before {
+  content: "▪";
+}
+
+.published-fg-gray { color: var(--article-fg-gray); }
+.published-bg-gray { background-color: var(--article-bg-gray); }
+.published-fg-brown { color: var(--article-fg-brown); }
+.published-bg-brown { background-color: var(--article-bg-brown); }
+.published-fg-red { color: var(--article-fg-red); }
+.published-bg-red { background-color: var(--article-bg-red); }
+.published-fg-orange { color: var(--article-fg-orange); }
+.published-bg-orange { background-color: var(--article-bg-orange); }
+.published-fg-yellow { color: var(--article-fg-yellow); }
+.published-bg-yellow { background-color: var(--article-bg-yellow); }
+.published-fg-green { color: var(--article-fg-green); }
+.published-bg-green { background-color: var(--article-bg-green); }
+.published-fg-blue { color: var(--article-fg-blue); }
+.published-bg-blue { background-color: var(--article-bg-blue); }
+.published-fg-purple { color: var(--article-fg-purple); }
+.published-bg-purple { background-color: var(--article-bg-purple); }
+.published-fg-pink { color: var(--article-fg-pink); }
+.published-bg-pink { background-color: var(--article-bg-pink); }

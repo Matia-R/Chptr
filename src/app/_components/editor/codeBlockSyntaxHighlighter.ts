@@ -46,10 +46,29 @@ const shikiLanguageIds = Object.keys(codeBlockLanguages);
 // Create the highlighter factory function for BlockNote
 // Type mismatch between shiki and @blocknote/core shiki types - both use different versions of @shikijs/types
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
-export const createCodeBlockHighlighter = () =>
-  createHighlighter({
-    themes: ["github-dark"],
+export const createCodeBlockHighlighter = async () => {
+  const highlighter = await createHighlighter({
+    themes: ["github-light", "github-dark"],
     langs: shikiLanguageIds,
-  }) as any;
+  });
+
+  // BlockNote highlights with the first loaded theme and bakes the color into
+  // inline styles. Force both themes so each token also carries --shiki-dark,
+  // and the editor stylesheet can swap color when .dark is set.
+  const codeToTokens = highlighter.codeToTokens.bind(highlighter);
+  highlighter.codeToTokens = ((code, options) => {
+    const next = { ...(options ?? {}) };
+    delete (next as { theme?: unknown }).theme;
+    return codeToTokens(code, {
+      ...next,
+      themes: {
+        light: "github-light",
+        dark: "github-dark",
+      },
+    });
+  }) as typeof highlighter.codeToTokens;
+
+  return highlighter as any;
+};
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
 

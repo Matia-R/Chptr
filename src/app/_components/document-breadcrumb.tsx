@@ -1,15 +1,10 @@
 "use client";
 
-import { api } from "~/trpc/react";
-import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { BreadcrumbItem, Breadcrumb, BreadcrumbList } from "./breadcrumb";
 import { useState } from "react";
 import * as React from "react";
 import { cn } from "~/lib/utils";
-import { useToast } from "../../hooks/use-toast";
 import { SquarePen, X } from "lucide-react";
-import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
-import { useDocumentIsPersisted } from "~/app/_components/editor/collaborative-doc-store";
 import {
   Popover,
   PopoverContent,
@@ -22,90 +17,23 @@ import {
   runWithMobileDrawerOpenSync,
 } from "~/app/_components/mobile-drawer";
 import { useIsMobile } from "~/hooks/use-mobile";
-import { useBrowserOffline } from "~/hooks/use-browser-offline";
-import { useKnownDocumentName } from "~/hooks/use-known-document-name";
-import {
-  applyDocumentName,
-  broadcastDocumentName,
-} from "~/hooks/use-document-meta-sync";
-
-function getCachedDocumentName(
-  utils: ReturnType<typeof api.useUtils>,
-  documentId: string,
-) {
-  return (
-    utils.document.getDocumentById.getData(documentId)?.document?.name ??
-    utils.document.getDocumentIdsForAuthenticatedUser
-      .getData()
-      ?.documents?.find((doc) => doc.id === documentId)?.name
-  );
-}
+import { useDocumentTitle } from "~/hooks/use-document-title";
 
 export function DocumentBreadcrumb() {
-  const documentId = useRouteDocumentId() ?? "";
-  const { isNew, clearFlag } = useNewDocumentFlag();
-  const isPersisted = useDocumentIsPersisted(documentId);
   const isMobile = useIsMobile();
-  const isOffline = useBrowserOffline();
-  const utils = api.useUtils();
-  const { toast } = useToast();
-  const knownName = useKnownDocumentName(documentId);
-
-  const { data: document, isLoading } = api.document.getDocumentById.useQuery(
+  const {
     documentId,
-    {
-      enabled: !!documentId && (!isNew || isPersisted),
-    },
-  );
-
-  const fetchedName = document?.document?.name;
-  const resolvedName =
-    fetchedName ?? knownName ?? (isNew ? "Untitled" : undefined);
+    name: resolvedName,
+    isLoading,
+    isOffline,
+    commitTitle,
+    cancelTitle,
+    previewTitle,
+  } = useDocumentTitle();
 
   const closingWithoutCommitRef = React.useRef(false);
   /** Enter already ran commitTitle; skip duplicate if onOpenChange(false) follows. */
   const skipCommitOnNextCloseRef = React.useRef(false);
-
-  const updateName = api.document.updateDocumentName.useMutation({
-    onMutate: ({ id, name }) => {
-      const previousName =
-        getCachedDocumentName(utils, id) ?? resolvedName ?? "Untitled";
-      applyDocumentName(utils, id, name);
-      broadcastDocumentName(id, name);
-      return { previousName, optimisticName: name };
-    },
-    onError: (err, { id }, context) => {
-      if (
-        context &&
-        getCachedDocumentName(utils, id) === context.optimisticName
-      ) {
-        setEditingName(context.previousName);
-        applyDocumentName(utils, id, context.previousName);
-        broadcastDocumentName(id, context.previousName);
-      }
-
-      toast({
-        variant: "destructive",
-        title: "Failed to update document name",
-        description:
-          err instanceof Error ? err.message : "An unexpected error occurred",
-      });
-    },
-    onSettled: (_data, _error, { id }, context) => {
-      const cachedName = getCachedDocumentName(utils, id);
-      if (
-        context &&
-        cachedName !== undefined &&
-        cachedName !== context.optimisticName &&
-        cachedName !== context.previousName
-      ) {
-        return;
-      }
-
-      void utils.document.getDocumentIdsForAuthenticatedUser.invalidate();
-      void utils.document.getDocumentById.invalidate(id);
-    },
-  });
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -127,38 +55,18 @@ export function DocumentBreadcrumb() {
     return () => window.cancelAnimationFrame(id);
   }, [popoverOpen]);
 
-  const persistName = React.useCallback(
-    (trimmedName: string) => {
-      if (isNew) {
-        clearFlag();
-      }
-
-      setEditingName(trimmedName);
-      updateName.mutate({ id: documentId, name: trimmedName });
+  const commitHeaderTitle = React.useCallback(
+    (nextName: string) => {
+      setEditingName(commitTitle(nextName));
     },
-    [clearFlag, documentId, isNew, updateName],
-  );
-
-  const commitTitle = React.useCallback(
-    (name: string) => {
-      const trimmedName = name.trim();
-      const currentName = resolvedName ?? "Untitled";
-
-      if (!trimmedName || trimmedName === currentName) {
-        setEditingName(currentName);
-        return;
-      }
-
-      persistName(trimmedName);
-    },
-    [persistName, resolvedName],
+    [commitTitle],
   );
 
   const handleCancel = React.useCallback(() => {
     closingWithoutCommitRef.current = true;
-    setEditingName(resolvedName ?? "Untitled");
+    setEditingName(cancelTitle());
     setPopoverOpen(false);
-  }, [resolvedName]);
+  }, [cancelTitle]);
 
   const openTitleEditor = React.useCallback(() => {
     if (isOffline) return;
@@ -182,17 +90,19 @@ export function DocumentBreadcrumb() {
   }, [isOffline]);
 
   const sharedStyles =
-    "min-w-0 w-full max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
+    "min-w-0 max-w-full py-1 px-2 rounded-sm text-sm text-foreground font-semibold outline-none";
+  const titleWidth =
+    "inline-flex min-w-0 max-w-full overflow-hidden sm:max-w-[75%] md:max-w-[50%] lg:max-w-[40%]";
 
-  if (isLoading && !isNew && !resolvedName) {
+  if (isLoading) {
     return (
-      <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
-        <BreadcrumbList className="min-w-0 flex-nowrap">
-          <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
+      <Breadcrumb className={titleWidth}>
+        <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
+          <BreadcrumbItem className="min-w-0 max-w-full">
             <div
               className={cn(
                 sharedStyles,
-                "h-4 w-full max-w-[24rem] animate-pulse bg-accent",
+                "h-4 w-24 max-w-full animate-pulse bg-accent",
               )}
             />
           </BreadcrumbItem>
@@ -212,7 +122,7 @@ export function DocumentBreadcrumb() {
       disabled={isOffline}
       className={cn(
         sharedStyles,
-        "flex w-full min-w-0 items-center gap-2 pr-2 text-left",
+        "flex min-w-0 max-w-full items-center gap-2 pr-2 text-left",
         !isOffline && "hover:bg-accent hover:text-accent-foreground",
         isOffline && "cursor-default disabled:opacity-100",
       )}
@@ -230,12 +140,12 @@ export function DocumentBreadcrumb() {
   );
 
   return (
-    <Breadcrumb className="w-full min-w-0 max-w-full flex-1 overflow-hidden">
-      <BreadcrumbList className="min-w-0 flex-nowrap">
-        <BreadcrumbItem className="w-full min-w-0 max-w-full flex-1">
+    <Breadcrumb className={titleWidth}>
+      <BreadcrumbList className="min-w-0 max-w-full flex-nowrap">
+        <BreadcrumbItem className="min-w-0 max-w-full">
           {isMobile ? (
             <>
-              <div className="group relative min-w-0">{titleTrigger}</div>
+              <div className="group relative min-w-0 max-w-full">{titleTrigger}</div>
               <MobileFormDrawer
                 open={drawerOpen}
                 onOpenChange={(open) => {
@@ -244,7 +154,7 @@ export function DocumentBreadcrumb() {
                 }}
                 title="Edit title"
                 initialValue={resolvedName ?? "Untitled"}
-                onCommit={commitTitle}
+                onCommit={commitHeaderTitle}
                 inputId="document-title-mobile"
                 inputLabel="Document title"
                 inputRef={titleInputRef}
@@ -267,12 +177,12 @@ export function DocumentBreadcrumb() {
                 } else if (skipCommitOnNextCloseRef.current) {
                   skipCommitOnNextCloseRef.current = false;
                 } else {
-                  commitTitle(editingName);
+                  commitHeaderTitle(editingName);
                 }
                 setPopoverOpen(false);
               }}
             >
-              <div className="group relative min-w-0">
+              <div className="group relative min-w-0 max-w-full">
                 <PopoverTrigger asChild>{titleTrigger}</PopoverTrigger>
               </div>
 
@@ -296,11 +206,14 @@ export function DocumentBreadcrumb() {
                     ref={titleInputRef}
                     type="text"
                     value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
+                    onChange={(e) => {
+                      setEditingName(e.target.value);
+                      previewTitle(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        commitTitle(editingName);
+                        commitHeaderTitle(editingName);
                         skipCommitOnNextCloseRef.current = true;
                         setPopoverOpen(false);
                       }

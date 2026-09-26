@@ -93,7 +93,7 @@ export function CommandMenu() {
               }}
             >
               <FileText aria-hidden />
-              {doc.name}
+              <span className="min-w-0 flex-1 truncate">{doc.name}</span>
             </CommandItem>
           ))}
         </CommandGroup>
