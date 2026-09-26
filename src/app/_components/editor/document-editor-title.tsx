@@ -18,11 +18,12 @@ function titleFieldValue(name: string | undefined) {
 }
 
 /** Inline document heading. Same typeface as the editor, without the author row. */
-export function DocumentEditorTitle() {
+export function DocumentEditorTitle({ editable }: { editable: boolean }) {
   const { isNew } = useNewDocumentFlag();
   const editor = useDocumentEditorStore((state) => state.editor);
   const { name, isLoading, isOffline, commitTitle, previewTitle } =
     useDocumentTitle();
+  const canEdit = editable && !isOffline;
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const focusedRef = useRef(false);
   const didFocusNewTitle = useRef(false);
@@ -44,7 +45,7 @@ export function DocumentEditorTitle() {
   }, [name]);
 
   useEffect(() => {
-    if (!isNew || didFocusNewTitle.current || isLoading || isOffline) return;
+    if (!isNew || didFocusNewTitle.current || isLoading || !canEdit) return;
     const field = fieldRef.current;
     if (!field) return;
     const id = window.setTimeout(() => {
@@ -52,7 +53,7 @@ export function DocumentEditorTitle() {
       didFocusNewTitle.current = true;
     }, 0);
     return () => window.clearTimeout(id);
-  }, [isNew, isLoading, isOffline, editor]);
+  }, [isNew, isLoading, canEdit, editor]);
 
   if (isLoading) {
     return (
@@ -68,14 +69,15 @@ export function DocumentEditorTitle() {
         ref={fieldRef}
         rows={1}
         defaultValue={titleFieldValue(name)}
-        disabled={isOffline}
+        disabled={!canEdit}
         aria-label="Document title"
         placeholder="Untitled"
-        className={cn(TITLE_CLASS, isOffline && "cursor-default")}
+        className={cn(TITLE_CLASS, !canEdit && "cursor-default")}
         onFocus={() => {
           focusedRef.current = true;
         }}
         onInput={(event) => {
+          if (!canEdit) return;
           if (!event.currentTarget.value.trim()) {
             event.currentTarget.value = "";
           }
@@ -84,12 +86,13 @@ export function DocumentEditorTitle() {
         }}
         onBlur={(event) => {
           focusedRef.current = false;
+          if (!canEdit) return;
           const committed = commitTitle(event.currentTarget.value);
           event.currentTarget.value = titleFieldValue(committed);
           resize();
         }}
         onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
+          if (!canEdit || event.key !== "Enter") return;
           event.preventDefault();
           if (!event.currentTarget.value.trim()) return;
           event.currentTarget.blur();

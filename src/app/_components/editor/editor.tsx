@@ -178,26 +178,28 @@ export default function Editor({
   };
 
   return (
-    <div ref={editorContainerRef} className="contents">
+    <>
       <div
         className="box-border w-full"
         style={{
           paddingInline: "var(--document-content-inline-padding, 44px)",
         }}
       >
-        <DocumentEditorTitle />
+        <DocumentEditorTitle editable={editable} />
       </div>
-      <BlockNoteView
-        editor={editor}
-        editable={editable}
-        theme={currentTheme as "light" | "dark"}
-        shadCNComponents={shadCNComponents}
-      >
-        <SuggestionMenuController
-          triggerCharacter="@"
-          getItems={async () => []} // placeholder
-        />
-      </BlockNoteView>
-    </div>
+      <div ref={editorContainerRef} className="contents">
+        <BlockNoteView
+          editor={editor}
+          editable={editable}
+          theme={currentTheme as "light" | "dark"}
+          shadCNComponents={shadCNComponents}
+        >
+          <SuggestionMenuController
+            triggerCharacter="@"
+            getItems={async () => []} // placeholder
+          />
+        </BlockNoteView>
+      </div>
+    </>
   );
 }

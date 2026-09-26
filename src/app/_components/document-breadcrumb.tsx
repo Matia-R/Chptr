@@ -27,6 +27,7 @@ export function DocumentBreadcrumb() {
     isLoading,
     isOffline,
     commitTitle,
+    cancelTitle,
     previewTitle,
   } = useDocumentTitle();
 
@@ -63,9 +64,9 @@ export function DocumentBreadcrumb() {
 
   const handleCancel = React.useCallback(() => {
     closingWithoutCommitRef.current = true;
-    setEditingName(resolvedName ?? "Untitled");
+    setEditingName(cancelTitle());
     setPopoverOpen(false);
-  }, [resolvedName]);
+  }, [cancelTitle]);
 
   const openTitleEditor = React.useCallback(() => {
     if (isOffline) return;

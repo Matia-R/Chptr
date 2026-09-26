@@ -328,7 +328,9 @@ function PublishedBlockView({
             </svg>
           </Button>
           <pre className="overflow-x-auto p-4 pr-10 font-mono text-sm leading-relaxed">
-            <code>{highlighted ? <CodeTokens lines={highlighted.lines} /> : source}</code>
+            <code data-code-source={source}>
+              {highlighted ? <CodeTokens lines={highlighted.lines} /> : source}
+            </code>
           </pre>
         </div>
       );

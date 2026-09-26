@@ -16,7 +16,7 @@ export function PublishedCodeCopy({ children }: { children: ReactNode }) {
         const button = target.closest("[data-copy-code]");
         if (!(button instanceof HTMLElement)) return;
         const code = button.parentElement?.querySelector("code");
-        const source = code?.textContent ?? "";
+        const source = code?.dataset.codeSource ?? code?.textContent ?? "";
         void navigator.clipboard.writeText(source).then(
           () => {
             toast({ title: "Copied to clipboard" });

@@ -14,6 +14,9 @@ import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { useToast } from "~/hooks/use-toast";
 import { api } from "~/trpc/react";
 
+// Only the latest title preview for a document may reach persistence.
+const persistTimers = new Map<string, number>();
+
 function getCachedDocumentName(
   utils: ReturnType<typeof api.useUtils>,
   documentId: string,
@@ -42,6 +45,7 @@ export function useDocumentTitle() {
   const persistTimer = useRef<number | null>(null);
   /** Name to restore if this edit is cleared before it should stick. */
   const editBaselineRef = useRef<string | null>(null);
+  const didPersistPreviewRef = useRef(false);
 
   const { data: document, isLoading } = api.document.getDocumentById.useQuery(
     documentId,
@@ -95,14 +99,21 @@ export function useDocumentTitle() {
   });
 
   const clearPersistTimer = useCallback(() => {
-    if (persistTimer.current == null) return;
-    window.clearTimeout(persistTimer.current);
+    const timer = persistTimers.get(documentId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    persistTimers.delete(documentId);
     persistTimer.current = null;
-  }, []);
+  }, [documentId]);
 
   useEffect(() => {
     editBaselineRef.current = null;
-    return clearPersistTimer;
+    didPersistPreviewRef.current = false;
+    return () => {
+      // Unmounting another title surface must not discard the active preview.
+      if (persistTimers.get(documentId) === persistTimer.current) {
+        clearPersistTimer();
+      }
+    };
   }, [clearPersistTimer, documentId]);
 
   const persistName = useCallback(
@@ -121,23 +132,30 @@ export function useDocumentTitle() {
     return baseline;
   }, [documentId, name, utils]);
 
+  const cancelTitle = useCallback(() => {
+    clearPersistTimer();
+    const baseline = restoreBaseline();
+    editBaselineRef.current = null;
+    if (didPersistPreviewRef.current) persistName(baseline);
+    didPersistPreviewRef.current = false;
+    return baseline;
+  }, [clearPersistTimer, persistName, restoreBaseline]);
+
   const commitTitle = useCallback(
     (nextName: string) => {
       clearPersistTimer();
       const trimmedName = nextName.trim();
       const baseline = editBaselineRef.current ?? name ?? "Untitled";
-      editBaselineRef.current = null;
-
       if (!trimmedName || trimmedName === baseline) {
-        applyDocumentName(utils, documentId, baseline);
-        broadcastDocumentName(documentId, baseline);
-        return baseline;
+        return cancelTitle();
       }
 
+      editBaselineRef.current = null;
+      didPersistPreviewRef.current = false;
       persistName(trimmedName);
       return trimmedName;
     },
-    [clearPersistTimer, documentId, name, persistName, utils],
+    [cancelTitle, clearPersistTimer, name, persistName],
   );
 
   /** Paint the name in every title surface immediately, then save. */
@@ -157,13 +175,25 @@ export function useDocumentTitle() {
 
       applyDocumentName(utils, documentId, nextName);
       broadcastDocumentName(documentId, nextName);
-      persistTimer.current = window.setTimeout(() => {
+      const timer = window.setTimeout(() => {
+        if (persistTimers.get(documentId) !== timer) return;
+        persistTimers.delete(documentId);
         persistTimer.current = null;
-        editBaselineRef.current = trimmedName;
+        didPersistPreviewRef.current = true;
         persistName(trimmedName);
       }, 400);
+      persistTimer.current = timer;
+      persistTimers.set(documentId, timer);
     },
-    [clearPersistTimer, documentId, isOffline, name, persistName, restoreBaseline, utils],
+    [
+      clearPersistTimer,
+      documentId,
+      isOffline,
+      name,
+      persistName,
+      restoreBaseline,
+      utils,
+    ],
   );
 
   return {
@@ -172,6 +202,7 @@ export function useDocumentTitle() {
     isLoading: isLoading && !isNew && name === undefined,
     isOffline,
     commitTitle,
+    cancelTitle,
     previewTitle,
   };
 }
