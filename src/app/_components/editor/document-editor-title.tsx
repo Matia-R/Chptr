@@ -21,12 +21,13 @@ function titleFieldValue(name: string | undefined) {
 export function DocumentEditorTitle({ editable }: { editable: boolean }) {
   const { isNew } = useNewDocumentFlag();
   const editor = useDocumentEditorStore((state) => state.editor);
-  const { name, isLoading, isOffline, commitTitle, previewTitle } =
+  const { name, isLoading, isOffline, commitTitle, cancelTitle, previewTitle } =
     useDocumentTitle();
   const canEdit = editable && !isOffline;
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const focusedRef = useRef(false);
   const didFocusNewTitle = useRef(false);
+  const wasEditableRef = useRef(canEdit);
 
   const resize = () => {
     const field = fieldRef.current;
@@ -43,6 +44,19 @@ export function DocumentEditorTitle({ editable }: { editable: boolean }) {
     if (field.value !== nextValue) field.value = nextValue;
     resize();
   }, [name]);
+
+  useEffect(() => {
+    if (wasEditableRef.current && !canEdit) {
+      const baseline = cancelTitle();
+      focusedRef.current = false;
+      const field = fieldRef.current;
+      if (field) {
+        field.value = titleFieldValue(baseline);
+        resize();
+      }
+    }
+    wasEditableRef.current = canEdit;
+  }, [canEdit, cancelTitle]);
 
   useEffect(() => {
     if (!isNew || didFocusNewTitle.current || isLoading || !canEdit) return;
