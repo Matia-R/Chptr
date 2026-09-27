@@ -209,6 +209,7 @@ export function DocumentPreviewSheet() {
             key={generation}
             className={cn(
               "fixed inset-x-3 bottom-0 top-3 z-[60] flex min-h-0 flex-col overflow-hidden bg-background shadow-lg outline-none",
+              "dark:border dark:border-sidebar-border",
               "rounded-t-xl md:inset-x-4 md:top-4",
               "ease-[cubic-bezier(0.22,1,0.36,1)] duration-500",
               "data-[state=open]:animate-in data-[state=closed]:animate-out",
