@@ -21,11 +21,14 @@ import {
   DialogPortal,
   DialogTitle,
 } from "~/app/_components/dialog";
+import { DrawerTitle } from "~/app/_components/drawer";
+import { MobileMenuDrawer } from "~/app/_components/mobile-drawer";
 import { useDocumentPreviewStore } from "~/app/_components/editor/document-preview-store";
 import type { DocumentPreviewSnapshot } from "~/app/_components/editor/document-preview-store";
 import { useDocumentPublishStore } from "~/app/_components/editor/document-publish-store";
 import { PublishedDocumentView } from "~/app/_components/published-document-view";
 import { useDocumentPublish } from "~/hooks/use-document-publish";
+import { useIsMobile } from "~/hooks/use-mobile";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { useToast } from "~/hooks/use-toast";
 import { useUserProfile } from "~/hooks/use-user-profile";
@@ -33,7 +36,8 @@ import { publicationOwnerPathSegment } from "~/lib/slug";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 
-export function DocumentPreviewButton() {
+/** Snapshot the open editor and show the published-page preview. */
+export function useOpenDocumentPreview() {
   const ctx = useDocumentPublish();
   const { data: profile } = useUserProfile();
   const { toast } = useToast();
@@ -41,9 +45,9 @@ export function DocumentPreviewButton() {
   const openPreview = useDocumentPreviewStore((state) => state.openPreview);
   const closePreview = useDocumentPreviewStore((state) => state.closePreview);
 
-  if (!ctx) return null;
-
   const toggle = () => {
+    if (!ctx) return;
+
     if (open) {
       closePreview();
       return;
@@ -97,6 +101,14 @@ export function DocumentPreviewButton() {
     });
   };
 
+  return { open, toggle, available: ctx != null };
+}
+
+export function DocumentPreviewButton() {
+  const { open, toggle, available } = useOpenDocumentPreview();
+
+  if (!available) return null;
+
   return (
     <Button
       type="button"
@@ -121,7 +133,13 @@ export function DocumentPreviewButton() {
   );
 }
 
-function PreviewSurface({ snapshot }: { snapshot: DocumentPreviewSnapshot }) {
+function PreviewSurface({
+  snapshot,
+  variant,
+}: {
+  snapshot: DocumentPreviewSnapshot;
+  variant: "sheet" | "drawer";
+}) {
   const blocks = useMemo(
     () => parsePublishedBlocks(snapshot.blocks),
     [snapshot.blocks],
@@ -151,31 +169,44 @@ function PreviewSurface({ snapshot }: { snapshot: DocumentPreviewSnapshot }) {
 
   return (
     <>
-      <DialogTitle className="sr-only">Preview</DialogTitle>
-      <DialogClose asChild>
-        <Button
-          id="document-preview-close"
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-3 top-3 z-10 h-8 w-8 bg-background/90 hover:bg-accent"
-        >
-          <X aria-hidden />
-          <span className="sr-only">Close preview</span>
-        </Button>
-      </DialogClose>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <PublishedDocumentView
-          className="min-h-full"
-          headerClassName="pr-14"
-          title={snapshot.title}
-          authorProfile={snapshot.authorProfile}
-          ownerUsername={snapshot.ownerUsername}
-          slug={snapshot.slug}
-          publishedAt={snapshot.publishedAt}
-        >
-          <PublishedArticleBody blocks={blocks} code={code} />
-        </PublishedDocumentView>
+      {variant === "sheet" ? (
+        <>
+          <DialogTitle className="sr-only">Preview</DialogTitle>
+          <DialogClose asChild>
+            <Button
+              id="document-preview-close"
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-3 top-3 z-10 h-8 w-8 bg-background/90 hover:bg-accent"
+            >
+              <X aria-hidden />
+              <span className="sr-only">Close preview</span>
+            </Button>
+          </DialogClose>
+        </>
+      ) : (
+        <DrawerTitle className="sr-only">Preview</DrawerTitle>
+      )}
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          variant === "drawer" && "pt-3",
+        )}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <PublishedDocumentView
+            className="min-h-full"
+            headerClassName={variant === "sheet" ? "pr-14" : undefined}
+            title={snapshot.title}
+            authorProfile={snapshot.authorProfile}
+            ownerUsername={snapshot.ownerUsername}
+            slug={snapshot.slug}
+            publishedAt={snapshot.publishedAt}
+          >
+            <PublishedArticleBody blocks={blocks} code={code} />
+          </PublishedDocumentView>
+        </div>
       </div>
     </>
   );
@@ -186,6 +217,7 @@ export function DocumentPreviewSheet() {
   const snapshot = useDocumentPreviewStore((state) => state.snapshot);
   const generation = useDocumentPreviewStore((state) => state.generation);
   const closePreview = useDocumentPreviewStore((state) => state.closePreview);
+  const isMobile = useIsMobile();
   const documentId = useRouteDocumentId();
   const previousDocumentId = useRef(documentId);
 
@@ -195,13 +227,30 @@ export function DocumentPreviewSheet() {
     closePreview();
   }, [closePreview, documentId]);
 
+  const onOpenChange = (next: boolean) => {
+    if (!next) closePreview();
+  };
+
+  if (isMobile) {
+    return (
+      <MobileMenuDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        className="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] bg-background"
+      >
+        {snapshot ? (
+          <PreviewSurface
+            key={generation}
+            snapshot={snapshot}
+            variant="drawer"
+          />
+        ) : null}
+      </MobileMenuDrawer>
+    );
+  }
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) closePreview();
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogOverlay />
         {snapshot ? (
@@ -221,7 +270,7 @@ export function DocumentPreviewSheet() {
               document.getElementById("document-preview-close")?.focus();
             }}
           >
-            <PreviewSurface snapshot={snapshot} />
+            <PreviewSurface snapshot={snapshot} variant="sheet" />
           </DialogPrimitive.Content>
         ) : null}
       </DialogPortal>
