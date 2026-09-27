@@ -64,6 +64,8 @@ function formatUsernameSegmentForDisplay(username: string): string {
 
 export type DocumentPublishValue = {
   documentId: string;
+  /** Title publish would use right now. */
+  title: string;
   editor: AppBlockNoteEditor | null;
   popoverOpen: boolean;
   setPopoverOpen: (open: boolean) => void;
@@ -551,6 +553,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
     return {
       documentId,
+      title,
       editor,
       popoverOpen,
       setPopoverOpen,
@@ -582,6 +585,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     copyPublicUrl,
     documentId,
     editor,
+    title,
     handlePublish,
     hasChangesToPublish,
     hasPendingSlugChange,

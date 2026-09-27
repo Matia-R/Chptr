@@ -3,6 +3,7 @@
 import {
   CloudUpload,
   ExternalLink,
+  Eye,
   X,
   Globe,
   GlobeOff,
@@ -42,6 +43,7 @@ import {
   useDocumentPublishStore,
   type MobileDrawerView,
 } from "~/app/_components/editor/document-publish-store";
+import { useOpenDocumentPreview } from "~/app/_components/document-preview";
 import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 
@@ -172,6 +174,7 @@ function MobilePublishMainView({
 }) {
   const ctx = useDocumentPublish();
   const copyDocumentLink = useCopyDocumentLink();
+  const { toggle: togglePreview } = useOpenDocumentPreview();
   if (!ctx) return null;
 
   const {
@@ -205,6 +208,11 @@ function MobilePublishMainView({
         {header}
         <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
           <MobileActionGroup>
+            <MobileActionButtonRow
+              icon={Eye}
+              label="Preview"
+              onClick={togglePreview}
+            />
             <MobileActionLinkRow
               icon={ExternalLink}
               label="View page"
@@ -269,6 +277,11 @@ function MobilePublishMainView({
       {header}
       <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
         <MobileActionGroup>
+          <MobileActionButtonRow
+            icon={Eye}
+            label="Preview"
+            onClick={togglePreview}
+          />
           <MobileActionButtonRow
             icon={LinkIcon}
             label="Copy link"

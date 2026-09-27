@@ -1,9 +1,8 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
-import { PublishedDocumentTitleSection } from "~/app/_components/published-document-title-section";
+import { PublishedDocumentView } from "~/app/_components/published-document-view";
 
-import { PublishedCodeCopy } from "./blocks/published-code-block";
 import { renderPublishedArticle } from "./blocks/render-article";
 import {
   authorDisplayLabel,
@@ -76,31 +75,13 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
   const article = await renderPublishedArticle(publication.blocks_json);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex max-w-3xl items-center px-4 py-4">
-          <p className="min-w-0 truncate text-left text-sm text-muted-foreground">
-            <span className="text-foreground/90">
-              {publication.owner_username}
-            </span>
-            <span className="mx-1.5 text-border">/</span>
-            <span>{publication.slug}</span>
-          </p>
-        </div>
-      </header>
-
-      <PublishedDocumentTitleSection
-        title={publication.title}
-        authorProfile={authorProfile}
-        ownerUsername={publication.owner_username}
-        publishedAt={publication.published_at}
-      />
-
-      <main className="mx-auto max-w-3xl px-4 pb-24">
-        <article>
-          <PublishedCodeCopy>{article}</PublishedCodeCopy>
-        </article>
-      </main>
-    </div>
+    <PublishedDocumentView
+      title={publication.title}
+      authorProfile={authorProfile}
+      ownerUsername={publication.owner_username}
+      publishedAt={publication.published_at}
+    >
+      {article}
+    </PublishedDocumentView>
   );
 }

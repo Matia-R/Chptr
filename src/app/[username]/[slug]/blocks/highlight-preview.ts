@@ -1,19 +1,15 @@
-import "server-only";
-
 import { createHighlighter, type Highlighter } from "shiki";
 
 import {
   highlightPublishedBlocks,
   publishedShikiLanguageIds,
 } from "./highlight-published";
-import type { HighlightedCode, HighlightedToken } from "./highlight-types";
+import type { HighlightedCode } from "./highlight-types";
 import type { PublishedBlock } from "./parse";
-
-export type { HighlightedCode, HighlightedToken };
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
-function getHighlighter(): Promise<Highlighter> {
+function getPreviewHighlighter(): Promise<Highlighter> {
   highlighterPromise ??= createHighlighter({
     themes: ["github-light", "github-dark"],
     langs: publishedShikiLanguageIds,
@@ -21,9 +17,10 @@ function getHighlighter(): Promise<Highlighter> {
   return highlighterPromise;
 }
 
-export async function highlightPublishedCode(
+/** Browser highlighter for the editor preview. Same classes as the published page. */
+export async function highlightPreviewCode(
   blocks: PublishedBlock[],
 ): Promise<Map<string, HighlightedCode>> {
-  const highlighter = await getHighlighter();
+  const highlighter = await getPreviewHighlighter();
   return highlightPublishedBlocks(highlighter, blocks);
 }

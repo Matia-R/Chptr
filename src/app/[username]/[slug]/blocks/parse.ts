@@ -92,6 +92,13 @@ export function publishedBlocksHaveContent(blocks: PublishedBlock[]): boolean {
   return blocks.some(blockHasContent);
 }
 
+export function publishedBlocksIncludeCode(blocks: PublishedBlock[]): boolean {
+  return blocks.some(
+    (block) =>
+      block.type === "codeBlock" || publishedBlocksIncludeCode(block.children),
+  );
+}
+
 export function inlineToPlainText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
