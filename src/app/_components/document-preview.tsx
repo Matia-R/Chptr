@@ -8,6 +8,7 @@ import { Eye, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { HighlightedCode } from "~/app/[username]/[slug]/blocks/highlight-types";
+import { highlightPreviewCode } from "~/app/[username]/[slug]/blocks/highlight-preview";
 import { PublishedArticleBody } from "~/app/[username]/[slug]/blocks/published-blocks";
 import {
   parsePublishedBlocks,
@@ -34,7 +35,6 @@ import { useToast } from "~/hooks/use-toast";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { publicationOwnerPathSegment } from "~/lib/slug";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react";
 
 /** Snapshot the open editor and show the published-page preview. */
 export function useOpenDocumentPreview() {
@@ -147,17 +147,13 @@ function PreviewSurface({
   const [code, setCode] = useState<Map<string, HighlightedCode>>(
     () => new Map(),
   );
-  const highlight = api.document.highlightPublishedPreview.useMutation();
-  const highlightRef = useRef(highlight.mutateAsync);
-  highlightRef.current = highlight.mutateAsync;
 
   useEffect(() => {
     if (!publishedBlocksIncludeCode(blocks)) return;
     let cancelled = false;
-    void highlightRef
-      .current({ blocksJson: JSON.stringify(snapshot.blocks) })
+    void highlightPreviewCode(blocks)
       .then((result) => {
-        if (!cancelled) setCode(new Map(Object.entries(result)));
+        if (!cancelled) setCode(result);
       })
       .catch(() => {
         // Plain code still matches the published structure.
@@ -165,7 +161,7 @@ function PreviewSurface({
     return () => {
       cancelled = true;
     };
-  }, [blocks, snapshot.blocks]);
+  }, [blocks]);
 
   return (
     <>
