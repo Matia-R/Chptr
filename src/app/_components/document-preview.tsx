@@ -87,7 +87,6 @@ export function useOpenDocumentPreview() {
       blocks,
       publishedAt: ctx.publication?.published_at ?? new Date().toISOString(),
       ownerUsername: ctx.ownerPreview ?? ownerFromProfile,
-      slug: ctx.publicSlugSegment,
       authorProfile: profile
         ? {
             username: profile.username,
@@ -197,7 +196,6 @@ function PreviewSurface({
             title={snapshot.title}
             authorProfile={snapshot.authorProfile}
             ownerUsername={snapshot.ownerUsername}
-            slug={snapshot.slug}
             publishedAt={snapshot.publishedAt}
           >
             <PublishedArticleBody blocks={blocks} code={code} />

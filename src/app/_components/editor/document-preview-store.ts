@@ -9,7 +9,6 @@ export type DocumentPreviewSnapshot = {
   blocks: unknown;
   publishedAt: string;
   ownerUsername: string;
-  slug: string;
   authorProfile: PublishedAuthorProfileRow | null;
 };
 

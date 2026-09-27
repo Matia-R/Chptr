@@ -13,7 +13,6 @@ export function PublishedDocumentView({
   title,
   authorProfile,
   ownerUsername,
-  slug,
   publishedAt,
   children,
   className,
@@ -22,7 +21,6 @@ export function PublishedDocumentView({
   title: string;
   authorProfile: PublishedAuthorProfileRow | null;
   ownerUsername: string;
-  slug: string;
   publishedAt: string;
   children: ReactNode;
   className?: string;
@@ -44,7 +42,7 @@ export function PublishedDocumentView({
             <p className="min-w-0 truncate text-left text-sm text-muted-foreground">
               <span className="text-foreground/90">{ownerUsername}</span>
               <span className="mx-1.5 text-border">/</span>
-              <span>{slug}</span>
+              <span>{title}</span>
             </p>
           </div>
         </header>

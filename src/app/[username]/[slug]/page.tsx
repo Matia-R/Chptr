@@ -79,7 +79,6 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
       title={publication.title}
       authorProfile={authorProfile}
       ownerUsername={publication.owner_username}
-      slug={publication.slug}
       publishedAt={publication.published_at}
     >
       {article}
