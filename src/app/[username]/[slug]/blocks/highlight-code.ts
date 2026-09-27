@@ -8,20 +8,10 @@ import {
 
 import { supportedLanguages } from "~/app/_components/editor/codeBlockSyntaxHighlighter";
 
+import type { HighlightedCode, HighlightedToken } from "./highlight-types";
 import { inlineToPlainText, type PublishedBlock } from "./parse";
 
-export type HighlightedToken = {
-  text: string;
-  lightClass?: string;
-  darkClass?: string;
-  italic: boolean;
-  bold: boolean;
-  underline: boolean;
-};
-
-export type HighlightedCode = {
-  lines: HighlightedToken[][];
-};
+export type { HighlightedCode, HighlightedToken };
 
 const shikiLanguageIds = Object.keys(supportedLanguages);
 

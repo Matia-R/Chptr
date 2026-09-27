@@ -11,6 +11,7 @@ import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
 import { AccountSettings } from "../_components/account-settings";
 import { DocumentTrash } from "../_components/document-trash";
+import { DocumentPreviewSheet } from "../_components/document-preview";
 import { Header } from "../_components/header";
 import { DocumentsMain } from "../_components/document-unavailable-state";
 import { DocumentListSeedProvider } from "~/hooks/use-known-document-name";
@@ -64,6 +65,7 @@ export default async function RootLayout({
               <div className="relative flex h-full min-h-0 min-w-0 flex-col">
                 <Header />
                 <DocumentsMain>{children}</DocumentsMain>
+                <DocumentPreviewSheet />
               </div>
             </SidebarInset>
             <Toaster />

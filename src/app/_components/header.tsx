@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "./sidebar";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
+import { DocumentPreviewButton } from "./document-preview";
 import { DocumentPublishButton } from "./document-publish-button";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "./save-feedback-label";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
@@ -45,7 +46,8 @@ export function Header() {
                 transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
                 className="flex items-center gap-2"
               >
-                <div className="hidden shrink-0 md:flex md:items-center">
+                <div className="hidden shrink-0 items-center gap-2 md:flex">
+                  <DocumentPreviewButton />
                   <DocumentPublishButton key={pathname} />
                 </div>
                 <DocumentActions />

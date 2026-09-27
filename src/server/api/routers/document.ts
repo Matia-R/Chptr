@@ -23,6 +23,7 @@ import {
 import type { PartykitSupabase } from "~/server/partykit/auth";
 import { connectDocument } from "~/server/partykit/connect-document";
 import { DOCUMENT_TITLE_MAX_LENGTH } from "~/lib/document-title";
+import { highlightPublishedPreview } from "~/server/published-preview";
 
 function authFromCtx(ctx: {
   user: { id: string };
@@ -148,6 +149,17 @@ export const documentRouter = createTRPCRouter({
     .input(z.string().uuid())
     .mutation(async ({ input, ctx }) => {
       return unpublishDocument(input, authFromCtx(ctx));
+    }),
+
+  /** Token colors for the in-editor preview. Does not publish. */
+  highlightPublishedPreview: protectedProcedure
+    .input(
+      z.object({
+        blocksJson: z.string().min(2).max(8_000_000),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return highlightPublishedPreview(input.blocksJson);
     }),
 
   trashDocument: protectedProcedure

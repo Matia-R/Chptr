@@ -2,7 +2,7 @@ import { UserAvatar } from "~/app/_components/user-avatar";
 import {
   authorDisplayLabel,
   type PublishedAuthorProfileRow,
-} from "~/server/db/document-publications";
+} from "~/lib/published-author";
 
 function formatPublishedDate(iso: string): string {
   const d = new Date(iso);
