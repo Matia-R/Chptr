@@ -8,10 +8,12 @@ import {
   CommandItem,
   CommandDialog,
   CommandGroup,
+  CommandShortcut,
 } from "./command";
+import { useOpenDocumentPreview } from "./document-preview";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-import { FileText, SunMoon, FilePlus } from "lucide-react";
+import { Eye, FileText, SunMoon, FilePlus } from "lucide-react";
 import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
@@ -36,6 +38,8 @@ export function CommandMenu() {
   const prefetchDocumentState = usePrefetchDocumentState();
   const { theme, setTheme } = useTheme();
   const isOffline = useBrowserOffline();
+  const { toggle: togglePreview, available: previewAvailable } =
+    useOpenDocumentPreview();
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
@@ -106,6 +110,19 @@ export function CommandMenu() {
             <FilePlus aria-hidden />
             New document
           </CommandItem>
+          {previewAvailable ? (
+            <CommandItem
+              value="preview"
+              onSelect={() => {
+                closeAll();
+                togglePreview();
+              }}
+            >
+              <Eye aria-hidden />
+              Preview
+              <CommandShortcut>⌘⇧P</CommandShortcut>
+            </CommandItem>
+          ) : null}
           <CommandItem
             value="toggle-theme"
             onSelect={() => {

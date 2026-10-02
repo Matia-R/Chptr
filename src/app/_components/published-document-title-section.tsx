@@ -3,6 +3,7 @@ import {
   authorDisplayLabel,
   type PublishedAuthorProfileRow,
 } from "~/lib/published-author";
+import { cn } from "~/lib/utils";
 
 function formatPublishedDate(iso: string): string {
   const d = new Date(iso);
@@ -40,6 +41,8 @@ export type PublishedDocumentTitleSectionProps = {
   authorProfile: PublishedAuthorProfileRow | null;
   ownerUsername: string;
   publishedAt: string;
+  /** Phone-width preview: keep the smaller title even on a wide screen. */
+  compact?: boolean;
 };
 
 export function PublishedDocumentTitleSection({
@@ -47,13 +50,24 @@ export function PublishedDocumentTitleSection({
   authorProfile,
   ownerUsername,
   publishedAt,
+  compact = false,
 }: PublishedDocumentTitleSectionProps) {
   const authorLabel = authorDisplayLabel(authorProfile, ownerUsername);
   const dateLabel = formatPublishedDate(publishedAt);
 
   return (
-    <section className="mx-auto max-w-3xl px-4 pt-10 md:pt-14">
-      <h1 className="mb-6 break-words font-sans text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+    <section
+      className={cn(
+        "mx-auto max-w-3xl px-4 pt-10",
+        !compact && "md:pt-14",
+      )}
+    >
+      <h1
+        className={cn(
+          "mb-6 break-words font-sans text-3xl font-semibold tracking-tight text-foreground",
+          !compact && "md:text-4xl",
+        )}
+      >
         {title}
       </h1>
       <div className="mb-10 flex items-center gap-3 border-b pb-4">

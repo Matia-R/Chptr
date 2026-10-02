@@ -17,6 +17,8 @@ export function PublishedDocumentView({
   children,
   className,
   headerClassName,
+  compact = false,
+  embedded = false,
 }: {
   title: string;
   authorProfile: PublishedAuthorProfileRow | null;
@@ -26,13 +28,24 @@ export function PublishedDocumentView({
   className?: string;
   /** Extra classes on the path row, e.g. room for the preview close control. */
   headerClassName?: string;
+  /** Phone-width preview: keep mobile title sizing on a wide screen. */
+  compact?: boolean;
+  /** Inside a rounded preview frame. An opaque header keeps the corner clip clean. */
+  embedded?: boolean;
 }) {
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", className)}
     >
       {ownerUsername ? (
-        <header className="border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <header
+          className={cn(
+            "border-b border-border/60",
+            embedded
+              ? "bg-background"
+              : "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+          )}
+        >
           <div
             className={cn(
               "mx-auto flex max-w-3xl items-center px-4 py-4",
@@ -53,6 +66,7 @@ export function PublishedDocumentView({
         authorProfile={authorProfile}
         ownerUsername={ownerUsername}
         publishedAt={publishedAt}
+        compact={compact}
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-24">
