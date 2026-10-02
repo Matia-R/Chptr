@@ -30,6 +30,7 @@ import { useDocumentPreviewStore } from "~/app/_components/editor/document-previ
 import type { DocumentPreviewSnapshot } from "~/app/_components/editor/document-preview-store";
 import { useDocumentPublishStore } from "~/app/_components/editor/document-publish-store";
 import { PublishedDocumentView } from "~/app/_components/published-document-view";
+import { HoverTooltip } from "~/app/_components/tooltip";
 import { useDocumentPublish } from "~/hooks/use-document-publish";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
@@ -107,30 +108,59 @@ export function useOpenDocumentPreview() {
 
 export function DocumentPreviewButton() {
   const { open, toggle, available } = useOpenDocumentPreview();
+  const toggleRef = useRef(toggle);
+  toggleRef.current = toggle;
+
+  useEffect(() => {
+    if (!available) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || !event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key.toLowerCase() !== "p") return;
+      event.preventDefault();
+      toggleRef.current();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [available]);
 
   if (!available) return null;
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      aria-expanded={open}
-      aria-haspopup="dialog"
-      onClick={toggle}
-      className={cn(
-        "h-8 shrink-0 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
-        "whitespace-nowrap",
-        "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
-        "hover:bg-accent hover:text-accent-foreground",
-        "[&_svg]:size-3.5",
-        open && "bg-accent text-accent-foreground",
-      )}
+    <HoverTooltip
+      side="bottom"
+      content={
+        <span className="inline-flex items-center gap-2">
+          Preview
+          <kbd className="font-sans text-[10px] font-normal text-muted-foreground">
+            ⌘⇧P
+          </kbd>
+        </span>
+      }
     >
-      <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
-        <Eye aria-hidden />
-      </span>
-      <span className="whitespace-nowrap">Preview</span>
-    </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={toggle}
+        className={cn(
+          "h-8 shrink-0 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
+          "whitespace-nowrap",
+          "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
+          "hover:bg-accent hover:text-accent-foreground",
+          "[&_svg]:size-3.5",
+          open && "bg-accent text-accent-foreground",
+        )}
+      >
+        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+          <Eye aria-hidden />
+        </span>
+        <span className="whitespace-nowrap">Preview</span>
+      </Button>
+    </HoverTooltip>
   );
 }
 
@@ -223,9 +253,9 @@ function PreviewSurface({
   return (
     <>
       {variant === "sheet" ? (
-        <div className="flex min-h-0 flex-1 flex-col bg-muted/40 p-6">
+        <div className="flex min-h-0 flex-1 flex-col bg-muted/40 px-6 pb-6 pt-4">
           <DialogTitle className="sr-only">Preview</DialogTitle>
-          <div className="relative mb-6 flex shrink-0 items-center justify-center">
+          <div className="relative mb-4 flex shrink-0 items-center justify-center">
             <PreviewDisplayToggle value={display} onChange={setDisplay} />
             <DialogClose asChild>
               <Button
@@ -243,7 +273,7 @@ function PreviewSurface({
           <div className="flex min-h-0 flex-1 justify-center">
             <div
               className={cn(
-                "flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm",
+                "flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-background shadow-md",
                 display === "mobile" ? "max-w-[390px]" : "max-w-6xl",
               )}
             >
