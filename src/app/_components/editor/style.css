@@ -985,7 +985,13 @@
   --bn-border-radius-large: max(var(--bn-border-radius) + 2px, 1px);
 }
 
-.bn-container[data-color-scheme="dark"] {
+/*
+ * Also match html.dark from next-themes. BlockNote only sets
+ * data-color-scheme after its theme prop resolves; without this, .bn-editor
+ * paints with the default white --bn-colors-editor-background for a frame.
+ */
+.bn-container[data-color-scheme="dark"],
+.dark .bn-container {
   --bn-colors-editor-text: #cfcfcf;
   --bn-colors-editor-background: hsl(var(--background));
   --bn-colors-menu-text: #cfcfcf;
@@ -1763,7 +1769,9 @@
   --radius: 0.5rem
 }
 
-.bn-shadcn.dark {
+/* Same as above: follow html.dark before BlockNote adds its own .dark class. */
+.bn-shadcn.dark,
+.dark .bn-shadcn {
   --background: 0 0% 9.803921568627451%;
   --foreground: 0 0% 98%;
   --card: 0 0% 3.9%;
@@ -1797,6 +1805,16 @@
 .bn-shadcn .bn-editor {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+}
+
+/*
+ * Hard fallback: .bn-shadcn defines its own light --background, so until
+ * BlockNote adds .dark / data-color-scheme, hsl(var(--background)) stays white
+ * even under html.dark. Paint the editor surface from the app tokens instead.
+ */
+.dark .bn-shadcn .bn-editor {
+  background-color: hsl(0 0% 9.803921568627451%);
+  color: hsl(0 0% 98%);
 }
 
 .bn-shadcn .bn-editor a {
