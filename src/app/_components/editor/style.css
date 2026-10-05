@@ -1807,6 +1807,16 @@
   color: hsl(var(--foreground));
 }
 
+/*
+ * Hard fallback: .bn-shadcn defines its own light --background, so until
+ * BlockNote adds .dark / data-color-scheme, hsl(var(--background)) stays white
+ * even under html.dark. Paint the editor surface from the app tokens instead.
+ */
+.dark .bn-shadcn .bn-editor {
+  background-color: hsl(0 0% 9.803921568627451%);
+  color: hsl(0 0% 98%);
+}
+
 .bn-shadcn .bn-editor a {
   color: revert;
   -webkit-text-decoration: revert;
