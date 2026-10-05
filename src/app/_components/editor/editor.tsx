@@ -6,7 +6,7 @@ import "~/app/_components/article/article.css";
 import "./style.css";
 import "~/app/_components/article/editor-article.css";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { en } from "@blocknote/core/locales";
 import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
@@ -26,8 +26,6 @@ import {
 } from "~/app/_components/popover";
 import { DocumentEditorTitle } from "./document-editor-title";
 import { useDocumentEditorStore } from "./document-editor-store";
-
-type Theme = "light" | "dark" | "system";
 
 interface CollaborationProvider {
   awareness: unknown;
@@ -50,6 +48,33 @@ const schema = BlockNoteSchema.create({
   },
 });
 
+/**
+ * Resolve BlockNote's theme on the first paint.
+ *
+ * next-themes' `theme` can be `"system"`, and `resolvedTheme` can be briefly
+ * undefined while the provider hydrates. Delaying the dark value until a
+ * useEffect caused `.bn-editor` to paint with its default white background.
+ * This editor is client-only (`dynamic(..., { ssr: false })`), so reading the
+ * `dark` class next-themes already put on `<html>` is safe and keeps doc
+ * switches from flashing light.
+ */
+function useEditorColorScheme(): "light" | "dark" {
+  const { resolvedTheme } = useTheme();
+
+  if (resolvedTheme === "dark" || resolvedTheme === "light") {
+    return resolvedTheme;
+  }
+
+  if (
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark")
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
 export default function Editor({
   userName,
   userColor,
@@ -57,8 +82,7 @@ export default function Editor({
   provider,
   editable = true,
 }: EditorProps) {
-  const { theme } = useTheme();
-  const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
+  const editorTheme = useEditorColorScheme();
 
   const setDocumentEditor = useDocumentEditorStore((s) => s.setEditor);
 
@@ -98,22 +122,6 @@ export default function Editor({
       setDocumentEditor(null);
     };
   }, [editor, setDocumentEditor]);
-
-  // --- Theme handling ---
-  useEffect(() => {
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const newTheme = mediaQuery.matches ? "dark" : "light";
-      setCurrentTheme(newTheme);
-      const handleChange = (e: MediaQueryListEvent) => {
-        setCurrentTheme(e.matches ? "dark" : "light");
-      };
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    } else {
-      setCurrentTheme(theme as Theme);
-    }
-  }, [theme]);
 
   // --- Cmd+/ (Mac) or Ctrl+/ (Windows/Linux): insert AiPromptInput block ---
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -191,7 +199,7 @@ export default function Editor({
         <BlockNoteView
           editor={editor}
           editable={editable}
-          theme={currentTheme as "light" | "dark"}
+          theme={editorTheme}
           shadCNComponents={shadCNComponents}
         >
           <SuggestionMenuController
