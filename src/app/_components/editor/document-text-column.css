@@ -17,3 +17,9 @@
   width: 100%;
   max-width: 100%;
 }
+
+/* Wrapped titles take their real height during layout, not after paint. */
+.document-editor-title {
+  field-sizing: content;
+  max-width: 100%;
+}
