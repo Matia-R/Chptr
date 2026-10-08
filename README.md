@@ -6,9 +6,9 @@ This is currently a work in progress! An Early Access beta is set to go live Nov
 
 ## Is it open source?
 
-At the moment, kind-of. I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest in contributing, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
+At the moment, not really. I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest in contributing, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
 
-That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
+More practically, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on this (at least not cheaply - and I'm on a tight budget). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
 
 Thank you for your understanding 🫶
 
