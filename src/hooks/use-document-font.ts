@@ -19,7 +19,7 @@ function subscribeToDocumentFont(
   ydoc: Y.Doc | null,
   onStoreChange: () => void,
 ) {
-  if (!ydoc) return () => {};
+  if (!ydoc) return () => undefined;
   // Doc-level updates, not getMap: creating the meta map would persist an edit.
   // React skips the re-render when the font id is unchanged.
   ydoc.on("update", onStoreChange);
