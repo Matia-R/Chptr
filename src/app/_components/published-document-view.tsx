@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { documentFontStyle, resolveDocumentFontId } from "~/lib/document-fonts";
 import type { PublishedAuthorProfileRow } from "~/lib/published-author";
 import { cn } from "~/lib/utils";
 
@@ -14,6 +15,7 @@ export function PublishedDocumentView({
   authorProfile,
   ownerUsername,
   publishedAt,
+  font,
   children,
   className,
   headerClassName,
@@ -24,6 +26,8 @@ export function PublishedDocumentView({
   authorProfile: PublishedAuthorProfileRow | null;
   ownerUsername: string;
   publishedAt: string;
+  /** Stable font id from the publish snapshot. Missing values are Inter. */
+  font?: string | null;
   children: ReactNode;
   className?: string;
   /** Extra classes on the path row, e.g. room for the preview close control. */
@@ -33,6 +37,8 @@ export function PublishedDocumentView({
   /** Inside a rounded preview frame. An opaque header keeps the corner clip clean. */
   embedded?: boolean;
 }) {
+  const fontId = resolveDocumentFontId(font);
+
   return (
     <div
       className={cn("min-h-screen bg-background text-foreground", className)}
@@ -61,17 +67,23 @@ export function PublishedDocumentView({
         </header>
       ) : null}
 
-      <PublishedDocumentTitleSection
-        title={title}
-        authorProfile={authorProfile}
-        ownerUsername={ownerUsername}
-        publishedAt={publishedAt}
-        compact={compact}
-      />
+      <div
+        className="document-type"
+        data-document-font={fontId}
+        style={documentFontStyle(fontId)}
+      >
+        <PublishedDocumentTitleSection
+          title={title}
+          authorProfile={authorProfile}
+          ownerUsername={ownerUsername}
+          publishedAt={publishedAt}
+          compact={compact}
+        />
 
-      <main className="mx-auto max-w-3xl px-4 pb-24">
-        <article>{children}</article>
-      </main>
+        <main className="mx-auto max-w-3xl px-4 pb-24">
+          <article>{children}</article>
+        </main>
+      </div>
     </div>
   );
 }

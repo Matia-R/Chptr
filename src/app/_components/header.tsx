@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "./sidebar";
 import { DocumentBreadcrumb } from "./document-breadcrumb";
 import { DocumentActions } from "./document-actions";
+import { DocumentFontButton } from "./document-font-button";
 import { DocumentPreviewButton } from "./document-preview";
 import { DocumentPublishButton } from "./document-publish-button";
 import { SAVE_FEEDBACK_CONTENT_TRANSITION } from "./save-feedback-label";
@@ -50,6 +51,7 @@ export function Header() {
                   <DocumentPreviewButton />
                   <DocumentPublishButton key={pathname} />
                 </div>
+                <DocumentFontButton />
                 <DocumentActions />
               </motion.div>
             )}

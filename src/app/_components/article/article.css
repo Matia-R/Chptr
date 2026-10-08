@@ -61,12 +61,24 @@
   font-weight: var(--article-heading-weight);
 }
 
-.article-heading-1 { font-size: var(--article-heading-1); }
-.article-heading-2 { font-size: var(--article-heading-2); }
-.article-heading-3 { font-size: var(--article-heading-3); }
-.article-heading-4 { font-size: var(--article-heading-4); }
-.article-heading-5 { font-size: var(--article-heading-5); }
-.article-heading-6 { font-size: var(--article-heading-6); }
+.article-heading-1 {
+  font-size: var(--article-heading-1);
+}
+.article-heading-2 {
+  font-size: var(--article-heading-2);
+}
+.article-heading-3 {
+  font-size: var(--article-heading-3);
+}
+.article-heading-4 {
+  font-size: var(--article-heading-4);
+}
+.article-heading-5 {
+  font-size: var(--article-heading-5);
+}
+.article-heading-6 {
+  font-size: var(--article-heading-6);
+}
 
 .article-block {
   padding: var(--article-block-gap) 0;
@@ -93,29 +105,96 @@
   content: "•";
 }
 
-.article-list .article-list > .article-list-item > .article-marker-bullet::before {
+.article-list
+  .article-list
+  > .article-list-item
+  > .article-marker-bullet::before {
   content: "◦";
 }
 
-.article-list .article-list .article-list > .article-list-item > .article-marker-bullet::before {
+.article-list
+  .article-list
+  .article-list
+  > .article-list-item
+  > .article-marker-bullet::before {
   content: "▪";
 }
 
-.published-fg-gray { color: var(--article-fg-gray); }
-.published-bg-gray { background-color: var(--article-bg-gray); }
-.published-fg-brown { color: var(--article-fg-brown); }
-.published-bg-brown { background-color: var(--article-bg-brown); }
-.published-fg-red { color: var(--article-fg-red); }
-.published-bg-red { background-color: var(--article-bg-red); }
-.published-fg-orange { color: var(--article-fg-orange); }
-.published-bg-orange { background-color: var(--article-bg-orange); }
-.published-fg-yellow { color: var(--article-fg-yellow); }
-.published-bg-yellow { background-color: var(--article-bg-yellow); }
-.published-fg-green { color: var(--article-fg-green); }
-.published-bg-green { background-color: var(--article-bg-green); }
-.published-fg-blue { color: var(--article-fg-blue); }
-.published-bg-blue { background-color: var(--article-bg-blue); }
-.published-fg-purple { color: var(--article-fg-purple); }
-.published-bg-purple { background-color: var(--article-bg-purple); }
-.published-fg-pink { color: var(--article-fg-pink); }
-.published-bg-pink { background-color: var(--article-bg-pink); }
+.published-fg-gray {
+  color: var(--article-fg-gray);
+}
+.published-bg-gray {
+  background-color: var(--article-bg-gray);
+}
+.published-fg-brown {
+  color: var(--article-fg-brown);
+}
+.published-bg-brown {
+  background-color: var(--article-bg-brown);
+}
+.published-fg-red {
+  color: var(--article-fg-red);
+}
+.published-bg-red {
+  background-color: var(--article-bg-red);
+}
+.published-fg-orange {
+  color: var(--article-fg-orange);
+}
+.published-bg-orange {
+  background-color: var(--article-bg-orange);
+}
+.published-fg-yellow {
+  color: var(--article-fg-yellow);
+}
+.published-bg-yellow {
+  background-color: var(--article-bg-yellow);
+}
+.published-fg-green {
+  color: var(--article-fg-green);
+}
+.published-bg-green {
+  background-color: var(--article-bg-green);
+}
+.published-fg-blue {
+  color: var(--article-fg-blue);
+}
+.published-bg-blue {
+  background-color: var(--article-bg-blue);
+}
+.published-fg-purple {
+  color: var(--article-fg-purple);
+}
+.published-bg-purple {
+  background-color: var(--article-bg-purple);
+}
+.published-fg-pink {
+  color: var(--article-fg-pink);
+}
+.published-bg-pink {
+  background-color: var(--article-bg-pink);
+}
+
+.document-type {
+  font-family: var(
+    --document-font-family,
+    var(--font-inter),
+    "Inter",
+    sans-serif
+  );
+}
+
+.document-title {
+  font-family: var(
+    --document-font-family,
+    var(--font-inter),
+    "Inter",
+    sans-serif
+  );
+}
+
+/* Merriweather ships 400 and 700, not 600. Use the real bold cut. */
+.document-type[data-document-font="merriweather"]
+  :is(.document-title, .font-semibold) {
+  font-weight: 700;
+}

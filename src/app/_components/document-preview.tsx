@@ -26,6 +26,7 @@ import {
 } from "~/app/_components/dialog";
 import { DrawerTitle } from "~/app/_components/drawer";
 import { MobileMenuDrawer } from "~/app/_components/mobile-drawer";
+import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
 import { useDocumentPreviewStore } from "~/app/_components/editor/document-preview-store";
 import type { DocumentPreviewSnapshot } from "~/app/_components/editor/document-preview-store";
 import { useDocumentPublishStore } from "~/app/_components/editor/document-publish-store";
@@ -36,6 +37,8 @@ import { useIsMobile } from "~/hooks/use-mobile";
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 import { useToast } from "~/hooks/use-toast";
 import { useUserProfile } from "~/hooks/use-user-profile";
+import { readDocumentFontId } from "~/lib/document-font-state";
+import { DEFAULT_DOCUMENT_FONT_ID } from "~/lib/document-fonts";
 import { publicationOwnerPathSegment } from "~/lib/slug";
 import { cn } from "~/lib/utils";
 
@@ -84,12 +87,19 @@ export function useOpenDocumentPreview() {
         })
       : "";
 
+    const live = useCollaborativeDocStore.getState();
+    const font =
+      live.ydoc && live.documentId === ctx.documentId
+        ? readDocumentFontId(live.ydoc)
+        : DEFAULT_DOCUMENT_FONT_ID;
+
     useDocumentPublishStore.getState().closeBothPanels();
     openPreview({
       title: ctx.title,
       blocks,
       publishedAt: ctx.publication?.published_at ?? new Date().toISOString(),
       ownerUsername: ctx.ownerPreview ?? ownerFromProfile,
+      font,
       authorProfile: profile
         ? {
             username: profile.username,
@@ -289,6 +299,7 @@ function PreviewSurface({
                   authorProfile={snapshot.authorProfile}
                   ownerUsername={snapshot.ownerUsername}
                   publishedAt={snapshot.publishedAt}
+                  font={snapshot.font}
                 >
                   <PublishedArticleBody blocks={blocks} code={code} />
                 </PublishedDocumentView>
@@ -305,6 +316,7 @@ function PreviewSurface({
               authorProfile={snapshot.authorProfile}
               ownerUsername={snapshot.ownerUsername}
               publishedAt={snapshot.publishedAt}
+              font={snapshot.font}
             >
               <PublishedArticleBody blocks={blocks} code={code} />
             </PublishedDocumentView>

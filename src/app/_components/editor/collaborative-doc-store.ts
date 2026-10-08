@@ -19,6 +19,8 @@ type CollaborativeDocState = {
   hasYjsPublishHash: boolean;
   /** True after the first post-sync Yjs publish comparison for the bound doc. */
   isYjsPublishReady: boolean;
+  /** True once prefetched or synced Y.Doc state is safe to read (font, body). */
+  isContentReady: boolean;
   /**
    * Last live publish comparison per document. Survives navigate / reset.
    * `getDocumentState` cannot replace this: hover prefetch is a no-op while
@@ -33,6 +35,7 @@ type CollaborativeDocState = {
     isYjsContentDirty: boolean;
     hasYjsPublishHash: boolean;
   }) => void;
+  setContentReady: (isContentReady: boolean) => void;
   reset: () => void;
 };
 
@@ -43,6 +46,7 @@ const initialBoundState = {
   isYjsContentDirty: false,
   hasYjsPublishHash: false,
   isYjsPublishReady: false,
+  isContentReady: false,
 };
 
 export const useCollaborativeDocStore = create<CollaborativeDocState>(
@@ -62,6 +66,7 @@ export const useCollaborativeDocStore = create<CollaborativeDocState>(
       ),
     setYdoc: (ydoc) => set({ ydoc }),
     setPersisted: (isPersisted) => set({ isPersisted }),
+    setContentReady: (isContentReady) => set({ isContentReady }),
     setYjsPublishState: ({ isYjsContentDirty, hasYjsPublishHash }) =>
       set((state) => ({
         isYjsContentDirty,

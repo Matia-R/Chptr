@@ -57,20 +57,17 @@ export function PublishedDocumentTitleSection({
 
   return (
     <section
-      className={cn(
-        "mx-auto max-w-3xl px-4 pt-10",
-        !compact && "md:pt-14",
-      )}
+      className={cn("mx-auto max-w-3xl px-4 pt-10", !compact && "md:pt-14")}
     >
       <h1
         className={cn(
-          "mb-6 break-words font-sans text-3xl font-semibold tracking-tight text-foreground",
+          "document-title mb-6 break-words text-3xl font-semibold tracking-tight text-foreground",
           !compact && "md:text-4xl",
         )}
       >
         {title}
       </h1>
-      <div className="mb-10 flex items-center gap-3 border-b pb-4">
+      <div className="mb-10 flex items-center gap-3 border-b pb-4 font-sans">
         <UserAvatar
           first_name={authorProfile?.first_name ?? null}
           last_name={authorProfile?.last_name ?? null}

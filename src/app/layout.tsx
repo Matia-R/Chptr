@@ -2,23 +2,58 @@ import "~/styles/globals.css";
 import { ThemeProvider } from "./_components/theme-provider";
 
 import { GeistSans } from "geist/font/sans";
-import { Inter, Lora, Noto_Serif } from "next/font/google";
+import {
+  IBM_Plex_Mono,
+  Inter,
+  Lora,
+  Merriweather,
+  Noto_Serif,
+  Source_Serif_4,
+} from "next/font/google";
 import { type Metadata, type Viewport } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { AuthSessionListener } from "./_components/auth-session-listener";
 import { OverlayThemeSync } from "./_components/overlay-theme-sync";
 
+const inter = Inter({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
 const lora = Lora({
   subsets: ["latin"],
+  style: ["normal", "italic"],
   variable: "--font-lora",
   display: "swap",
 });
 
-const inter = Inter({
+const merriweather = Merriweather({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-merriweather",
   display: "swap",
+  preload: false,
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-ibm-plex-mono",
+  display: "swap",
+  preload: false,
+});
+
+const sourceSerif4 = Source_Serif_4({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-source-serif-4",
+  display: "swap",
+  preload: false,
 });
 
 const notoSerif = Noto_Serif({
@@ -62,7 +97,7 @@ export default function RootLayout({
     <html
       suppressHydrationWarning
       lang="en"
-      className={`${GeistSans.variable} ${lora.variable} ${inter.variable} ${notoSerif.variable}`}
+      className={`${GeistSans.variable} ${inter.variable} ${lora.variable} ${merriweather.variable} ${ibmPlexMono.variable} ${sourceSerif4.variable} ${notoSerif.variable}`}
     >
       <body>
         <OverlayThemeSync />
