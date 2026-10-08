@@ -4,7 +4,6 @@ import { Check } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "~/app/_components/button";
-import { PanelHeader } from "~/app/_components/panel-header";
 import {
   Popover,
   PopoverContent,
@@ -12,17 +11,12 @@ import {
 } from "~/app/_components/popover";
 import { HoverTooltip } from "~/app/_components/tooltip";
 import { useDocumentFont } from "~/hooks/use-document-font";
-import { DOCUMENT_FONTS, type DocumentFontId } from "~/lib/document-fonts";
+import { DOCUMENT_FONTS } from "~/lib/document-fonts";
 import { cn } from "~/lib/utils";
 
 export function DocumentFontButton() {
   const { fontId, ready, selectFont } = useDocumentFont();
   const [open, setOpen] = useState(false);
-
-  const choose = (next: DocumentFontId) => {
-    if (!selectFont(next)) return;
-    setOpen(false);
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -48,9 +42,8 @@ export function DocumentFontButton() {
         side="bottom"
         sideOffset={8}
         collisionPadding={8}
-        className="grid w-[min(18.75rem,calc(100vw-1rem))] gap-3 border-sidebar-border bg-sidebar px-6 pb-3 pt-6 text-sidebar-foreground shadow-lg"
+        className="w-[min(18.75rem,calc(100vw-1rem))] border-sidebar-border bg-sidebar px-6 py-3 text-sidebar-foreground shadow-lg"
       >
-        <PanelHeader title="Font" />
         <div
           role="listbox"
           aria-label="Font"
@@ -66,7 +59,7 @@ export function DocumentFontButton() {
                 role="option"
                 aria-selected={selected}
                 disabled={!ready}
-                onClick={() => choose(font.id)}
+                onClick={() => selectFont(font.id)}
                 className={cn(
                   "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors",
                   "hover:bg-sidebar-accent focus-visible:bg-sidebar-accent",
