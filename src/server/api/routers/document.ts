@@ -22,7 +22,10 @@ import {
 } from "~/server/db";
 import type { PartykitSupabase } from "~/server/partykit/auth";
 import { connectDocument } from "~/server/partykit/connect-document";
-import { DOCUMENT_FONT_IDS } from "~/lib/document-fonts";
+import {
+  DEFAULT_DOCUMENT_FONT_ID,
+  DOCUMENT_FONT_IDS,
+} from "~/lib/document-fonts";
 import { DOCUMENT_TITLE_MAX_LENGTH } from "~/lib/document-title";
 
 function authFromCtx(ctx: {
@@ -131,7 +134,7 @@ export const documentRouter = createTRPCRouter({
         title: z.string().min(1).max(DOCUMENT_TITLE_MAX_LENGTH),
         blocksJson: z.string().min(2).max(8_000_000),
         slug: z.string().min(1).max(200).optional(),
-        font: z.enum(DOCUMENT_FONT_IDS),
+        font: z.enum(DOCUMENT_FONT_IDS).default(DEFAULT_DOCUMENT_FONT_ID),
       }),
     )
     .mutation(async ({ input, ctx }) => {
