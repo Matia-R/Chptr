@@ -5,7 +5,7 @@ import "~/app/[username]/[slug]/published-document.css";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
-import { Eye, Monitor, Smartphone, X } from "lucide-react";
+import { BookOpen, Monitor, Smartphone, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -166,7 +166,7 @@ export function DocumentPreviewButton() {
         )}
       >
         <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
-          <Eye aria-hidden />
+          <BookOpen aria-hidden />
         </span>
         <span className="whitespace-nowrap">Preview</span>
       </Button>

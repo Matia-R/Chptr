@@ -13,7 +13,7 @@ import {
 import { useOpenDocumentPreview } from "./document-preview";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-import { Eye, FileText, SunMoon, FilePlus } from "lucide-react";
+import { BookOpen, FileText, SunMoon, FilePlus } from "lucide-react";
 import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
@@ -118,7 +118,7 @@ export function CommandMenu() {
                 togglePreview();
               }}
             >
-              <Eye aria-hidden />
+              <BookOpen aria-hidden />
               Preview
               <CommandShortcut>⌘⇧P</CommandShortcut>
             </CommandItem>

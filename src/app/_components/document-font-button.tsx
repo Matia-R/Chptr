@@ -72,7 +72,7 @@ function DocumentFontOptions({
             disabled={!ready}
             onClick={() => onSelect(font.id)}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors",
+              "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors",
               "hover:bg-sidebar-accent focus-visible:bg-sidebar-accent active:bg-sidebar-accent",
               "disabled:pointer-events-none",
               selected && "bg-sidebar-accent",
