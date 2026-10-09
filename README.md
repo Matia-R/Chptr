@@ -1,18 +1,18 @@
 # Chptr
 
-Chptr is a platform for creating and sharing beautiful blog posts. Documents save and sync in realtime across sessions, and can be published at anytime to a public URL.
+Chptr is a platform for creating and sharing blog posts. Documents save and sync in realtime across sessions, and can be published at anytime to a public URL.
 
-This is currently a work in progress! An Early Access beta is set to go live Novemeber 2026.
+This is a work in progress! An Early Access beta is set to go live Novemeber 2026.
 
-## Is it open source?
+## Is Chptr open source?
 
-At the moment, not really. I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest in contributing, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
+I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest in contributing, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
 
-More practically, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on this (at least not cheaply - and I'm on a tight budget). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
+On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on (at least not cheaply). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
 
 Thank you for your understanding 🫶
 
-## Goals
+## Goals 🎯
 
 The goal for Chptr is to make a platform that focuses on the ergonomics of writing and sharing long-form content.
 
@@ -22,7 +22,7 @@ The process of writing an article is fragmented. The mission is to create someth
 
 The hope is that we can build something that simplifies all the most archaic aspects of writing while keeping the messy parts that promote creativity.
 
-## What you can do
+## How it works ⚙️
 
 - **Write.** Documents open in a [BlockNote](https://www.blocknotejs.org/) editor (slash commands, code blocks with syntax highlighting, alert blocks, and an in-editor AI prompt).
 - **Keep drafts in sync.** The editor is backed by a [Yjs](https://yjs.dev/) document. Open sessions connect to a [PartyKit](https://www.partykit.io/) room, which is the only process that writes the live document back to the database.
@@ -34,9 +34,7 @@ Inviting other people to a document is not a product flow yet. Permission rows e
 
 In-editor AI calls Google Gemini through the [Vercel AI SDK](https://sdk.vercel.ai/) (`ai`, `@ai-sdk/google`). Those requests are rate-limited per user. The rest of the app runs without an AI key; prompts fail until one is set.
 
-## Goals
-
-## Stack
+## Stack 🥞
 
 | Piece                   | Role                                          |
 | ----------------------- | --------------------------------------------- |
@@ -47,7 +45,7 @@ In-editor AI calls Google Gemini through the [Vercel AI SDK](https://sdk.vercel.
 | Tailwind CSS, Radix     | UI                                            |
 | BlockNote               | Editor                                        |
 
-## Repository layout
+## Repository layout 📁  
 
 ```
 src/app/                  Routes and UI
@@ -67,7 +65,7 @@ migrations/               SQL source of truth (applied to Supabase separately)
 
 tRPC routers live in `src/server/api/routers/` and are mounted in `src/server/api/root.ts`: `document`, `user`, and `aiPrompt`.
 
-## How a document moves through the system
+### How a document moves through the system
 
 ```
 Browser (BlockNote + Y.Doc)
@@ -94,7 +92,7 @@ App features other than live sync — list, rename, trash, restore, profile, pub
 
 Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT_ARCHITECTURE.md](./PARTYKIT_ARCHITECTURE.md).
 
-## Routes
+### Routes
 
 | Path                                               | Who                    | What                                     |
 | -------------------------------------------------- | ---------------------- | ---------------------------------------- |
@@ -107,7 +105,7 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 | `/api/trpc/[trpc]`                                 | —                      | tRPC                                     |
 | `/api/partykit/connect`, `/api/partykit/save`      | PartyKit server        | Load, create, and persist document state |
 
-## Run it locally
+## Run it locally 💻
 
 You need Node.js 18.18 or newer (this repo uses npm 10) and a Supabase project you can point the app at.
 
@@ -141,7 +139,7 @@ You need Node.js 18.18 or newer (this repo uses npm 10) and a Supabase project y
 
    Use `npm run dev:partykit`, not `npx partykit dev`. A freshly downloaded CLI cannot see this project’s dependencies.
 
-## Serve it
+## Serve it ☁️
 
 The Next.js app and the PartyKit worker are deployed separately. They must share `PARTYKIT_SECRET`, and the worker’s `APP_URL` must be the public URL of the Next.js app. The client’s `NEXT_PUBLIC_PARTYKIT_HOST` must be the deployed worker host. The PartyKit project name is `chptr-collab` (`partykit.json`).
 
@@ -153,7 +151,7 @@ npm run deploy:partykit
 
 Set `APP_URL` and `PARTYKIT_SECRET` on the PartyKit project after deploy (`npx partykit env add …`). Step-by-step notes are in [PARTYKIT.md](./PARTYKIT.md).
 
-## Scripts
+## Scripts 📄
 
 | Script                                  | What it does                |
 | --------------------------------------- | --------------------------- |
