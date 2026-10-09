@@ -3,7 +3,7 @@
 import {
   CloudUpload,
   ExternalLink,
-  Eye,
+  BookOpen,
   X,
   Globe,
   GlobeOff,
@@ -209,7 +209,7 @@ function MobilePublishMainView({
         <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
           <MobileActionGroup>
             <MobileActionButtonRow
-              icon={Eye}
+              icon={BookOpen}
               label="Preview"
               onClick={togglePreview}
             />
@@ -278,7 +278,7 @@ function MobilePublishMainView({
       <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
         <MobileActionGroup>
           <MobileActionButtonRow
-            icon={Eye}
+            icon={BookOpen}
             label="Preview"
             onClick={togglePreview}
           />

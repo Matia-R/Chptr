@@ -80,6 +80,7 @@ export default async function PublishedDocumentPage({ params }: PageProps) {
       authorProfile={authorProfile}
       ownerUsername={publication.owner_username}
       publishedAt={publication.published_at}
+      font={publication.font}
     >
       {article}
     </PublishedDocumentView>

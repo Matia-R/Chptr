@@ -264,6 +264,7 @@ export function useCollaborativeDoc({
 
         const markReady = () => {
           if (closedForAuth || cancelled) return;
+          useCollaborativeDocStore.getState().setContentReady(true);
           setIsReady(true);
           setIsLoading(false);
         };

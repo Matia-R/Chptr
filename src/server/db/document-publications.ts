@@ -18,6 +18,8 @@ import {
   slugifyTitle,
 } from "~/lib/slug";
 
+import { isDocumentFontId } from "~/lib/document-fonts";
+
 import type { AuthContext } from "./shared";
 
 export type DocumentPublicationRow = {
@@ -28,6 +30,8 @@ export type DocumentPublicationRow = {
   title: string;
   body_html: string;
   blocks_json: unknown;
+  /** Stable font id. Null on snapshots published before document fonts. */
+  font: string | null;
   published_at: string;
   updated_at: string;
 };
@@ -476,6 +480,7 @@ export async function publishDocument(
     slug?: string;
     title: string;
     blocksJson: string;
+    font: string;
   },
   auth: AuthContext,
 ) {
@@ -561,6 +566,13 @@ export async function publishDocument(
     });
   }
 
+  if (!isDocumentFontId(input.font)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Unknown document font",
+    });
+  }
+
   if (!Array.isArray(blocksParsed)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -622,6 +634,7 @@ export async function publishDocument(
     title,
     body_html: bodyHtml,
     blocks_json: blocksParsed,
+    font: input.font,
     published_at: publishedAt,
     updated_at: new Date().toISOString(),
   };

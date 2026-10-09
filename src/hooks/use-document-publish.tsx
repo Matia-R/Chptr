@@ -46,6 +46,8 @@ import {
   useDocumentPublishStore,
   type PublishFeedbackState,
 } from "~/app/_components/editor/document-publish-store";
+import { readDocumentFontId } from "~/lib/document-font-state";
+import { DEFAULT_DOCUMENT_FONT_ID } from "~/lib/document-fonts";
 import { writeYjsPublishedContentHash } from "~/lib/yjs-publish-state";
 
 type PublishDocumentResult = RouterOutputs["document"]["publishDocument"];
@@ -369,12 +371,18 @@ export function useDocumentPublish(): DocumentPublishValue | null {
 
     try {
       const blocksJson = JSON.stringify(editor.document);
+      const liveBeforePublish = useCollaborativeDocStore.getState();
+      const font =
+        liveBeforePublish.ydoc && liveBeforePublish.documentId === documentId
+          ? readDocumentFontId(liveBeforePublish.ydoc)
+          : DEFAULT_DOCUMENT_FONT_ID;
 
       await publishMutation.mutateAsync({
         documentId,
         title,
         blocksJson,
         slug: slugOverride.trim() || undefined,
+        font,
       });
 
       const live = useCollaborativeDocStore.getState();

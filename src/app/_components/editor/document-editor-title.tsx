@@ -8,7 +8,7 @@ import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { cn } from "~/lib/utils";
 
 const TITLE_CLASS =
-  "w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-sans text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-foreground/25 md:text-4xl";
+  "document-title w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-foreground/25 md:text-4xl";
 
 /** Default name is a placeholder, not characters in the field. */
 function titleFieldValue(name: string | undefined) {

@@ -26,6 +26,8 @@ import {
 } from "~/app/_components/popover";
 import { DocumentEditorTitle } from "./document-editor-title";
 import { useDocumentEditorStore } from "./document-editor-store";
+import { useDocumentFont } from "~/hooks/use-document-font";
+import { documentFontStyle } from "~/lib/document-fonts";
 
 type Theme = "light" | "dark" | "system";
 
@@ -59,6 +61,7 @@ export default function Editor({
 }: EditorProps) {
   const { theme } = useTheme();
   const [currentTheme, setCurrentTheme] = useState<Theme>(theme as Theme);
+  const { fontId } = useDocumentFont();
 
   const setDocumentEditor = useDocumentEditorStore((s) => s.setEditor);
 
@@ -178,7 +181,11 @@ export default function Editor({
   };
 
   return (
-    <>
+    <div
+      className="document-type"
+      data-document-font={fontId ?? undefined}
+      style={fontId ? documentFontStyle(fontId) : undefined}
+    >
       <div
         className="box-border w-full"
         style={{
@@ -200,6 +207,6 @@ export default function Editor({
           />
         </BlockNoteView>
       </div>
-    </>
+    </div>
   );
 }

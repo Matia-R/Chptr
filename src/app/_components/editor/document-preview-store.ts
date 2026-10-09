@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 
+import type { DocumentFontId } from "~/lib/document-fonts";
 import type { PublishedAuthorProfileRow } from "~/lib/published-author";
 
 export type DocumentPreviewSnapshot = {
@@ -10,6 +11,7 @@ export type DocumentPreviewSnapshot = {
   publishedAt: string;
   ownerUsername: string;
   authorProfile: PublishedAuthorProfileRow | null;
+  font: DocumentFontId;
 };
 
 type DocumentPreviewStore = {

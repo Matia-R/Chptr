@@ -1,5 +1,8 @@
 import type * as Y from "yjs";
 
+import { readDocumentFontId } from "~/lib/document-font-state";
+import { DEFAULT_DOCUMENT_FONT_ID } from "~/lib/document-fonts";
+
 /** Shared Y.Map: every collaborator sees the same published snapshot. */
 export const YJS_PUBLISH_MAP = "chptr-publish";
 export const YJS_PUBLISH_ORIGIN = "chptr-publish";
@@ -14,10 +17,16 @@ function fnv1a(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/** Hash of the collaborative document body only (not publish metadata). */
+/**
+ * Hash of the collaborative document body plus a non-default font.
+ * Inter is omitted so documents published before fonts existed keep the same hash.
+ */
 export function getYjsContentHash(ydoc: Y.Doc): string {
   const json = ydoc.getXmlFragment(YJS_DOCUMENT_FRAGMENT).toJSON();
-  return `${json.length.toString(16)}:${fnv1a(json)}`;
+  const body = `${json.length.toString(16)}:${fnv1a(json)}`;
+  const fontId = readDocumentFontId(ydoc);
+  if (fontId === DEFAULT_DOCUMENT_FONT_ID) return body;
+  return `${body}:${fontId}`;
 }
 
 export function getYjsPublishedContentHash(ydoc: Y.Doc): string | undefined {
