@@ -183,6 +183,20 @@ html.dark[data-drawer-chrome-sampler] {
     background-color: transparent;
   }
 
+  /*
+   * The header fill stays transparent so Safari samples the status-bar strip.
+   * Cover the toolbar itself or scrolled document text shows through it.
+   */
+  html[data-drawer-chrome-sampler] [data-app-header]::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset-inline: 0;
+    top: 12px;
+    bottom: 0;
+    background-color: hsl(var(--background));
+  }
+
   [data-overlay-chrome-sampler] {
     position: fixed;
     inset-inline: 0;
