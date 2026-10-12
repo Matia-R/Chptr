@@ -84,8 +84,8 @@ export function resolveDocumentFontId(value: unknown): DocumentFontId {
 }
 
 /**
- * Editor-only. Published routes block style attributes, so the public page
- * sets the same custom property from article.css via data-document-font.
+ * Editor-only. The public page sets the same custom property from article.css
+ * via data-document-font.
  */
 export function documentFontStyle(fontId: DocumentFontId): CSSProperties {
   return {

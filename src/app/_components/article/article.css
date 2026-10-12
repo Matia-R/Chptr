@@ -185,9 +185,8 @@
 }
 
 /*
- * Face comes from the attribute, not a style attribute. Published routes send
- * style-src 'self', which blocks inline styles (including custom properties).
- * Keep these families in sync with DOCUMENT_FONTS in document-fonts.ts.
+ * Face is keyed by the attribute. Keep these families in sync with
+ * DOCUMENT_FONTS in document-fonts.ts.
  */
 .document-type[data-document-font="inter"] {
   --document-font-family: var(--font-inter), "Inter", sans-serif;
