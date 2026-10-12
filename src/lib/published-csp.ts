@@ -16,8 +16,10 @@ const RESERVED_FIRST_SEGMENTS = new Set([
 /**
  * Published docs render a React tree from the stored block snapshot.
  * Next.js still needs script-src inline/eval for the app bundle. Article text
- * is escaped by React, and highlighter colors are classes, so style-src stays
- * limited to same-origin stylesheets.
+ * is escaped by React, highlighter colors are classes, and the document face
+ * is a data-document-font rule in article.css. style-src stays limited to
+ * same-origin stylesheets: a style attribute is blocked, including one that
+ * only sets a CSS variable.
  */
 function isSecureRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get("x-forwarded-proto");

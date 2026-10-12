@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { documentFontStyle, resolveDocumentFontId } from "~/lib/document-fonts";
+import { resolveDocumentFontId } from "~/lib/document-fonts";
 import type { PublishedAuthorProfileRow } from "~/lib/published-author";
 import { cn } from "~/lib/utils";
 
@@ -70,7 +70,6 @@ export function PublishedDocumentView({
       <div
         className="document-type"
         data-document-font={fontId}
-        style={documentFontStyle(fontId)}
       >
         <PublishedDocumentTitleSection
           title={title}

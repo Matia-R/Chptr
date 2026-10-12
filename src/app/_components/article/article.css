@@ -184,6 +184,31 @@
   );
 }
 
+/*
+ * Face comes from the attribute, not a style attribute. Published routes send
+ * style-src 'self', which blocks inline styles (including custom properties).
+ * Keep these families in sync with DOCUMENT_FONTS in document-fonts.ts.
+ */
+.document-type[data-document-font="inter"] {
+  --document-font-family: var(--font-inter), "Inter", sans-serif;
+}
+.document-type[data-document-font="geist"] {
+  --document-font-family: var(--font-geist-sans), "Geist", sans-serif;
+}
+.document-type[data-document-font="lora"] {
+  --document-font-family: var(--font-lora), "Lora", serif;
+}
+.document-type[data-document-font="merriweather"] {
+  --document-font-family: var(--font-merriweather), "Merriweather", serif;
+}
+.document-type[data-document-font="ibm-plex-mono"] {
+  --document-font-family: var(--font-ibm-plex-mono), "IBM Plex Mono",
+    ui-monospace, monospace;
+}
+.document-type[data-document-font="source-serif-4"] {
+  --document-font-family: var(--font-source-serif-4), "Source Serif 4", serif;
+}
+
 .document-title {
   font-family: var(
     --document-font-family,
