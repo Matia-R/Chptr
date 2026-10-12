@@ -83,6 +83,10 @@ export function resolveDocumentFontId(value: unknown): DocumentFontId {
   return isDocumentFontId(value) ? value : DEFAULT_DOCUMENT_FONT_ID;
 }
 
+/**
+ * Editor-only. Published routes block style attributes, so the public page
+ * sets the same custom property from article.css via data-document-font.
+ */
 export function documentFontStyle(fontId: DocumentFontId): CSSProperties {
   return {
     "--document-font-family": getDocumentFont(fontId).family,
