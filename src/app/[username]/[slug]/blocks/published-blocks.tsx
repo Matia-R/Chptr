@@ -4,6 +4,7 @@ import { AlertView } from "~/app/_components/article/alert-view";
 import { cn } from "~/lib/utils";
 
 import { PublishedCodeCopyButton } from "./published-code-block";
+import { PublishedCodeCopyButtonMarkup } from "./published-code-copy";
 
 import type { HighlightedCode, HighlightedToken } from "./highlight-types";
 import { inlineToPlainText, type PublishedBlock } from "./parse";
@@ -183,14 +184,29 @@ function CodeTokens({ lines }: { lines: HighlightedToken[][] }) {
   ));
 }
 
+function PublishedCodeCopy({
+  source,
+  staticMarkup,
+}: {
+  source: string;
+  staticMarkup: boolean;
+}) {
+  // The HTML snapshot is rendered with renderToStaticMarkup, which invokes
+  // components as functions. The interactive button is a client component.
+  if (staticMarkup) return <PublishedCodeCopyButtonMarkup />;
+  return <PublishedCodeCopyButton source={source} />;
+}
+
 function PublishedList({
   type,
   items,
   code,
+  staticMarkup,
 }: {
   type: string;
   items: PublishedBlock[];
   code: Map<string, HighlightedCode>;
+  staticMarkup: boolean;
 }) {
   const start = items[0]?.props.start;
   const Tag = type === "numberedListItem" ? "ol" : "ul";
@@ -218,7 +234,11 @@ function PublishedList({
             )}
             <div className="min-w-0 flex-1">
               <InlineContent content={item.content} />
-              <NestedBlocks blocks={item.children} code={code} />
+              <NestedBlocks
+                blocks={item.children}
+                code={code}
+                staticMarkup={staticMarkup}
+              />
             </div>
           </li>
         );
@@ -239,13 +259,19 @@ function Caption({ caption }: { caption: string | undefined }) {
 function PublishedBlockView({
   block,
   code,
+  staticMarkup,
 }: {
   block: PublishedBlock;
   code: Map<string, HighlightedCode>;
+  staticMarkup: boolean;
 }) {
   const chrome = blockChrome(block.props);
   const children = (
-    <NestedBlocks blocks={block.children} code={code} />
+    <NestedBlocks
+      blocks={block.children}
+      code={code}
+      staticMarkup={staticMarkup}
+    />
   );
 
   switch (block.type) {
@@ -305,7 +331,7 @@ function PublishedBlockView({
       const source = inlineToPlainText(block.content);
       return (
         <div className="published-code relative my-3 rounded-md">
-          <PublishedCodeCopyButton source={source} />
+          <PublishedCodeCopy source={source} staticMarkup={staticMarkup} />
           <pre className="overflow-x-auto p-4 pr-10 font-mono text-sm leading-relaxed">
             <code>
               {highlighted ? <CodeTokens lines={highlighted.lines} /> : source}
@@ -527,14 +553,20 @@ function AlertBlock({
 function NestedBlocks({
   blocks,
   code,
+  staticMarkup,
 }: {
   blocks: PublishedBlock[];
   code: Map<string, HighlightedCode>;
+  staticMarkup: boolean;
 }) {
   if (blocks.length === 0) return null;
   return (
     <div className="article-nested">
-      <PublishedSequence blocks={blocks} code={code} />
+      <PublishedSequence
+        blocks={blocks}
+        code={code}
+        staticMarkup={staticMarkup}
+      />
     </div>
   );
 }
@@ -542,13 +574,20 @@ function NestedBlocks({
 export function PublishedArticleBody({
   blocks,
   code,
+  staticMarkup = false,
 }: {
   blocks: PublishedBlock[];
   code: Map<string, HighlightedCode>;
+  /** HTML snapshot path. Skips the client copy button. */
+  staticMarkup?: boolean;
 }) {
   return (
     <div className="published-document text-[1.05rem] leading-relaxed">
-      <PublishedSequence blocks={blocks} code={code} />
+      <PublishedSequence
+        blocks={blocks}
+        code={code}
+        staticMarkup={staticMarkup}
+      />
     </div>
   );
 }
@@ -556,9 +595,11 @@ export function PublishedArticleBody({
 export function PublishedSequence({
   blocks,
   code,
+  staticMarkup,
 }: {
   blocks: PublishedBlock[];
   code: Map<string, HighlightedCode>;
+  staticMarkup: boolean;
 }) {
   const nodes: ReactNode[] = [];
   let index = 0;
@@ -577,11 +618,19 @@ export function PublishedSequence({
           type={type}
           items={items}
           code={code}
+          staticMarkup={staticMarkup}
         />,
       );
       continue;
     }
-    nodes.push(<PublishedBlockView key={block.id} block={block} code={code} />);
+    nodes.push(
+      <PublishedBlockView
+        key={block.id}
+        block={block}
+        code={code}
+        staticMarkup={staticMarkup}
+      />,
+    );
     index += 1;
   }
   return nodes;

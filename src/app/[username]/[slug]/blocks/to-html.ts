@@ -8,5 +8,7 @@ import { renderPublishedBlocks } from "./render-article";
 export async function publishedBlocksToHtml(
   blocks: PublishedBlock[],
 ): Promise<string> {
-  return renderToStaticMarkup(await renderPublishedBlocks(blocks));
+  return renderToStaticMarkup(
+    await renderPublishedBlocks(blocks, { staticMarkup: true }),
+  );
 }
