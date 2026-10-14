@@ -17,7 +17,7 @@ const RESERVED_FIRST_SEGMENTS = new Set([
  * Published docs are a React tree from the stored blocks. Author text is
  * escaped there, so this header does not try to police scripts or styles.
  * Those directives were blocking the app's own inline styles and the Vercel
- * toolbar. Framing, plugins, and `<base>` are still locked down.
+ * toolbar. Framing, plugins, `<base>`, and image sources are still locked down.
  */
 function isSecureRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get("x-forwarded-proto");
@@ -34,6 +34,7 @@ function buildPublishedDocumentCsp({ secure }: { secure: boolean }): string {
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
+    "img-src 'self' https: data: blob:",
   ];
   // Safari upgrades http://localhost subresources to https://localhost when this
   // directive is present, breaking CSS/fonts in local dev (WebKit bug #250776).
