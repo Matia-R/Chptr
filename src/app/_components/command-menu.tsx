@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   CommandInput,
   CommandList,
@@ -13,7 +13,14 @@ import {
 import { useOpenDocumentPreview } from "./document-preview";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-import { BookOpen, FileText, SunMoon, FilePlus } from "lucide-react";
+import {
+  BookOpen,
+  FilePlus,
+  FileText,
+  Globe,
+  RefreshCw,
+  SunMoon,
+} from "lucide-react";
 import { DialogTitle } from "./dialog";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
@@ -26,6 +33,29 @@ import {
 } from "~/hooks/use-document-meta-sync";
 import { useTheme } from "next-themes";
 import { randomUUID } from "~/lib/utils";
+import { DOCUMENT_PUBLISH_SHORTCUT_LABEL } from "./document-publish-button";
+import {
+  useDocumentPublish,
+  type DocumentPublishValue,
+} from "~/hooks/use-document-publish";
+
+function publishCommandLabel(ctx: DocumentPublishValue): "Publish" | "Update" {
+  return ctx.showPublishedPopoverActions ? "Update" : "Publish";
+}
+
+/** Same gate as the Publish / Update buttons in the publish panel. */
+function isPublishActionUnavailable(
+  ctx: DocumentPublishValue,
+  isOffline: boolean,
+): boolean {
+  return (
+    isOffline ||
+    ctx.busy ||
+    !ctx.editor ||
+    ctx.publicationLoading ||
+    (!ctx.hasChangesToPublish && ctx.publishFeedback === "idle")
+  );
+}
 
 export function CommandMenu() {
   const [search, setSearch] = useState("");
@@ -40,6 +70,11 @@ export function CommandMenu() {
   const isOffline = useBrowserOffline();
   const { toggle: togglePreview, available: previewAvailable } =
     useOpenDocumentPreview();
+  const publishCtx = useDocumentPublish();
+  const publishCtxRef = useRef(publishCtx);
+  publishCtxRef.current = publishCtx;
+  const isOfflineRef = useRef(isOffline);
+  isOfflineRef.current = isOffline;
 
   // Instant document creation - navigate immediately with a new UUID
   const handleCreateDocument = useCallback(() => {
@@ -70,6 +105,29 @@ export function CommandMenu() {
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, [setOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || event.isComposing) return;
+      if (!event.shiftKey || !(event.metaKey || event.ctrlKey)) return;
+      if (event.key !== "Enter") return;
+
+      const ctx = publishCtxRef.current;
+      if (!ctx) return;
+
+      // Capture so the editor doesn't also start a new block.
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (isPublishActionUnavailable(ctx, isOfflineRef.current)) return;
+
+      useCommandMenuStore.getState().setOpen(false);
+      void ctx.handlePublish();
+    };
+
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   const allDocs = documents?.documents ?? [];
   const displayedDocs = search ? allDocs : allDocs.slice(0, 5);
@@ -121,6 +179,27 @@ export function CommandMenu() {
               <BookOpen aria-hidden />
               Preview
               <CommandShortcut>⌘⇧P</CommandShortcut>
+            </CommandItem>
+          ) : null}
+          {publishCtx ? (
+            <CommandItem
+              value="publish update document"
+              disabled={isPublishActionUnavailable(publishCtx, isOffline)}
+              onSelect={() => {
+                if (isPublishActionUnavailable(publishCtx, isOffline)) return;
+                closeAll();
+                void publishCtx.handlePublish();
+              }}
+            >
+              {publishCtx.showPublishedPopoverActions ? (
+                <RefreshCw aria-hidden />
+              ) : (
+                <Globe aria-hidden />
+              )}
+              {publishCommandLabel(publishCtx)}
+              <CommandShortcut>
+                {DOCUMENT_PUBLISH_SHORTCUT_LABEL}
+              </CommandShortcut>
             </CommandItem>
           ) : null}
           <CommandItem

@@ -13,7 +13,11 @@ import {
 } from "~/app/_components/editor/document-publish";
 import { SaveFeedbackContent } from "~/app/_components/save-feedback-label";
 import { Skeleton } from "~/app/_components/skeleton";
+import { HoverTooltip } from "~/app/_components/tooltip";
 import { cn } from "~/lib/utils";
+
+/** Header tooltip and command menu. Ctrl+Shift+Enter is the non-Mac binding. */
+export const DOCUMENT_PUBLISH_SHORTCUT_LABEL = "⌘⇧↵";
 
 /** Resting labels only — wrapper width must not include transitional copy. */
 const RESTING_TRIGGER_LABELS = ["Publish", "Published", "Update"] as const;
@@ -84,6 +88,13 @@ export function DocumentPublishButton() {
     </span>
   );
 
+  const tooltipLabel =
+    triggerLabel === "Publishing"
+      ? "Publish"
+      : triggerLabel === "Updating"
+        ? "Update"
+        : triggerLabel;
+
   if (publicationLoading) {
     return (
       <div
@@ -121,41 +132,53 @@ export function DocumentPublishButton() {
       <div className="pointer-events-none relative mr-2 inline-flex shrink-0">
         {widthSizer}
 
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            className={cn(
-              "pointer-events-auto absolute right-0 top-1/2 h-8 -translate-y-1/2 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
-              "whitespace-nowrap",
-              "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
-              "hover:bg-accent hover:text-accent-foreground",
-              "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
-              "[&_svg]:size-3.5",
-              (busy || publishFeedback !== "idle") && "disabled:opacity-100",
-              !hasChangesToPublish &&
-                publication &&
-                publishFeedback === "idle" &&
-                "text-muted-foreground",
-            )}
-            disabled={busy}
-          >
-            <SaveFeedbackContent
-              motionKey={triggerLabel}
-              contentClassName="gap-1"
+        <HoverTooltip
+          side="bottom"
+          content={
+            <span className="inline-flex items-center gap-2">
+              {tooltipLabel}
+              <kbd className="font-sans text-[10px] font-normal text-muted-foreground">
+                {DOCUMENT_PUBLISH_SHORTCUT_LABEL}
+              </kbd>
+            </span>
+          }
+        >
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                "pointer-events-auto absolute right-0 top-1/2 h-8 -translate-y-1/2 gap-1 rounded-md px-2 py-1 text-sm font-medium shadow-none",
+                "whitespace-nowrap",
+                "opacity-100 transition-[color,background-color,opacity] duration-200 ease-out",
+                "hover:bg-accent hover:text-accent-foreground",
+                "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+                "[&_svg]:size-3.5",
+                (busy || publishFeedback !== "idle") && "disabled:opacity-100",
+                !hasChangesToPublish &&
+                  publication &&
+                  publishFeedback === "idle" &&
+                  "text-muted-foreground",
+              )}
+              disabled={busy}
             >
-              <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
-                {isProgress ? (
-                  <Loader2 className="animate-spin" aria-hidden />
-                ) : (
-                  <TriggerIcon aria-hidden />
-                )}
-              </span>
-              <span className="whitespace-nowrap">{triggerLabel}</span>
-            </SaveFeedbackContent>
-            <ChevronDown aria-hidden />
-          </Button>
-        </PopoverTrigger>
+              <SaveFeedbackContent
+                motionKey={triggerLabel}
+                contentClassName="gap-1"
+              >
+                <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+                  {isProgress ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <TriggerIcon aria-hidden />
+                  )}
+                </span>
+                <span className="whitespace-nowrap">{triggerLabel}</span>
+              </SaveFeedbackContent>
+              <ChevronDown aria-hidden />
+            </Button>
+          </PopoverTrigger>
+        </HoverTooltip>
       </div>
 
       <PopoverContent
