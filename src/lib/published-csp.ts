@@ -14,12 +14,10 @@ const RESERVED_FIRST_SEGMENTS = new Set([
 ]);
 
 /**
- * Published docs render a React tree from the stored block snapshot.
- * Next.js still needs script-src inline/eval for the app bundle. Article text
- * is escaped by React, highlighter colors are classes, and the document face
- * is a data-document-font rule in article.css. style-src stays limited to
- * same-origin stylesheets: a style attribute is blocked, including one that
- * only sets a CSS variable.
+ * Published docs are a React tree from the stored blocks. Author text is
+ * escaped there, so this header does not try to police scripts or styles.
+ * Those directives were blocking the app's own inline styles and the Vercel
+ * toolbar. Framing, plugins, `<base>`, and image sources are still locked down.
  */
 function isSecureRequest(request: NextRequest): boolean {
   const forwarded = request.headers.get("x-forwarded-proto");
@@ -33,16 +31,10 @@ function isSecureRequest(request: NextRequest): boolean {
 
 function buildPublishedDocumentCsp({ secure }: { secure: boolean }): string {
   const directives = [
-    "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "frame-src 'self' https: data:",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self'",
     "img-src 'self' https: data: blob:",
-    "font-src 'self' data: https:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   ];
   // Safari upgrades http://localhost subresources to https://localhost when this
   // directive is present, breaking CSS/fonts in local dev (WebKit bug #250776).
