@@ -20,7 +20,7 @@ Exisiting platforms like Medium and Substack are excellent solutions for distrib
 
 The process of writing an article is fragmented. The mission is to create something that unifies all the aspects of the workflow in one place so you don't need to context switch. What if your whiteboard, countless tabs of sources, thesarus and LLM where all in the document with you? What if your human editor, or collaborator could work with you in the same document **in realtime**?
 
-The hope is that we can build something that simplifies all the most archaic aspects of writing while keeping the messy parts that promote creativity.
+The hope is that we can build something that simplifies all the most archaic aspects of writing while keeping the messy parts that make it great.
 
 ## How it works ⚙️
 
