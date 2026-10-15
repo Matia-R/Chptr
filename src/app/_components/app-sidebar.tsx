@@ -37,6 +37,7 @@ import { NavUser } from "./nav-user";
 import { HoverTooltip } from "~/app/_components/tooltip";
 import { useCommandMenuStore } from "~/hooks/use-command-menu";
 import { useUserProfile } from "~/hooks/use-user-profile";
+import { authorDisplayName } from "~/lib/published-author";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { usePrefetchDocumentState } from "~/hooks/use-prefetch-document-state";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
@@ -219,8 +220,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     ) : userProfile ? (
       <NavUser
         user={{
-          first_name: userProfile.first_name,
-          last_name: userProfile.last_name,
+          name: authorDisplayName(userProfile),
           username: userProfile.username,
           email: userEmail ?? "",
           avatar_url: userProfile.avatar_url,
@@ -270,7 +270,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarMenuButton
         asChild
         isActive={pathname === `/documents/${doc.id}`}
-        className="h-9 pr-2 data-[active=true]:font-normal group-has-[[data-sidebar=menu-action]]/menu-item:pr-2 group-hover/menu-item:!pr-8 group-has-[[data-state=open]]/menu-item:!pr-8 group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:text-sidebar-accent-foreground group-has-[[data-state=open]]/menu-item:bg-sidebar-accent group-has-[[data-state=open]]/menu-item:text-sidebar-accent-foreground"
+        className="h-9 pr-2 group-hover/menu-item:bg-sidebar-accent group-hover/menu-item:!pr-8 group-hover/menu-item:text-sidebar-accent-foreground group-has-[[data-state=open]]/menu-item:bg-sidebar-accent group-has-[[data-sidebar=menu-action]]/menu-item:pr-2 group-has-[[data-state=open]]/menu-item:!pr-8 group-has-[[data-state=open]]/menu-item:text-sidebar-accent-foreground data-[active=true]:font-normal"
       >
         <Link
           href={`/documents/${doc.id}`}
@@ -278,7 +278,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           onMouseEnter={() => prefetchDocumentState(doc.id)}
           onPointerDown={() => prefetchDocumentState(doc.id)}
         >
-          <span className="min-w-0 w-full truncate">{doc.name}</span>
+          <span className="w-full min-w-0 truncate">{doc.name}</span>
         </Link>
       </SidebarMenuButton>
       <DocumentRowMenu
@@ -294,7 +294,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             showOnHover
             type="button"
             aria-label="Open menu"
-            className="!top-0 right-1 h-9 w-7 aspect-auto translate-y-0 cursor-pointer bg-transparent text-muted-foreground hover:bg-transparent hover:!text-sidebar-accent-foreground focus-visible:bg-transparent focus-visible:ring-0 focus-visible:!text-sidebar-accent-foreground peer-hover/menu-button:text-muted-foreground peer-data-[active=true]/menu-button:text-muted-foreground"
+            className="!top-0 right-1 aspect-auto h-9 w-7 translate-y-0 cursor-pointer bg-transparent text-muted-foreground hover:bg-transparent hover:!text-sidebar-accent-foreground focus-visible:bg-transparent focus-visible:!text-sidebar-accent-foreground focus-visible:ring-0 peer-hover/menu-button:text-muted-foreground peer-data-[active=true]/menu-button:text-muted-foreground"
           >
             <MoreHorizontal />
           </SidebarMenuAction>

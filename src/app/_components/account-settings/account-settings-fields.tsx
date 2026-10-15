@@ -6,6 +6,7 @@ import { Input } from "~/app/_components/input";
 import { Label } from "~/app/_components/label";
 import { PasswordInput } from "~/app/_components/password-input";
 import { MIN_PASSWORD_LENGTH } from "~/lib/account-schema";
+import { publicHandleUrl } from "~/lib/public-url";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 
@@ -67,6 +68,8 @@ export type ProfileFieldsProps = AccountSettingsFieldsProps & {
   isSaving?: boolean;
   disabled?: boolean;
   usernameAvailabilityStatus?: UsernameAvailabilityStatus;
+  /** Free handle derived from the author name, when the username field is empty. */
+  usernameSuggestion?: string | null;
 };
 
 export function ProfileFields({
@@ -77,63 +80,65 @@ export function ProfileFields({
   isSaving,
   disabled,
   usernameAvailabilityStatus = "idle",
+  usernameSuggestion = null,
 }: ProfileFieldsProps) {
   const errors = form.formState.errors;
   const className = inputClassName(surface);
   const fieldsDisabled = Boolean(disabled) || Boolean(isSaving);
 
-  // Watched so the fallback initials track what is being typed.
-  const firstName = form.watch("first_name");
-  const lastName = form.watch("last_name");
+  const authorName = form.watch("author_name");
+  const username = form.watch("username");
 
   return (
     <div className={formSpacing.section}>
       <AvatarField
         draft={avatar}
-        firstName={firstName}
-        lastName={lastName}
+        name={authorName}
         defaultAvatarColor={defaultAvatarColor}
         disabled={fieldsDisabled}
       />
       <div className={formSpacing.stack}>
-        <div
-          className={cn(
-            surface === "dialog" && "grid grid-cols-2",
-            surface === "dialog" && formSpacing.stackGap,
-            surface === "drawer" && formSpacing.stack,
-          )}
+        <SettingsField
+          id="account-settings-author-name"
+          label="Author name"
+          description="The name displayed on your published articles. You can use a pen name."
+          error={errors.author_name?.message}
         >
-          <SettingsField
-            id="account-settings-first-name"
-            label="First name"
-            error={errors.first_name?.message}
-          >
-            <Input
-              id="account-settings-first-name"
-              autoComplete="given-name"
-              className={cn(className, fieldsDisabled && "cursor-auto")}
-              {...form.register("first_name")}
-              readOnly={fieldsDisabled}
-            />
-          </SettingsField>
-          <SettingsField
-            id="account-settings-last-name"
-            label="Last name"
-            error={errors.last_name?.message}
-          >
-            <Input
-              id="account-settings-last-name"
-              autoComplete="family-name"
-              className={cn(className, fieldsDisabled && "cursor-auto")}
-              {...form.register("last_name")}
-              readOnly={fieldsDisabled}
-            />
-          </SettingsField>
-        </div>
+          <Input
+            id="account-settings-author-name"
+            placeholder="Jane Mitchell"
+            autoComplete="name"
+            className={cn(className, fieldsDisabled && "cursor-auto")}
+            {...form.register("author_name")}
+            readOnly={fieldsDisabled}
+          />
+        </SettingsField>
         <SettingsField
           id="account-settings-username"
-          label="Username"
-          description="Optional. Published documents live at /username/document."
+          label="Handle"
+          description={
+            usernameSuggestion && username.trim().length === 0 ? (
+              <>
+                Suggested:{" "}
+                <button
+                  type="button"
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                  disabled={fieldsDisabled}
+                  onClick={() => {
+                    form.setValue("username", usernameSuggestion, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                >
+                  {usernameSuggestion}
+                </button>
+                . Published articles live at {publicHandleUrl("your-handle")}.
+              </>
+            ) : (
+              `Published articles live at ${publicHandleUrl("your-handle")}.`
+            )
+          }
           error={errors.username?.message}
           status={
             usernameAvailabilityStatus === "idle" ? null : (
@@ -145,6 +150,7 @@ export function ProfileFields({
         >
           <Input
             id="account-settings-username"
+            placeholder="janemitchell"
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}

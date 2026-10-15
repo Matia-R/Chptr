@@ -14,6 +14,7 @@ import { useReportDocumentUnavailable } from "~/hooks/use-document-unavailable";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { useUserProfile } from "~/hooks/use-user-profile";
 import { getAvatarColorHex } from "~/lib/avatar-colors";
+import { authorDisplayName } from "~/lib/published-author";
 import { getDocumentErrorCode } from "~/lib/document-access-error";
 
 const SKELETON_DELAY_MS = 500;
@@ -159,14 +160,7 @@ export default function DocumentPage() {
   // 2. Ready editor: keep it mounted so the doc stays visible, but lock
   // editing until the socket is back. Offline editing is not shipped yet.
   if (ydoc && provider && isReady) {
-    const userName = userProfile
-      ? [userProfile.first_name, userProfile.last_name]
-          .filter(
-            (p): p is string => typeof p === "string" && p.trim().length > 0,
-          )
-          .join(" ")
-          .trim() || "Anonymous User"
-      : "Anonymous User";
+    const userName = authorDisplayName(userProfile) ?? "Anonymous User";
     const userColor = getAvatarColorHex(
       userProfile?.default_avatar_background_color,
     );

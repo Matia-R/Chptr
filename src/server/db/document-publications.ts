@@ -10,6 +10,7 @@ import {
 } from "~/app/[username]/[slug]/blocks/parse";
 import { publishedBlocksToHtml } from "~/app/[username]/[slug]/blocks/to-html";
 import type { PublishedAuthorProfileRow } from "~/lib/published-author";
+import { planOwnerHandleChange } from "~/lib/publication-handle-change";
 import {
   isValidOwnerPathSegment,
   isValidPublicationSlug,
@@ -47,8 +48,6 @@ type DocRow = {
 
 type ProfileNameRow = {
   username: string | null;
-  first_name: string | null;
-  last_name: string | null;
 };
 
 type PublicationIdRow = {
@@ -324,7 +323,7 @@ export const getPublicationWithAuthorByUsernameSlug = cache(
     const profileResult = await supabase
       .from("profiles")
       .select(
-        "username, first_name, last_name, avatar_url, default_avatar_background_color",
+        "username, author_name, first_name, last_name, avatar_url, default_avatar_background_color",
       )
       .eq("id", publication.creator_id)
       .maybeSingle();
@@ -451,7 +450,7 @@ export async function getPublicationOwnerPathSegmentForDocument(
 
   const profileResult = await supabase
     .from("profiles")
-    .select("username, first_name, last_name")
+    .select("username")
     .eq("id", doc.creator_id)
     .maybeSingle();
 
@@ -465,8 +464,6 @@ export async function getPublicationOwnerPathSegmentForDocument(
   const profile = profileResult.data as ProfileNameRow | null;
   const segment = publicationOwnerPathSegment({
     username: profile?.username,
-    first_name: profile?.first_name,
-    last_name: profile?.last_name,
   });
 
   return {
@@ -530,7 +527,7 @@ export async function publishDocument(
 
   const profileResult = await supabase
     .from("profiles")
-    .select("username, first_name, last_name")
+    .select("username")
     .eq("id", doc.creator_id)
     .maybeSingle();
 
@@ -544,15 +541,13 @@ export async function publishDocument(
   const profile = profileResult.data as ProfileNameRow | null;
   const ownerUsername = publicationOwnerPathSegment({
     username: profile?.username,
-    first_name: profile?.first_name,
-    last_name: profile?.last_name,
   });
 
   if (!isValidOwnerPathSegment(ownerUsername)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message:
-        "The document owner needs a username, or first and last names that produce a valid public URL (2–50 URL-safe characters). Update profile in Account settings.",
+        "The document owner needs a handle (2–50 letters, numbers, hyphens, or underscores) before this document can be published. Update it in Account settings.",
     });
   }
 
@@ -776,9 +771,9 @@ export async function unpublishDocument(documentId: string, auth: AuthContext) {
 
 /**
  * Rewrites `document_publications.owner_username` for every publication owned by
- * this user so public URLs track the current profile path segment (username or
- * name fallback). Writes path-exact redirects from old URLs and collapses
- * redirect chains. Called after profile updates that change that segment.
+ * this user so public URLs track the current handle. Writes path-exact redirects
+ * from old URLs and collapses redirect chains. Called after profile updates that
+ * change that segment. The old handle itself is reserved by the database trigger.
  */
 export async function syncPublicationOwnerUsernameForCreator(
   auth: AuthContext,
@@ -811,30 +806,46 @@ export async function syncPublicationOwnerUsernameForCreator(
     return;
   }
 
-  for (const row of stale) {
-    const { data: blockingRedirectRaw, error: blockingRedirectError } =
-      await supabase
-        .from("document_publication_redirects")
-        .select("document_id")
-        .eq("from_owner_username", nextOwnerUsername)
-        .eq("from_slug", row.slug)
-        .maybeSingle();
+  const blockingResult = await supabase
+    .from("document_publication_redirects")
+    .select("document_id, from_slug")
+    .eq("from_owner_username", nextOwnerUsername)
+    .in(
+      "from_slug",
+      stale.map((row) => row.slug),
+    );
 
-    if (blockingRedirectError) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: blockingRedirectError.message,
-      });
-    }
+  if (blockingResult.error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: blockingResult.error.message,
+    });
+  }
 
-    const blockingRedirect = blockingRedirectRaw as PublicationIdRow | null;
-    if (blockingRedirect && blockingRedirect.document_id !== row.document_id) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message:
-          "That username conflicts with a reserved published URL. Unpublish or rename the conflicting document, then try again.",
-      });
-    }
+  const blockingRedirects = (blockingResult.data ?? []) as {
+    document_id: string;
+    from_slug: string;
+  }[];
+
+  const plan = planOwnerHandleChange({
+    publications: existing.map((row) => ({
+      documentId: row.document_id,
+      ownerUsername: row.owner_username,
+      slug: row.slug,
+    })),
+    nextOwnerUsername,
+    blockingRedirects: blockingRedirects.map((row) => ({
+      documentId: row.document_id,
+      slug: row.from_slug,
+    })),
+  });
+
+  if (!plan.ok) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message:
+        "That handle conflicts with a reserved published URL. Unpublish or rename the conflicting document, then try again.",
+    });
   }
 
   const { error: updateError } = await supabase
@@ -851,7 +862,7 @@ export async function syncPublicationOwnerUsernameForCreator(
       throw new TRPCError({
         code: "CONFLICT",
         message:
-          "That username conflicts with an existing published URL. Unpublish or rename the conflicting document, then try again.",
+          "That handle conflicts with an existing published URL. Unpublish or rename the conflicting document, then try again.",
       });
     }
     throw new TRPCError({
@@ -860,16 +871,16 @@ export async function syncPublicationOwnerUsernameForCreator(
     });
   }
 
-  for (const row of stale) {
+  for (const move of plan.moves) {
     await recordPublicationPathRedirect(supabase, {
-      fromOwnerUsername: row.owner_username,
-      fromSlug: row.slug,
-      toOwnerUsername: nextOwnerUsername,
-      toSlug: row.slug,
-      documentId: row.document_id,
+      fromOwnerUsername: move.fromOwnerUsername,
+      fromSlug: move.fromSlug,
+      toOwnerUsername: move.toOwnerUsername,
+      toSlug: move.toSlug,
+      documentId: move.documentId,
       creatorId: userId,
     });
-    revalidatePath(`/${row.owner_username}/${row.slug}`);
-    revalidatePath(`/${nextOwnerUsername}/${row.slug}`);
+    revalidatePath(`/${move.fromOwnerUsername}/${move.fromSlug}`);
+    revalidatePath(`/${move.toOwnerUsername}/${move.toSlug}`);
   }
 }

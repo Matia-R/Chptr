@@ -120,7 +120,7 @@ export const documentRouter = createTRPCRouter({
       return getPublicationByDocumentId(input, authFromCtx(ctx));
     }),
 
-  /** Owner's URL prefix: `username` if set, else `firstname`+`lastname` (document owner, not current user). */
+  /** Owner's public URL prefix: the document owner's handle (`username`). */
   getPublicationOwnerPathSegment: protectedProcedure
     .input(z.string().uuid())
     .query(async ({ input, ctx }) => {

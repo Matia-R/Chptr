@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { AUTHOR_NAME_MAX_LENGTH, isReservedHandle } from "~/lib/author-handle";
+
 /** Shared by the account settings form and the tRPC user router. */
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -7,28 +9,55 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 72;
 
-/** Empty means "no username" — the profiles row stores `null` instead. */
+/**
+ * Empty means "no handle" — the profiles row stores `null` instead.
+ * Account settings and incomplete profiles use this. Signup uses
+ * `signupProfileSchema`, which requires both fields.
+ */
 export const usernameSchema = z
   .string()
   .trim()
-  .max(50, { message: "Username must be at most 50 characters" })
+  .max(50, { message: "Handle must be at most 50 characters" })
   .refine((value) => value.length === 0 || value.length >= 2, {
-    message: "Username must be at least 2 characters",
+    message: "Handle must be at least 2 characters",
   })
   .refine((value) => value.length === 0 || USERNAME_PATTERN.test(value), {
     message: "Use only letters, numbers, hyphens, and underscores",
+  })
+  .refine((value) => value.length === 0 || !isReservedHandle(value), {
+    message: "That handle is reserved",
   });
 
+/** Public byline. Empty is allowed on an incomplete profile. */
+export const authorNameSchema = z.string().trim().max(AUTHOR_NAME_MAX_LENGTH, {
+  message: "Author name must be at most 100 characters",
+});
+
 export const profileSchema = z.object({
-  first_name: z
-    .string()
-    .trim()
-    .max(100, { message: "First name must be at most 100 characters" }),
-  last_name: z
-    .string()
-    .trim()
-    .max(100, { message: "Last name must be at most 100 characters" }),
+  author_name: authorNameSchema,
   username: usernameSchema,
+});
+
+/** Signup collects both before the account exists. The columns stay nullable. */
+export const signupProfileSchema = z.object({
+  author_name: z
+    .string()
+    .trim()
+    .min(1, { message: "Author name is required" })
+    .max(AUTHOR_NAME_MAX_LENGTH, {
+      message: "Author name must be at most 100 characters",
+    }),
+  username: z
+    .string()
+    .trim()
+    .min(2, { message: "Handle must be at least 2 characters" })
+    .max(50, { message: "Handle must be at most 50 characters" })
+    .regex(USERNAME_PATTERN, {
+      message: "Use only letters, numbers, hyphens, and underscores",
+    })
+    .refine((value) => !isReservedHandle(value), {
+      message: "That handle is reserved",
+    }),
 });
 
 const newPasswordField = z
@@ -46,7 +75,9 @@ const newPasswordField = z
  */
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, { message: "Current password is required" }),
+    currentPassword: z
+      .string()
+      .min(1, { message: "Current password is required" }),
     password: newPasswordField,
     confirmPassword: z.string(),
     /** Present only when Secure password change requires a reauth nonce. */

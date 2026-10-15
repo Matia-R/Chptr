@@ -11,34 +11,21 @@ export function slugifyTitle(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   if (!s) return "untitled";
-  return s.length > MAX_SLUG_LEN ? s.slice(0, MAX_SLUG_LEN).replace(/-+$/g, "") : s;
+  return s.length > MAX_SLUG_LEN
+    ? s.slice(0, MAX_SLUG_LEN).replace(/-+$/g, "")
+    : s;
 }
 
 const MAX_OWNER_HANDLE_LEN = 50;
 
 export function normalizePublicationUsername(username: string): string {
-  return username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return username
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
 }
 
-/**
- * Public URL path segment for the document owner: `first_name` and `last_name`
- * concatenated (no space), then URL-normalized to match `document_publications.owner_username`.
- */
-export function ownerHandleFromProfileNames(
-  firstName: string | null | undefined,
-  lastName: string | null | undefined,
-): string {
-  const a = (firstName ?? "").trim();
-  const b = (lastName ?? "").trim();
-  const combined = `${a}${b}`;
-  let h = normalizePublicationUsername(combined);
-  if (h.length > MAX_OWNER_HANDLE_LEN) {
-    h = h.slice(0, MAX_OWNER_HANDLE_LEN).replace(/-+$/g, "");
-  }
-  return h;
-}
-
-/** First URL segment for published docs: username if valid, else first+last handle. */
+/** First URL segment for published docs: the profile handle (`username`). */
 export function isValidOwnerPathSegment(segment: string): boolean {
   return (
     segment.length >= 2 &&
@@ -49,20 +36,17 @@ export function isValidOwnerPathSegment(segment: string): boolean {
 
 export function publicationOwnerPathSegment(profile: {
   username: string | null | undefined;
-  first_name: string | null | undefined;
-  last_name: string | null | undefined;
 }): string {
-  const trimmedU = profile.username?.trim();
-  if (trimmedU) {
-    const u = normalizePublicationUsername(trimmedU);
-    if (isValidOwnerPathSegment(u)) {
-      return u;
-    }
-  }
-  const fallback = ownerHandleFromProfileNames(profile.first_name, profile.last_name);
-  return isValidOwnerPathSegment(fallback) ? fallback : "";
+  const trimmed = profile.username?.trim();
+  if (!trimmed) return "";
+  const normalized = normalizePublicationUsername(trimmed);
+  return isValidOwnerPathSegment(normalized) ? normalized : "";
 }
 
 export function isValidPublicationSlug(slug: string): boolean {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length >= 1 && slug.length <= 200;
+  return (
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) &&
+    slug.length >= 1 &&
+    slug.length <= 200
+  );
 }

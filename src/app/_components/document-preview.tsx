@@ -82,8 +82,6 @@ export function useOpenDocumentPreview() {
     const ownerFromProfile = profile
       ? publicationOwnerPathSegment({
           username: profile.username,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
         })
       : "";
 
@@ -103,6 +101,7 @@ export function useOpenDocumentPreview() {
       authorProfile: profile
         ? {
             username: profile.username,
+            author_name: profile.author_name,
             first_name: profile.first_name,
             last_name: profile.last_name,
             avatar_url: profile.avatar_url,

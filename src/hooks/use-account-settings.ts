@@ -6,13 +6,12 @@ import { create } from "zustand";
 export type AccountSettingsView =
   | "main"
   | "profile"
-  | "first_name"
-  | "last_name"
+  | "author_name"
   | "username"
   | "password";
 
 /** Profile text fields that edit on their own mobile screen. */
-export type AccountProfileField = "first_name" | "last_name" | "username";
+export type AccountProfileField = "author_name" | "username";
 
 interface AccountSettingsState {
   isOpen: boolean;

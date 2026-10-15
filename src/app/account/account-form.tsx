@@ -5,6 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { authorNameSchema, usernameSchema } from "~/lib/account-schema";
+import { publicHandleUrl } from "~/lib/public-url";
+
 import { updateProfile } from "./actions";
 import { Button } from "../_components/button";
 import {
@@ -26,39 +29,29 @@ const formSchema = z.object({
     .min(2, { message: "Email must be at least 2 characters" })
     .max(50)
     .email({ message: "Must be a valid email address" }),
-  username: z
-    .string()
-    .trim()
-    .max(50, { message: "Username must be at most 50 characters" })
-    .refine((s) => s.length === 0 || s.length >= 2, {
-      message: "Username must be at least 2 characters when provided",
-    }),
-  first_name: z.string().max(100).optional().default(""),
-  last_name: z.string().max(100).optional().default(""),
+  username: usernameSchema,
+  author_name: authorNameSchema,
 });
 
 interface AccountFormProps {
   user: User | null;
   initialEmail?: string;
   initialUsername?: string;
-  initialFirstName?: string;
-  initialLastName?: string;
+  initialAuthorName?: string;
 }
 
 export default function AccountForm({
   user: _user,
   initialEmail = "",
   initialUsername = "",
-  initialFirstName = "",
-  initialLastName = "",
+  initialAuthorName = "",
 }: AccountFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: initialEmail,
       username: initialUsername,
-      first_name: initialFirstName,
-      last_name: initialLastName,
+      author_name: initialAuthorName,
     },
   });
 
@@ -67,8 +60,7 @@ export default function AccountForm({
       const formData = new FormData();
       formData.append("email", values.email);
       formData.append("username", values.username);
-      formData.append("first_name", values.first_name ?? "");
-      formData.append("last_name", values.last_name ?? "");
+      formData.append("author_name", values.author_name ?? "");
 
       await updateProfile(formData);
       console.log("Profile updated successfully");
@@ -109,14 +101,17 @@ export default function AccountForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium">
-                    Username (optional)
+                    Handle (optional)
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Username" {...field} />
+                    <Input placeholder="janemitchell" {...field} />
                   </FormControl>
                   <FormDescription className="text-sm text-gray-500">
-                    If set, your public docs use{" "}
-                    <span className="font-mono">/[username]/…</span>.
+                    If set, your public articles live at{" "}
+                    <span className="font-mono">
+                      {publicHandleUrl("your-handle")}
+                    </span>
+                    .
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -124,34 +119,23 @@ export default function AccountForm({
             />
             <FormField
               control={form.control}
-              name="first_name"
+              name="author_name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium">
-                    First name
+                    Author name
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="First name" {...field} />
+                    <Input
+                      placeholder="Jane Mitchell"
+                      autoComplete="name"
+                      {...field}
+                    />
                   </FormControl>
                   <FormDescription className="text-sm text-gray-500">
-                    Used for public URLs when username is not set (with last
-                    name).
+                    The name displayed on your published articles. You can use a
+                    pen name.
                   </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="last_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="block text-sm font-medium">
-                    Last name
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="Last name" {...field} />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

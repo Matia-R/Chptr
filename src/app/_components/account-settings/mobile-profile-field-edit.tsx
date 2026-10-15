@@ -16,41 +16,53 @@ import {
 import { useToast } from "~/hooks/use-toast";
 import type { AccountProfileField } from "~/hooks/use-account-settings";
 import { usernameSchema } from "~/lib/account-schema";
+import { authorDisplayName } from "~/lib/published-author";
+import { publicHandleUrl } from "~/lib/public-url";
 import { api } from "~/trpc/react";
 
 import type { AccountSettingsProfile } from "./use-account-settings-form";
-import { useUsernameAvailability } from "./use-username-availability";
+import {
+  useHandleSuggestion,
+  useUsernameAvailability,
+} from "./use-username-availability";
 import { UsernameAvailabilityFeedback } from "./username-availability-feedback";
 
 const FIELD_COPY: Record<
   AccountProfileField,
   { title: string; helperText: string; autoComplete: string }
 > = {
-  first_name: {
-    title: "First name",
-    helperText: "Shown on your profile and published documents.",
-    autoComplete: "given-name",
-  },
-  last_name: {
-    title: "Last name",
-    helperText: "Shown on your profile and published documents.",
-    autoComplete: "family-name",
+  author_name: {
+    title: "Author name",
+    helperText:
+      "The name displayed on your published articles. You can use a pen name.",
+    autoComplete: "name",
   },
   username: {
-    title: "Username",
-    helperText: "Optional. Published documents live at /username/document.",
+    title: "Handle",
+    helperText: `Published articles live at ${publicHandleUrl("your-handle")}.`,
     autoComplete: "username",
   },
 };
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "An unexpected error occurred";
+  return error instanceof Error
+    ? error.message
+    : "An unexpected error occurred";
 }
 
 function profileFieldValue(
   profile: AccountSettingsProfile,
   field: AccountProfileField,
 ) {
+  if (field === "author_name") {
+    return (
+      authorDisplayName({
+        author_name: profile.author_name,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+      }) ?? ""
+    );
+  }
   return profile[field] ?? "";
 }
 
@@ -81,6 +93,10 @@ export function MobileProfileFieldEdit({
     field === "username" ? draft : "",
     profile.username,
   );
+  const suggestion = useHandleSuggestion(
+    field === "username" ? (profile.author_name ?? "") : "",
+    field === "username" ? draft : "set",
+  );
 
   React.useEffect(() => {
     setDraft(initialValue);
@@ -108,8 +124,7 @@ export function MobileProfileFieldEdit({
     !dirty ||
     isBusy ||
     usernameInvalid ||
-    (field === "username" &&
-      (availability.isTaken || availability.isChecking));
+    (field === "username" && (availability.isTaken || availability.isChecking));
 
   const save = async () => {
     if (
@@ -127,9 +142,10 @@ export function MobileProfileFieldEdit({
 
     try {
       await updateProfile.mutateAsync({
-        first_name:
-          field === "first_name" ? trimmed : (profile.first_name ?? ""),
-        last_name: field === "last_name" ? trimmed : (profile.last_name ?? ""),
+        author_name:
+          field === "author_name"
+            ? trimmed
+            : profileFieldValue(profile, "author_name"),
         username: field === "username" ? trimmed : (profile.username ?? ""),
       });
       await utils.user.getCurrentUserProfile.invalidate();
@@ -162,6 +178,17 @@ export function MobileProfileFieldEdit({
     <p className="text-[0.8rem] font-medium text-destructive">{schemaError}</p>
   ) : showAvailability ? (
     <UsernameAvailabilityFeedback status={availability.status} />
+  ) : suggestion ? (
+    <p className="text-[0.8rem] text-muted-foreground">
+      Suggested:{" "}
+      <button
+        type="button"
+        className="font-medium text-foreground underline-offset-2 hover:underline"
+        onClick={() => setDraft(suggestion)}
+      >
+        {suggestion}
+      </button>
+    </p>
   ) : undefined;
   const describedBy = [
     description ? descriptionId : null,
@@ -190,6 +217,7 @@ export function MobileProfileFieldEdit({
       <Input
         id={inputId}
         autoComplete={copy.autoComplete}
+        placeholder={field === "username" ? "janemitchell" : "Jane Mitchell"}
         autoCapitalize={field === "username" ? "none" : undefined}
         spellCheck={field === "username" ? false : undefined}
         value={draft}

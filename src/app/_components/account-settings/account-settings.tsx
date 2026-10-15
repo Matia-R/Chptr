@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { AtSign, ChevronRight, Lock, LogOut, Moon, Sun, Trash2, User } from "lucide-react";
+import {
+  AtSign,
+  ChevronRight,
+  Lock,
+  LogOut,
+  Moon,
+  Sun,
+  Trash2,
+  User,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
@@ -35,6 +44,7 @@ import { useDocumentTrashStore } from "~/hooks/use-document-trash";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useBrowserOffline } from "~/hooks/use-browser-offline";
 import { useUserProfile } from "~/hooks/use-user-profile";
+import { authorDisplayName } from "~/lib/published-author";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 import { createClient } from "~/utils/supabase/client";
@@ -58,15 +68,13 @@ import {
 
 /** Field editors and password open the keyboard; the profile list does not. */
 const KEYBOARD_VIEWS: readonly AccountSettingsView[] = [
-  "first_name",
-  "last_name",
+  "author_name",
   "username",
   "password",
 ];
 
 const PROFILE_FIELDS: readonly AccountProfileField[] = [
-  "first_name",
-  "last_name",
+  "author_name",
   "username",
 ];
 
@@ -90,8 +98,10 @@ const DIALOG_SECTIONS: readonly {
 const PROFILE_FORM_ID = "account-settings-profile-form";
 const PASSWORD_FORM_ID = "account-settings-password-form";
 
+/** 5% taller than the shared app modal (`h-[min(85vh,32.1rem)]`). */
+const DIALOG_SHELL_HEIGHT = "h-[min(89.25vh,33.705rem)]";
 /** +1% so the extra offline notice line fits without clipping. */
-const DIALOG_SHELL_HEIGHT_OFFLINE = "h-[min(85.85vh,32.421rem)]";
+const DIALOG_SHELL_HEIGHT_OFFLINE = "h-[min(90.1425vh,34.042rem)]";
 
 const DIALOG_FOOTER_CLASS =
   "flex shrink-0 items-center justify-end gap-2 px-6 py-4";
@@ -251,6 +261,7 @@ function AccountSettingsDialogBody({
                   usernameAvailabilityStatus={
                     profileForm.usernameAvailabilityStatus
                   }
+                  usernameSuggestion={profileForm.usernameSuggestion}
                 />
               </DialogSection>
             </form>
@@ -339,7 +350,7 @@ function AccountSettingsDialog({
       open={open}
       onOpenChange={handleOpenChange}
       srDescription="Manage your profile and password."
-      className={isOffline ? DIALOG_SHELL_HEIGHT_OFFLINE : undefined}
+      className={isOffline ? DIALOG_SHELL_HEIGHT_OFFLINE : DIALOG_SHELL_HEIGHT}
       onEscapeKeyDown={preventDismissWhileSaving}
       onPointerDownOutside={preventDismissWhileSaving}
       onInteractOutside={preventDismissWhileSaving}
@@ -428,9 +439,7 @@ function AccountSettingsDrawerBody({
     stage.returnToMainView();
   }, [stage]);
 
-  const fullName = [profile.first_name, profile.last_name]
-    .filter((part): part is string => Boolean(part?.trim()))
-    .join(" ");
+  const fullName = authorDisplayName(profile) ?? "";
 
   const handleSignOut = async () => {
     if (isOffline) return;
@@ -512,29 +521,21 @@ function AccountSettingsDrawerBody({
         {isOffline ? <OfflineProfileNotice /> : null}
         <AvatarField
           draft={avatar}
-          firstName={profile.first_name ?? ""}
-          lastName={profile.last_name ?? ""}
+          name={authorDisplayName(profile) ?? ""}
           defaultAvatarColor={profile.default_avatar_background_color}
           disabled={isOffline || isSaving}
         />
         <MobileActionGroup>
           <MobileActionButtonRow
             icon={User}
-            label="First name"
-            trailing={<RowTrailing value={profile.first_name ?? undefined} />}
+            label="Author name"
+            trailing={<RowTrailing value={profile.author_name ?? undefined} />}
             disabled={isOffline}
-            onClick={() => openSubView("first_name")}
-          />
-          <MobileActionButtonRow
-            icon={User}
-            label="Last name"
-            trailing={<RowTrailing value={profile.last_name ?? undefined} />}
-            disabled={isOffline}
-            onClick={() => openSubView("last_name")}
+            onClick={() => openSubView("author_name")}
           />
           <MobileActionButtonRow
             icon={AtSign}
-            label="Username"
+            label="Handle"
             trailing={
               <RowTrailing
                 value={profile.username ? `@${profile.username}` : undefined}

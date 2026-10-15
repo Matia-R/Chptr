@@ -21,6 +21,7 @@
     "noEmit": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "jsx": "preserve",
     "plugins": [
       {

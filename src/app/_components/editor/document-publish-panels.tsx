@@ -154,7 +154,7 @@ function MobilePublishEditUrlView({
       </div>
       {!ownerPreview ? (
         <p className="text-xs text-muted-foreground">
-          Add a username in Account to use your real URL path.
+          Add a handle in Account to use your real URL path.
         </p>
       ) : null}
     </MobileDrawerFieldView>
@@ -236,7 +236,7 @@ function MobilePublishMainView({
 
           {!ownerPreview ? (
             <p className="px-1 text-xs text-muted-foreground">
-              Add a username in Account to use your real URL path.
+              Add a handle in Account to use your real URL path.
             </p>
           ) : null}
 
@@ -300,7 +300,7 @@ function MobilePublishMainView({
         </MobileActionGroup>
         {!ownerPreview ? (
           <p className="px-1 text-xs text-muted-foreground">
-            Add a username in Account to use your real URL path.
+            Add a handle in Account to use your real URL path.
           </p>
         ) : null}
         <MobileActionGroup>

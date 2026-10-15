@@ -9,7 +9,8 @@ export type UsernameAvailabilityStatus =
   | "idle"
   | "checking"
   | "available"
-  | "taken";
+  | "taken"
+  | "reserved";
 
 const DEBOUNCE_MS = 400;
 
@@ -24,8 +25,7 @@ export function useUsernameAvailability(
   const trimmed = username.trim();
   const current = (currentUsername ?? "").trim();
   const isOwnUsername =
-    trimmed.length > 0 &&
-    trimmed.toLowerCase() === current.toLowerCase();
+    trimmed.length > 0 && trimmed.toLowerCase() === current.toLowerCase();
   const isValid =
     usernameSchema.safeParse(trimmed).success && trimmed.length > 0;
   const shouldCheck = isValid && !isOwnUsername;
@@ -61,13 +61,33 @@ export function useUsernameAvailability(
     if (isDebouncing || query.isFetching || (queryEnabled && query.isPending)) {
       status = "checking";
     } else if (query.isSuccess) {
-      status = query.data.available ? "available" : "taken";
+      status = query.data.available
+        ? "available"
+        : query.data.reason === "reserved"
+          ? "reserved"
+          : "taken";
     }
   }
 
   return {
     status,
-    isTaken: status === "taken",
+    isTaken: status === "taken" || status === "reserved",
     isChecking: status === "checking",
   };
+}
+
+/** Suggested handle from the author name, only while the username field is empty. */
+export function useHandleSuggestion(authorName: string, username: string) {
+  const trimmedAuthor = authorName.trim();
+  const trimmedUsername = username.trim();
+  const query = api.user.suggestHandle.useQuery(
+    { authorName: trimmedAuthor },
+    {
+      enabled: trimmedAuthor.length > 0 && trimmedUsername.length === 0,
+      staleTime: 30_000,
+    },
+  );
+
+  if (trimmedUsername.length > 0) return null;
+  return query.data?.handle ?? null;
 }

@@ -45,7 +45,9 @@ export function UsernameAvailabilityFeedback({
           transition={FADE_TRANSITION}
           className={cn(
             "inline-flex items-center gap-1.5 text-[0.8rem]",
-            status === "taken" ? "text-destructive" : "text-muted-foreground",
+            status === "taken" || status === "reserved"
+              ? "text-destructive"
+              : "text-muted-foreground",
           )}
         >
           {status === "checking" ? (
@@ -56,10 +58,12 @@ export function UsernameAvailabilityFeedback({
           ) : status === "available" ? (
             <>
               <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
-              Username is available
+              Handle is available
             </>
+          ) : status === "reserved" ? (
+            "Handle is reserved"
           ) : (
-            "Username is taken"
+            "Handle is taken"
           )}
         </motion.span>
       </AnimatePresence>
