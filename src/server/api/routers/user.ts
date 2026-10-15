@@ -29,7 +29,8 @@ const publicHandleChecks = new Map<
 
 function assertPublicHandleRateLimit(headers: Headers) {
   const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const key = forwarded || headers.get("x-real-ip") || "anonymous";
+  const realIp = headers.get("x-real-ip")?.trim();
+  const key = forwarded ? forwarded : realIp ? realIp : "anonymous";
   const now = Date.now();
   for (const [entryKey, value] of publicHandleChecks) {
     if (value.resetAt <= now) publicHandleChecks.delete(entryKey);

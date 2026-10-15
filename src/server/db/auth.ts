@@ -230,10 +230,10 @@ export async function getHandleAvailability(
   const trimmed = username.trim();
   if (trimmed.length === 0) return "available";
 
-  const { data, error } = await auth.supabase.rpc("handle_availability", {
+  const { data, error } = (await auth.supabase.rpc("handle_availability", {
     p_handle: trimmed,
     p_user_id: auth.userId,
-  });
+  })) as { data: unknown; error: { message: string } | null };
 
   if (error) {
     throw new TRPCError({

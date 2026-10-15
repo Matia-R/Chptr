@@ -112,7 +112,8 @@ export function NavUser({
     );
   }
 
-  const displayName = user.name?.trim() || "Account";
+  const trimmedName = user.name?.trim();
+  const displayName = trimmedName ? trimmedName : "Account";
   const subtitle = user.username
     ? `@${user.username}`
     : user.email
