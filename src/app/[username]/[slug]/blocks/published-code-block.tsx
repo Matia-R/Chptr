@@ -1,7 +1,8 @@
 "use client";
 
-import { Button } from "~/app/_components/button";
 import { useToast } from "~/hooks/use-toast";
+
+import { PublishedCodeCopyButtonMarkup } from "./published-code-copy";
 
 async function writeClipboard(text: string, anchor: HTMLElement) {
   try {
@@ -38,12 +39,7 @@ export function PublishedCodeCopyButton({ source }: { source: string }) {
   const { toast } = useToast();
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="absolute right-1.5 top-1.5 z-10 size-7 text-[hsl(var(--code-block-foreground))] opacity-40 hover:bg-transparent hover:opacity-80"
-      aria-label="Copy"
+    <PublishedCodeCopyButtonMarkup
       onClick={(event) => {
         void writeClipboard(source, event.currentTarget).then(
           () => {
@@ -58,20 +54,6 @@ export function PublishedCodeCopyButton({ source }: { source: string }) {
           },
         );
       }}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="size-3.5"
-        aria-hidden
-      >
-        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-      </svg>
-    </Button>
+    />
   );
 }
