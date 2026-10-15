@@ -35,6 +35,7 @@ import { useTheme } from "next-themes";
 import { randomUUID } from "~/lib/utils";
 import { DOCUMENT_PUBLISH_SHORTCUT_LABEL } from "./document-publish-button";
 import {
+  isPublishRequestPending,
   useDocumentPublish,
   type DocumentPublishValue,
 } from "~/hooks/use-document-publish";
@@ -50,6 +51,7 @@ function isPublishActionUnavailable(
 ): boolean {
   return (
     isOffline ||
+    isPublishRequestPending(ctx.documentId) ||
     ctx.busy ||
     !ctx.editor ||
     ctx.publicationLoading ||

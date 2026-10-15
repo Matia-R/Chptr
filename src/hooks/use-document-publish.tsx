@@ -52,6 +52,39 @@ import { writeYjsPublishedContentHash } from "~/lib/yjs-publish-state";
 
 type PublishDocumentResult = RouterOutputs["document"]["publishDocument"];
 
+/**
+ * Shared by every `useDocumentPublish()` instance. Each instance has its own
+ * tRPC mutation, and `publishFeedback` in a given `handlePublish` closure stays
+ * idle until that instance re-renders — so the command shortcut and the publish
+ * panel can both submit. In-flight ids flip before `mutateAsync`. Keyed by
+ * document so `resetForNavigation()` can clear the shared feedback slot and
+ * another document can publish while this one is still blocked.
+ */
+const publishSubmissionsInFlight = new Set<string>();
+
+/** Same path rule as `useRouteDocumentId`. */
+function currentRouteDocumentId(): string | null {
+  if (typeof window === "undefined") return null;
+  return /^\/documents\/([^/]+)$/.exec(window.location.pathname)?.[1] ?? null;
+}
+
+export function isPublishRequestPending(documentId: string): boolean {
+  if (publishSubmissionsInFlight.has(documentId)) return true;
+  if (currentRouteDocumentId() !== documentId) return false;
+  const feedback = useDocumentPublishStore.getState().publishFeedback;
+  return feedback === "publishing" || feedback === "published";
+}
+
+function beginPublishSubmission(documentId: string): boolean {
+  if (isPublishRequestPending(documentId)) return false;
+  publishSubmissionsInFlight.add(documentId);
+  return true;
+}
+
+function endPublishSubmission(documentId: string) {
+  publishSubmissionsInFlight.delete(documentId);
+}
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "An unexpected error occurred";
@@ -295,32 +328,42 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         ? "Update"
         : "Published";
 
+  const submissionInFlight =
+    !!documentId && publishSubmissionsInFlight.has(documentId);
+  // Navigation clears the shared feedback slot while this document's request
+  // is still running. Keep the publishing presentation until it settles.
+  const visiblePublishFeedback: PublishFeedbackState =
+    submissionInFlight && publishFeedback === "idle"
+      ? "publishing"
+      : publishFeedback;
+
   const busy =
     publishMutation.isPending ||
     unpublishMutation.isPending ||
     publishFeedback === "publishing" ||
-    publishFeedback === "published";
+    publishFeedback === "published" ||
+    submissionInFlight;
 
   const publishButtonLabel =
-    publishFeedback === "publishing"
+    visiblePublishFeedback === "publishing"
       ? "Publishing..."
-      : publishFeedback === "published"
+      : visiblePublishFeedback === "published"
         ? "Published"
         : primaryTriggerLabel;
 
   const publishButtonIcon = useMemo(() => {
-    if (publishFeedback === "publishing") {
+    if (visiblePublishFeedback === "publishing") {
       return (
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
       );
     }
-    if (publishFeedback === "published") {
+    if (visiblePublishFeedback === "published") {
       return (
         <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
       );
     }
     return null;
-  }, [publishFeedback]);
+  }, [visiblePublishFeedback]);
 
   const showPublishedPopoverActions =
     !!publication && !freezeFirstPublishActions;
@@ -351,25 +394,20 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       return;
     }
 
-    if (
-      publishMutation.isPending ||
-      publishFeedback === "publishing" ||
-      publishFeedback === "published"
-    ) {
-      return;
-    }
-
-    clearPublishUiTimeouts();
-
-    const isFirstTimePublish = publication === null;
-    if (isFirstTimePublish) {
-      setFreezeFirstPublishActions(true);
-    }
+    if (!beginPublishSubmission(documentId)) return;
 
     const startedAt = Date.now();
-    setPublishFeedback("publishing");
 
     try {
+      clearPublishUiTimeouts();
+
+      const isFirstTimePublish = publication === null;
+      if (isFirstTimePublish) {
+        setFreezeFirstPublishActions(true);
+      }
+
+      setPublishFeedback("publishing");
+
       const blocksJson = JSON.stringify(editor.document);
       const liveBeforePublish = useCollaborativeDocStore.getState();
       const font =
@@ -390,6 +428,10 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         writeYjsPublishedContentHash(live.ydoc);
       }
 
+      // Navigation resets the shared feedback slot for the next document.
+      // Don't write this request's result back onto that document.
+      if (currentRouteDocumentId() !== documentId) return;
+
       const elapsed = Date.now() - startedAt;
       if (elapsed < SAVE_FEEDBACK_MIN_SAVING_MS) {
         await new Promise((resolve) =>
@@ -397,22 +439,26 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         );
       }
 
+      if (currentRouteDocumentId() !== documentId) return;
+
       setPublishFeedback("published");
 
       schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
       scheduleClosePublishPanels(SAVE_FEEDBACK_SETTLE_MS);
     } catch {
+      if (currentRouteDocumentId() !== documentId) return;
       setPublishFeedback("failed");
       setFreezeFirstPublishActions(false);
 
       schedulePublishFeedbackReset(SAVE_FEEDBACK_RESULT_MS);
+    } finally {
+      endPublishSubmission(documentId);
     }
   }, [
     aligned,
     documentId,
     editor,
     publication,
-    publishFeedback,
     publishMutation,
     slugOverride,
     title,
@@ -574,7 +620,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       busy,
       publicationLoading,
       publication: publication ?? null,
-      publishFeedback,
+      publishFeedback: visiblePublishFeedback,
       handlePublish,
       showPublishedPopoverActions,
       hasUnpublishedChanges,
@@ -606,7 +652,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     publicationLoading,
     publishButtonIcon,
     publishButtonLabel,
-    publishFeedback,
+    visiblePublishFeedback,
     revertSlugStore,
     showPublishedPopoverActions,
     unpublish,
