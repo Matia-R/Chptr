@@ -40,21 +40,54 @@ export function authorDisplayName(
   return username.length > 0 ? username : null;
 }
 
-/** First and last initials, else the first two letters, else "?". */
+/** First `count` Unicode code points. Indexing and `slice` count UTF-16 units. */
+function leadingCodePoints(value: string, count: number): string {
+  let result = "";
+  let taken = 0;
+  for (const character of value) {
+    if (taken === count) break;
+    result += character;
+    taken += 1;
+  }
+  return result;
+}
+
+function upperCodePoint(character: string): string {
+  const upper = character.toUpperCase();
+  return [...upper].length === 1 ? upper : character;
+}
+
+function lettersIn(value: string): string[] {
+  return [...value].filter((character) => /^\p{L}$/u.test(character));
+}
+
+/**
+ * Avatar mark, at most two characters.
+ *
+ * Spaces and dashes separate names. "Mary Jane Watson" and "Anne-Marie Bernard"
+ * both use the first letter of the first name and the first letter of the last.
+ * One name uses its first two letters ("Ada" → "AD"). A single letter stays as
+ * it is. When the name has no letters, the first character is used ("🌟"), and
+ * an empty name is "?".
+ */
 export function authorInitials(name: string | null | undefined): string {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const trimmed = (name ?? "").trim();
+  const parts = trimmed
+    .split(/[\s\p{Pd}]+/u)
+    .map(lettersIn)
+    .filter((letters) => letters.length > 0);
+
+  let marks: string[] = [];
   if (parts.length >= 2) {
-    const first = parts[0]?.[0] ?? "";
-    const last = parts[parts.length - 1]?.[0] ?? "";
-    const initials = `${first}${last}`.toUpperCase();
-    return initials.length > 0 ? initials : "?";
+    marks = [parts[0]?.[0] ?? "", parts[parts.length - 1]?.[0] ?? ""];
+  } else if (parts.length === 1) {
+    marks = (parts[0] ?? []).slice(0, 2);
+  } else {
+    marks = [...leadingCodePoints(trimmed, 1)];
   }
-  if (parts.length === 1) {
-    const word = parts[0] ?? "";
-    const initials = word.slice(0, 2).toUpperCase();
-    return initials.length > 0 ? initials : "?";
-  }
-  return "?";
+
+  const initials = marks.filter(Boolean).map(upperCodePoint).join("");
+  return initials.length > 0 ? initials : "?";
 }
 
 export function authorDisplayLabel(
