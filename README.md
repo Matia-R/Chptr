@@ -82,7 +82,7 @@ Supabase   documents, document_permissions, document_state
            document_publications (+ redirects) for the public page
 ```
 
-Signing in is Supabase Auth (email and password). Middleware refreshes the session and sends anonymous visitors away from `/documents` and `/account`.
+Signing in is Supabase Auth (email and password). Middleware refreshes the session and sends anonymous visitors away from `/documents`.
 
 Creating a note navigates straight to a new id. The row is created when the PartyKit room connects, after the connect route checks that the caller may create it. Later connections are authorized again. Saves run as that user, so row-level security still applies. The room debounces those writes; the stored blob is the full Y.Doc, not a change log.
 
@@ -100,7 +100,6 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 | `/login`, `/signup`, `/confirm-signup`, `/welcome` | Public                 | Sign-in and first-run                    |
 | `/documents`                                       | Signed in              | Library; create a note                   |
 | `/documents/[documentId]`                          | Signed in, with access | Editor                                   |
-| `/account`                                         | Signed in              | Profile and password                     |
 | `/[username]/[slug]`                               | Public                 | Published article                        |
 | `/api/trpc/[trpc]`                                 | —                      | tRPC                                     |
 | `/api/partykit/connect`, `/api/partykit/save`      | PartyKit server        | Load, create, and persist document state |
