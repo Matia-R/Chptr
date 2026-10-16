@@ -4,14 +4,6 @@ Chptr is a platform for creating and sharing blog posts. Documents save and sync
 
 This is a work in progress! An Early Access beta is set to go live Novemeber 2026.
 
-## Is Chptr open source?
-
-I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest in contributing, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
-
-On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on (at least not cheaply). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
-
-Thank you for your understanding 🫶
-
 ## Goals 🎯
 
 The goal for Chptr is to make a platform that focuses on the ergonomics of writing and sharing long-form content.
@@ -21,6 +13,14 @@ Exisiting platforms like Medium and Substack are excellent solutions for distrib
 The process of writing an article is fragmented. The mission is to create something that unifies all the aspects of the workflow in one place so you don't need to context switch. What if your whiteboard, countless tabs of sources, thesarus and LLM where all in the document with you? What if your human editor, or collaborator could work with you in the same document **in realtime**?
 
 The hope is that we can build something that simplifies all the most archaic aspects of writing while keeping the messy parts that make it great.
+
+## Is Chptr open source?
+
+I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
+
+On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
+
+Thank you for your understanding 🫶
 
 ## How it works ⚙️
 
