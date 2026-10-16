@@ -12,31 +12,41 @@ import {
   accountSettingsSchema,
   type AccountSettingsValues,
 } from "~/lib/account-schema";
+import { authorDisplayName } from "~/lib/published-author";
 import { api } from "~/trpc/react";
 
 import { useAvatarDraft } from "./use-avatar-draft";
-import { useUsernameAvailability } from "./use-username-availability";
+import {
+  useHandleSuggestion,
+  useUsernameAvailability,
+} from "./use-username-availability";
 
 export type AccountSettingsProfile = {
-  first_name: string | null;
-  last_name: string | null;
+  author_name: string | null;
+  /** Present on rows that have not stored `author_name` yet. */
+  first_name?: string | null;
+  last_name?: string | null;
   username: string | null;
   avatar_url: string | null;
   default_avatar_background_color: string | null;
 };
 
-function toFormValues(
-  profile: AccountSettingsProfile,
-): AccountSettingsValues {
+function toFormValues(profile: AccountSettingsProfile): AccountSettingsValues {
   return {
-    first_name: profile.first_name ?? "",
-    last_name: profile.last_name ?? "",
+    author_name:
+      authorDisplayName({
+        author_name: profile.author_name,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+      }) ?? "",
     username: profile.username ?? "",
   };
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "An unexpected error occurred";
+  return error instanceof Error
+    ? error.message
+    : "An unexpected error occurred";
 }
 
 /**
@@ -61,9 +71,14 @@ export function useAccountSettingsForm({
   const avatar = useAvatarDraft(profile.avatar_url);
   const feedback = useSaveFeedback();
   const watchedUsername = form.watch("username");
+  const watchedAuthorName = form.watch("author_name");
   const usernameAvailability = useUsernameAvailability(
     watchedUsername,
     profile.username,
+  );
+  const usernameSuggestion = useHandleSuggestion(
+    watchedAuthorName,
+    watchedUsername,
   );
 
   const updateProfile = api.user.updateProfile.useMutation();
@@ -74,8 +89,7 @@ export function useAccountSettingsForm({
 
     const defaults = form.formState.defaultValues;
     const profileChanged =
-      values.first_name !== (defaults?.first_name ?? "") ||
-      values.last_name !== (defaults?.last_name ?? "") ||
+      values.author_name !== (defaults?.author_name ?? "") ||
       values.username !== (defaults?.username ?? "");
     const avatarChanged = avatar.isDirty;
 
@@ -84,8 +98,7 @@ export function useAccountSettingsForm({
     feedback.start();
 
     let savedProfile = {
-      first_name: values.first_name,
-      last_name: values.last_name,
+      author_name: values.author_name,
       username: values.username,
     };
     let avatarSaved = false;
@@ -112,8 +125,7 @@ export function useAccountSettingsForm({
       try {
         const updated = await updateProfile.mutateAsync(savedProfile);
         savedProfile = {
-          first_name: updated.first_name ?? "",
-          last_name: updated.last_name ?? "",
+          author_name: updated.author_name ?? "",
           username: updated.username ?? "",
         };
       } catch (error) {
@@ -167,6 +179,7 @@ export function useAccountSettingsForm({
     isBusy,
     isUsernameTaken,
     usernameAvailabilityStatus: usernameAvailability.status,
+    usernameSuggestion,
     saveState: feedback.state,
     canSave: dirty && !isBusy && !isUsernameUnresolved,
     saveDisabled: (!dirty && !isBusy) || isUsernameUnresolved,

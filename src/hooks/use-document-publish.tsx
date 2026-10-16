@@ -29,6 +29,7 @@ import {
 } from "~/hooks/use-save-feedback";
 import { useToast } from "~/hooks/use-toast";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
+import { PUBLIC_SITE_HOST } from "~/lib/public-url";
 import { slugifyTitle } from "~/lib/slug";
 import { cn } from "~/lib/utils";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -57,7 +58,6 @@ function getErrorMessage(err: unknown): string {
   return "An unexpected error occurred";
 }
 
-const LIVE_HOST_DISPLAY = "chptr.io";
 const MAX_USERNAME_DISPLAY_CHARS = 10;
 
 function formatUsernameSegmentForDisplay(username: string): string {
@@ -245,10 +245,10 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       : slugifyTitle(title);
   const urlPrefixDisplay =
     ownerPreview != null
-      ? `${LIVE_HOST_DISPLAY}/${formatUsernameSegmentForDisplay(ownerPreview)}/`
-      : `${LIVE_HOST_DISPLAY}/…/`;
+      ? `${PUBLIC_SITE_HOST}/${formatUsernameSegmentForDisplay(ownerPreview)}/`
+      : `${PUBLIC_SITE_HOST}/…/`;
   const urlPrefixTitle =
-    ownerPreview != null ? `${LIVE_HOST_DISPLAY}/${ownerPreview}/` : undefined;
+    ownerPreview != null ? `${PUBLIC_SITE_HOST}/${ownerPreview}/` : undefined;
 
   const previewSlugSegment = slugOverride.trim()
     ? slugifyTitle(slugOverride)
@@ -531,7 +531,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
           </div>
           {!ownerPreview && surface === "popover" ? (
             <p className="text-xs text-muted-foreground">
-              Add a username in Account to use your real URL path.
+              Add a handle in Account to use your real URL path.
             </p>
           ) : null}
         </>

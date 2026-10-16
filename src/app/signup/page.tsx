@@ -1,15 +1,16 @@
 "use client";
 
-import { signup } from "./actions";
-import { Button } from "../_components/button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+
+import { Button } from "../_components/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,20 +18,19 @@ import {
 } from "../_components/form";
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
+import { UsernameAvailabilityFeedback } from "~/app/_components/account-settings/username-availability-feedback";
+import { signupProfileSchema } from "~/lib/account-schema";
 import { formSpacing } from "~/lib/form-spacing";
+import { publicHandleUrl } from "~/lib/public-url";
 import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
 
-const formSchema = z
-  .object({
-    firstName: z.string().min(1, { message: "First name is required" }),
-    lastName: z.string().min(1, { message: "Last name is required" }),
-    username: z
-      .string()
-      .trim()
-      .max(50, { message: "Username must be at most 50 characters" })
-      .refine((s) => s.length === 0 || s.length >= 2, {
-        message: "Username must be at least 2 characters when provided",
-      }),
+import { signup } from "./actions";
+
+const HANDLE_PLACEHOLDER = "janemitchell";
+
+const formSchema = signupProfileSchema
+  .extend({
     email: z
       .string()
       .min(2, { message: "Email must be at least 2 characters" })
@@ -46,14 +46,16 @@ const formSchema = z
     path: ["confirmPassword"],
   });
 
+type SignupValues = z.infer<typeof formSchema>;
+
 export default function SignUpPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<z.infer<typeof formSchema>>({
+  const [handleTouched, setHandleTouched] = useState(false);
+  const form = useForm<SignupValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      author_name: "",
       username: "",
       email: "",
       password: "",
@@ -61,11 +63,79 @@ export default function SignUpPage() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const authorName = form.watch("author_name");
+  const handle = form.watch("username");
+  const [debouncedAuthorName, setDebouncedAuthorName] = useState(authorName);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedAuthorName(authorName);
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [authorName]);
+
+  const suggestion = api.user.suggestSignupHandle.useQuery(
+    { authorName: debouncedAuthorName.trim() },
+    {
+      enabled: debouncedAuthorName.trim().length > 0 && !handleTouched,
+      staleTime: 30_000,
+    },
+  );
+
+  useEffect(() => {
+    if (handleTouched) return;
+    if (debouncedAuthorName.trim().length === 0) {
+      form.setValue("username", "", {
+        shouldDirty: false,
+        shouldValidate: false,
+      });
+      return;
+    }
+    const next = suggestion.data?.handle;
+    if (!next) return;
+    form.setValue("username", next, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [debouncedAuthorName, form, handleTouched, suggestion.data?.handle]);
+
+  const trimmedHandle = handle.trim();
+  const shouldCheckHandle = /^[a-zA-Z0-9_-]{2,50}$/.test(trimmedHandle);
+  const debouncedMatches = debouncedAuthorName === authorName;
+  const availability = api.user.checkSignupHandle.useQuery(
+    { username: trimmedHandle },
+    {
+      enabled: shouldCheckHandle,
+      staleTime: 30_000,
+    },
+  );
+  const availabilityStatus = !shouldCheckHandle
+    ? "idle"
+    : availability.isFetching || availability.isPending
+      ? "checking"
+      : availability.isSuccess
+        ? availability.data.available
+          ? "available"
+          : availability.data.reason === "reserved"
+            ? "reserved"
+            : "taken"
+        : "idle";
+  const handleBlocked =
+    availabilityStatus === "checking" ||
+    availabilityStatus === "taken" ||
+    availabilityStatus === "reserved";
+  const suggestionPending =
+    !handleTouched &&
+    authorName.trim().length > 0 &&
+    trimmedHandle.length === 0 &&
+    (!debouncedMatches || suggestion.isFetching);
+
+  async function onSubmit(values: SignupValues) {
+    if (handleBlocked || suggestionPending) return;
+
     setAuthError(null);
     const formData = new FormData();
-    formData.append("firstName", values.firstName);
-    formData.append("lastName", values.lastName);
+    formData.append("authorName", values.author_name);
     formData.append("username", values.username);
     formData.append("email", values.email);
     formData.append("password", values.password);
@@ -81,6 +151,10 @@ export default function SignUpPage() {
     }
   }
 
+  const urlPreview = publicHandleUrl(
+    trimmedHandle.length > 0 ? trimmedHandle : HANDLE_PLACEHOLDER,
+  );
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <Form {...form}>
@@ -94,30 +168,23 @@ export default function SignUpPage() {
           <div className={formSpacing.stack}>
             <FormField
               control={form.control}
-              name="firstName"
+              name="author_name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium">
-                    First Name
+                    Author name
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="First Name" {...field} />
+                    <Input
+                      placeholder="Jane Mitchell"
+                      autoComplete="name"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="block text-sm font-medium">
-                    Last Name
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="Last Name" {...field} />
-                  </FormControl>
+                  <FormDescription>
+                    The name displayed on your published articles. You can use a
+                    pen name.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -128,19 +195,29 @@ export default function SignUpPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="block text-sm font-medium">
-                    Username (optional)
+                    Handle
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Username"
+                      placeholder={HANDLE_PLACEHOLDER}
                       autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setHandleTouched(next.trim().length > 0);
+                        field.onChange(event);
                         setAuthError(null);
                       }}
                     />
                   </FormControl>
+                  <FormDescription className="font-mono">
+                    {urlPreview}
+                  </FormDescription>
+                  {availabilityStatus === "idle" ? null : (
+                    <UsernameAvailabilityFeedback status={availabilityStatus} />
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -198,7 +275,7 @@ export default function SignUpPage() {
             <Button
               type="submit"
               className="w-full py-2 text-sm font-medium"
-              disabled={isLoading}
+              disabled={isLoading || handleBlocked || suggestionPending}
             >
               Submit
             </Button>

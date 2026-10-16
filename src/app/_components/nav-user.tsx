@@ -42,8 +42,7 @@ export function NavUser({
   triggerClassName,
 }: {
   user?: {
-    first_name: string | null;
-    last_name: string | null;
+    name: string | null;
     username: string | null;
     email: string;
     avatar_url: string | null;
@@ -113,6 +112,8 @@ export function NavUser({
     );
   }
 
+  const trimmedName = user.name?.trim();
+  const displayName = trimmedName ? trimmedName : "Account";
   const subtitle = user.username
     ? `@${user.username}`
     : user.email
@@ -122,16 +123,13 @@ export function NavUser({
   const trigger = (
     <>
       <UserAvatar
-        first_name={user.first_name}
-        last_name={user.last_name}
+        name={displayName}
         avatar_url={user.avatar_url}
-        default_avatar_background_color={
-          user.default_avatar_background_color
-        }
-        alt={`${user.first_name} ${user.last_name}`}
+        default_avatar_background_color={user.default_avatar_background_color}
+        alt={displayName}
       />
       <div className="grid flex-1 text-left text-sm leading-tight">
-        <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
+        <span className="truncate font-semibold">{displayName}</span>
         {subtitle ? (
           <span className="truncate text-xs text-muted-foreground">
             {subtitle}
@@ -186,16 +184,15 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <UserAvatar
-                  first_name={user.first_name}
-                  last_name={user.last_name}
+                  name={displayName}
                   avatar_url={user.avatar_url}
                   default_avatar_background_color={
                     user.default_avatar_background_color
                   }
-                  alt={`${user.first_name} ${user.last_name}`}
+                  alt={displayName}
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{`${user.first_name} ${user.last_name}`}</span>
+                  <span className="truncate font-semibold">{displayName}</span>
                   {subtitle ? (
                     <span className="truncate text-xs text-muted-foreground">
                       {subtitle}

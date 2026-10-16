@@ -1,13 +1,15 @@
-export type { AuthContext } from './shared'
+export type { AuthContext } from "./shared";
 export {
   getCurrentUser,
   getCurrentUserProfile,
+  getHandleAvailability,
   isUsernameAvailable,
+  suggestAvailableHandle,
   updateUserAvatar,
   updateUserProfile,
   type UpdateUserProfileInput,
   type UserProfile,
-} from './auth'
+} from "./auth";
 export {
   createDocument,
   getDocumentById,
@@ -16,7 +18,7 @@ export {
   updateDocumentName,
   trashDocument,
   restoreDocument,
-} from './documents'
+} from "./documents";
 export {
   authorDisplayLabel,
   getPublicationByUsernameSlug,
@@ -29,4 +31,4 @@ export {
   unpublishDocument,
   type DocumentPublicationRow,
   type PublishedAuthorProfileRow,
-} from './document-publications'
+} from "./document-publications";

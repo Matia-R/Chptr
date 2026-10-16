@@ -1,6 +1,7 @@
 import { UserAvatar } from "~/app/_components/user-avatar";
 import {
   authorDisplayLabel,
+  authorInitials,
   type PublishedAuthorProfileRow,
 } from "~/lib/published-author";
 import { cn } from "~/lib/utils";
@@ -12,28 +13,6 @@ function formatPublishedDate(iso: string): string {
     day: "numeric",
     year: "numeric",
   }).format(d);
-}
-
-/** Matches NavUser: first + last initial, else derived from display label. */
-function authorAvatarInitials(
-  authorProfile: {
-    first_name: string | null;
-    last_name: string | null;
-  } | null,
-  displayLabel: string,
-): string {
-  const fromProfile =
-    `${authorProfile?.first_name?.[0] ?? ""}${authorProfile?.last_name?.[0] ?? ""}`.toUpperCase();
-  if (fromProfile) return fromProfile;
-
-  const parts = displayLabel.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    const a = parts[0]!.slice(0, 1);
-    const b = parts[parts.length - 1]!.slice(0, 1);
-    return (a + b).toUpperCase();
-  }
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return "?";
 }
 
 export type PublishedDocumentTitleSectionProps = {
@@ -69,13 +48,12 @@ export function PublishedDocumentTitleSection({
       </h1>
       <div className="mb-10 flex items-center gap-3 border-b pb-4 font-sans">
         <UserAvatar
-          first_name={authorProfile?.first_name ?? null}
-          last_name={authorProfile?.last_name ?? null}
+          name={authorLabel}
           avatar_url={authorProfile?.avatar_url ?? null}
           default_avatar_background_color={
             authorProfile?.default_avatar_background_color ?? null
           }
-          initials={authorAvatarInitials(authorProfile, authorLabel)}
+          initials={authorInitials(authorLabel)}
           alt={authorLabel}
           className="h-12 w-12 rounded-full"
         />

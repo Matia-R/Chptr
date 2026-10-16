@@ -19,6 +19,8 @@ Older tables in your project may have been created before this repo’s filename
 | `drop_document_changes_and_snapshots.sql` | Removes legacy `document_changes` / `document_snapshots` tables |
 | `document_publications.sql` | Public published docs: `/[owner segment]/[slug]`, RLS |
 | `document_publication_redirects.sql` | Path redirects after username/slug changes; redirect-before-publication lookup |
+| `profiles_author_name_and_handles.sql` | `author_name` byline, handle reservations, case-insensitive claim trigger. Does not drop `first_name` / `last_name` |
+| `grant_handle_availability_anon.sql` | Lets signed-out signup check whether a handle is free |
 | `document_soft_delete.sql` | `documents.deleted_at`, trash/restore RPCs, hide trashed from `document_exists` |
 | `documents_active_last_updated_idx.sql` | Partial recency index on active `documents` — **not** via `apply_migration` |
 | `purge_expired_trash.sql` | 30-day hard delete: `purge_expired_trash()`, id-only audit log, `pg_cron` job |

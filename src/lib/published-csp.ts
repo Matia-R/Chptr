@@ -1,17 +1,9 @@
 import type { NextRequest, NextResponse } from "next/server";
 
+import { RESERVED_HANDLES } from "~/lib/author-handle";
+
 /** First path segment reserved for app routes (not `/:user/:slug` published docs). */
-const RESERVED_FIRST_SEGMENTS = new Set([
-  "api",
-  "documents",
-  "account",
-  "login",
-  "signup",
-  "welcome",
-  "confirm-signup",
-  "error",
-  "auth",
-]);
+const RESERVED_FIRST_SEGMENTS = new Set<string>(RESERVED_HANDLES);
 
 /**
  * Published docs are a React tree from the stored blocks. Author text is

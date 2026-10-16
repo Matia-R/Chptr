@@ -4,7 +4,10 @@ import * as React from "react";
 
 import { Button } from "~/app/_components/button";
 import { UserAvatar } from "~/app/_components/user-avatar";
-import { AVATAR_ACCEPT_ATTRIBUTE, AVATAR_MAX_SIZE_LABEL } from "~/lib/avatar-schema";
+import {
+  AVATAR_ACCEPT_ATTRIBUTE,
+  AVATAR_MAX_SIZE_LABEL,
+} from "~/lib/avatar-schema";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 
@@ -12,14 +15,12 @@ import type { AvatarDraft } from "./use-avatar-draft";
 
 export function AvatarField({
   draft,
-  firstName,
-  lastName,
+  name,
   defaultAvatarColor,
   disabled,
 }: {
   draft: AvatarDraft;
-  firstName: string;
-  lastName: string;
+  name: string;
   defaultAvatarColor: string | null;
   disabled?: boolean;
 }) {
@@ -36,8 +37,7 @@ export function AvatarField({
     <div className={formSpacing.tight}>
       <div className={cn("flex items-center", formSpacing.stackGap)}>
         <UserAvatar
-          first_name={firstName}
-          last_name={lastName}
+          name={name}
           avatar_url={draft.displayUrl}
           default_avatar_background_color={defaultAvatarColor}
           className="h-16 w-16 text-lg"
