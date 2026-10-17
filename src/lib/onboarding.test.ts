@@ -9,6 +9,7 @@ import {
   decideAccess,
   isOnboardingComplete,
   needsOnboardingLookup,
+  generatedHandleToApply,
   onboardingStepHref,
   onboardingStepMatchesRequest,
   qualifiesForOnboardingBackfill,
@@ -196,6 +197,59 @@ describe("onboarding steps", () => {
     assert.equal(onboardingStepHref("handle"), "/onboarding?step=handle");
     assert.equal(onboardingStepMatchesRequest(null, "name"), true);
     assert.equal(onboardingStepMatchesRequest("avatar", "handle"), false);
+  });
+
+  test("replaces only an untouched generated handle that is taken", () => {
+    assert.equal(
+      generatedHandleToApply({
+        edited: false,
+        authorName: "Jane Mitchell",
+        currentHandle: "jane-mitchell",
+        unavailable: true,
+        alternative: "jane-mitchell-2",
+      }),
+      "jane-mitchell-2",
+    );
+    assert.equal(
+      generatedHandleToApply({
+        edited: true,
+        authorName: "Jane Mitchell",
+        currentHandle: "jane-mitchell",
+        unavailable: true,
+        alternative: "jane-mitchell-2",
+      }),
+      null,
+    );
+    assert.equal(
+      generatedHandleToApply({
+        edited: false,
+        authorName: "Jane Mitchell",
+        currentHandle: "custom-name",
+        unavailable: true,
+        alternative: "jane-mitchell-2",
+      }),
+      null,
+    );
+    assert.equal(
+      generatedHandleToApply({
+        edited: false,
+        authorName: "Janet",
+        currentHandle: "jane-mitchell",
+        unavailable: true,
+        alternative: "jane-mitchell-2",
+      }),
+      null,
+    );
+    assert.equal(
+      generatedHandleToApply({
+        edited: false,
+        authorName: "Jane Mitchell",
+        currentHandle: "jane-mitchell",
+        unavailable: false,
+        alternative: "jane-mitchell-2",
+      }),
+      null,
+    );
   });
 });
 

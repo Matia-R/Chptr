@@ -10,7 +10,8 @@ export type UsernameAvailabilityStatus =
   | "checking"
   | "available"
   | "taken"
-  | "reserved";
+  | "reserved"
+  | "error";
 
 const DEBOUNCE_MS = 400;
 
@@ -58,12 +59,14 @@ export function useUsernameAvailability(
   const checkInFlight =
     isDebouncing ||
     query.isFetching ||
-    (queryEnabled && query.isPending && !query.isSuccess);
+    (queryEnabled && query.isPending && !query.isError);
 
   let status: UsernameAvailabilityStatus = "idle";
   if (shouldCheck) {
     if (checkInFlight) {
       status = "checking";
+    } else if (query.isError && debouncedMatches) {
+      status = "error";
     } else if (query.isSuccess && debouncedMatches) {
       status = query.data.available
         ? "available"
@@ -77,6 +80,7 @@ export function useUsernameAvailability(
     status,
     isTaken: status === "taken" || status === "reserved",
     isChecking: status === "checking",
+    refetch: query.refetch,
   };
 }
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion, useReducedMotion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
@@ -12,8 +14,8 @@ import {
   type AvatarDraft,
 } from "~/app/_components/account-settings/use-avatar-draft";
 import {
-  useHandleSuggestion,
   useUsernameAvailability,
+  type UsernameAvailabilityStatus,
 } from "~/app/_components/account-settings/use-username-availability";
 import { UsernameAvailabilityFeedback } from "~/app/_components/account-settings/username-availability-feedback";
 import { Button } from "~/app/_components/button";
@@ -32,10 +34,14 @@ import {
   useSaveFeedback,
 } from "~/hooks/use-save-feedback";
 import { signupProfileSchema } from "~/lib/account-schema";
-import { validateHandleFormat } from "~/lib/author-handle";
+import {
+  normalizeHandle,
+  suggestedHandleFromAuthorName,
+  validateHandleFormat,
+} from "~/lib/author-handle";
 import { formControlClassName } from "~/lib/form-control-styles";
 import { formSpacing } from "~/lib/form-spacing";
-import type { OnboardingStep } from "~/lib/onboarding";
+import { generatedHandleToApply, type OnboardingStep } from "~/lib/onboarding";
 import { PUBLIC_SITE_HOST } from "~/lib/public-url";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -68,6 +74,19 @@ const handleSchema = z.object({
       });
     }),
 });
+
+const STEP_INDEX: Record<OnboardingStep, number> = {
+  name: 0,
+  handle: 1,
+  avatar: 2,
+};
+
+const STEP_SLIDE_PX = 24;
+
+const STEP_TRANSITION = {
+  duration: 0.32,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
 
 const STEP_COPY: Record<
   OnboardingStep,
@@ -133,7 +152,75 @@ export function OnboardingClient({
     authorName.trim() || suggestedAuthorName || "",
   );
   const [draftHandle, setDraftHandle] = useState(username);
+  const [handleEdited, setHandleEdited] = useState(username.trim().length > 0);
   const [draftAvatar, setDraftAvatar] = useState<string | null>(avatarUrl);
+  const availability = useUsernameAvailability(draftHandle, username);
+  const unavailable =
+    availability.status === "taken" || availability.status === "reserved";
+  const alternative = api.user.suggestHandle.useQuery(
+    { authorName: draftName.trim() },
+    {
+      enabled: draftName.trim().length > 0 && unavailable,
+      staleTime: 30_000,
+    },
+  );
+  const utils = api.useUtils();
+  const linkStatus: UsernameAvailabilityStatus =
+    !handleEdited && unavailable && alternative.isFetching
+      ? "checking"
+      : availability.status;
+
+  const trimmedDraftName = draftName.trim();
+
+  useEffect(() => {
+    if (handleEdited) return;
+    setDraftHandle(suggestedHandleFromAuthorName(trimmedDraftName));
+  }, [handleEdited, trimmedDraftName]);
+
+  useEffect(() => {
+    const next = generatedHandleToApply({
+      edited: handleEdited,
+      authorName: draftName,
+      currentHandle: draftHandle,
+      unavailable,
+      alternative: alternative.data?.handle ?? null,
+    });
+    if (next) setDraftHandle(next);
+  }, [
+    alternative.data?.handle,
+    draftHandle,
+    draftName,
+    handleEdited,
+    unavailable,
+  ]);
+
+  function editHandle(next: string) {
+    setHandleEdited(true);
+    setDraftHandle(next);
+    setAuthError(null);
+  }
+
+  async function confirmHandle(handle: string) {
+    const own =
+      username.trim().length > 0 &&
+      normalizeHandle(handle) === normalizeHandle(username);
+    if (own) return { ok: true as const };
+    try {
+      const result = await utils.user.checkUsernameAvailability.fetch({
+        username: handle.trim(),
+      });
+      if (result.available) return { ok: true as const };
+      return {
+        ok: false as const,
+        reason:
+          result.reason === "reserved"
+            ? ("reserved" as const)
+            : ("taken" as const),
+      };
+    } catch {
+      return { ok: false as const, reason: "error" as const };
+    }
+  }
 
   async function signOut() {
     const supabase = createClient();
@@ -142,21 +229,20 @@ export function OnboardingClient({
     router.refresh();
   }
 
-  const copy = STEP_COPY[step];
   const preview = (
     <OnboardingArticlePreview
-      step={step}
       authorName={draftName}
       handle={draftHandle}
       avatarUrl={draftAvatar}
       defaultAvatarColor={defaultAvatarColor}
       variant="desktop"
+      showPath={step !== "name"}
     />
   );
 
   return (
     <div className="min-h-dvh bg-background lg:grid lg:h-dvh lg:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] lg:overflow-hidden">
-      <section className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:border-r lg:border-border/60">
+      <section className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0">
         <header className="flex items-center justify-between px-6 pt-6 sm:px-10 lg:px-12">
           <p className="font-lora text-xl font-medium tracking-tight">Chptr</p>
           <button
@@ -171,97 +257,153 @@ export function OnboardingClient({
         </header>
 
         <div className="flex flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
-          <div className={cn("m-auto w-full max-w-sm", formSpacing.section)}>
-            <div
-              key={step}
-              className={cn(
-                formSpacing.tight,
-                "motion-safe:duration-200 motion-safe:animate-in motion-safe:fade-in",
-              )}
-            >
-              <p className="text-sm text-muted-foreground">
-                Step {copy.index} of 3
-              </p>
-              <h1 className="font-lora text-3xl font-medium tracking-tight">
-                {copy.heading}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {copy.description}
-              </p>
-            </div>
+          <div className="relative m-auto w-full max-w-sm overflow-x-clip">
+            <StepPane step="name" active={step}>
+              <div className={formSpacing.section}>
+                <StepIntro step="name" />
+                <NameStep
+                  initialName={draftName}
+                  onDraftChange={setDraftName}
+                  onContinue={(name) => {
+                    setDraftName(name);
+                    setAuthError(null);
+                    setStep("handle");
+                  }}
+                  preview={
+                    <CompactPreview
+                      authorName={draftName}
+                      handle={draftHandle}
+                      avatarUrl={draftAvatar}
+                      defaultAvatarColor={defaultAvatarColor}
+                    />
+                  }
+                />
+              </div>
+            </StepPane>
 
-            <div hidden={step !== "name"}>
-              <NameStep
-                initialName={draftName}
-                onDraftChange={setDraftName}
-                onContinue={(name) => {
-                  setDraftName(name);
-                  setAuthError(null);
-                  setStep("handle");
-                }}
-                preview={
-                  <CompactPreview
-                    step="name"
-                    authorName={draftName}
-                    handle={draftHandle}
-                    avatarUrl={draftAvatar}
-                    defaultAvatarColor={defaultAvatarColor}
-                  />
-                }
-              />
-            </div>
+            <StepPane step="handle" active={step}>
+              <div className={formSpacing.section}>
+                <StepIntro step="handle" />
+                <HandleStep
+                  handle={draftHandle}
+                  edited={handleEdited}
+                  savedHandle={username}
+                  status={linkStatus}
+                  alternative={
+                    handleEdited &&
+                    unavailable &&
+                    alternative.data?.handle &&
+                    normalizeHandle(alternative.data.handle) !==
+                      normalizeHandle(draftHandle)
+                      ? alternative.data.handle
+                      : null
+                  }
+                  error={authError}
+                  onError={setAuthError}
+                  onEdit={editHandle}
+                  onRetry={() => {
+                    void availability.refetch();
+                  }}
+                  onUseAlternative={(next) => {
+                    editHandle(next);
+                  }}
+                  onConfirm={confirmHandle}
+                  onBack={() => setStep("name")}
+                  onContinue={(handle) => {
+                    setDraftHandle(handle);
+                    setAuthError(null);
+                    setStep("avatar");
+                  }}
+                />
+              </div>
+            </StepPane>
 
-            <div hidden={step !== "handle"}>
-              <HandleStep
-                authorName={step === "handle" ? draftName : ""}
-                initialHandle={draftHandle}
-                savedHandle={username}
-                error={authError}
-                onError={setAuthError}
-                onDraftChange={setDraftHandle}
-                onBack={() => setStep("name")}
-                onContinue={(handle) => {
-                  setDraftHandle(handle);
-                  setAuthError(null);
-                  setStep("avatar");
-                }}
-              />
-            </div>
-
-            <div hidden={step !== "avatar"}>
-              <AvatarStep
-                authorName={draftName}
-                username={draftHandle}
-                avatarUrl={avatarUrl}
-                suggestedAvatarUrl={suggestedAvatarUrl}
-                defaultAvatarColor={defaultAvatarColor}
-                error={authError}
-                onError={setAuthError}
-                onAvatarChange={setDraftAvatar}
-                onBack={() => setStep("handle")}
-                onIncomplete={setStep}
-                preview={
-                  <CompactPreview
-                    step="avatar"
-                    authorName={draftName}
-                    handle={draftHandle}
-                    avatarUrl={draftAvatar}
-                    defaultAvatarColor={defaultAvatarColor}
-                  />
-                }
-              />
-            </div>
+            <StepPane step="avatar" active={step}>
+              <div className={formSpacing.section}>
+                <StepIntro step="avatar" />
+                <AvatarStep
+                  authorName={draftName}
+                  username={draftHandle}
+                  avatarUrl={avatarUrl}
+                  suggestedAvatarUrl={suggestedAvatarUrl}
+                  defaultAvatarColor={defaultAvatarColor}
+                  error={authError}
+                  onError={setAuthError}
+                  onAvatarChange={setDraftAvatar}
+                  onBack={() => setStep("handle")}
+                  onIncomplete={setStep}
+                  preview={
+                    <CompactPreview
+                      authorName={draftName}
+                      handle={draftHandle}
+                      avatarUrl={draftAvatar}
+                      defaultAvatarColor={defaultAvatarColor}
+                    />
+                  }
+                />
+              </div>
+            </StepPane>
           </div>
         </div>
       </section>
 
-      <section className="hidden min-h-0 lg:block">{preview}</section>
+      <section className="hidden h-full min-h-0 overflow-hidden lg:block">
+        {preview}
+      </section>
     </div>
   );
 }
 
-function CompactPreview(props: {
+function StepIntro({ step }: { step: OnboardingStep }) {
+  const copy = STEP_COPY[step];
+
+  return (
+    <div className={formSpacing.tight}>
+      <p className="text-sm text-muted-foreground">Step {copy.index} of 3</p>
+      <h1 className="font-lora text-3xl font-medium tracking-tight">
+        {copy.heading}
+      </h1>
+      <p className="text-sm text-muted-foreground">{copy.description}</p>
+    </div>
+  );
+}
+
+function StepPane({
+  step,
+  active,
+  children,
+}: {
   step: OnboardingStep;
+  active: OnboardingStep;
+  children: ReactNode;
+}) {
+  const reduceMotion = useReducedMotion();
+  const delta = STEP_INDEX[step] - STEP_INDEX[active];
+  const inactive = delta !== 0;
+
+  return (
+    <motion.div
+      initial={false}
+      animate={{
+        opacity: inactive ? 0 : 1,
+        x: reduceMotion || !inactive ? 0 : delta * STEP_SLIDE_PX,
+      }}
+      transition={reduceMotion ? { duration: 0 } : STEP_TRANSITION}
+      className={cn(
+        "w-full",
+        inactive
+          ? "pointer-events-none absolute inset-x-0 top-0"
+          : "relative z-10",
+      )}
+      aria-hidden={inactive}
+      inert={inactive}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function CompactPreview(props: {
   authorName: string;
   handle: string;
   avatarUrl: string | null;
@@ -343,53 +485,52 @@ function NameStep({
 }
 
 function HandleStep({
-  authorName,
-  initialHandle,
+  handle,
+  edited,
   savedHandle,
+  status,
+  alternative,
   error,
   onError,
-  onDraftChange,
+  onEdit,
+  onRetry,
+  onUseAlternative,
+  onConfirm,
   onBack,
   onContinue,
 }: {
-  authorName: string;
-  initialHandle: string;
-  /** Profile handle already stored. Not the live draft — availability treats that as "yours". */
+  handle: string;
+  edited: boolean;
+  /** Profile handle already stored. Availability treats that as "yours". */
   savedHandle: string;
+  status: UsernameAvailabilityStatus;
+  alternative: string | null;
   error: string | null;
   onError: (message: string | null) => void;
-  onDraftChange: (value: string) => void;
+  onEdit: (value: string) => void;
+  onRetry: () => void;
+  onUseAlternative: (handle: string) => void;
+  onConfirm: (
+    handle: string,
+  ) => Promise<
+    { ok: true } | { ok: false; reason: "taken" | "reserved" | "error" }
+  >;
   onBack: () => void;
   onContinue: (handle: string) => void;
 }) {
-  const [handleTouched, setHandleTouched] = useState(
-    initialHandle.trim().length > 0,
-  );
+  const [resolving, setResolving] = useState(false);
   const form = useForm<z.infer<typeof handleSchema>>({
     resolver: zodResolver(handleSchema),
-    defaultValues: { username: initialHandle },
+    defaultValues: { username: handle },
   });
-  const handle = form.watch("username");
-  const suggestion = useHandleSuggestion(
-    authorName,
-    // A touched empty field must not look blank to the suggestion query, or
-    // clearing the input fetches the default and writes it back.
-    handleTouched ? handle.trim() || "-" : "",
-  );
-  const availability = useUsernameAvailability(handle, savedHandle);
+  const gateRef = useRef({ handle, status, resolving });
+  gateRef.current = { handle, status, resolving };
 
   useEffect(() => {
-    if (handleTouched) return;
-    if (!suggestion) return;
-    form.setValue("username", suggestion, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  }, [form, handleTouched, suggestion]);
-
-  useEffect(() => {
-    onDraftChange(handle);
-  }, [handle, onDraftChange]);
+    if (edited) return;
+    if (form.getValues("username") === handle) return;
+    form.setValue("username", handle, { shouldValidate: true });
+  }, [edited, form, handle]);
 
   const trimmedHandle = handle.trim();
   const parsedHandle = handleSchema.shape.username.safeParse(trimmedHandle);
@@ -397,26 +538,42 @@ function HandleStep({
     trimmedHandle.length > 0 && !parsedHandle.success
       ? parsedHandle.error.issues[0]?.message
       : undefined;
-  const ownsSavedHandle =
-    trimmedHandle.length > 0 &&
-    trimmedHandle.toLowerCase() === savedHandle.trim().toLowerCase();
-  const linkConfirmed = ownsSavedHandle || availability.status === "available";
-  const linkBlocked =
+  const knownTaken = status === "taken" || status === "reserved";
+  const continueBlocked =
+    resolving ||
     trimmedHandle.length === 0 ||
     Boolean(formatError) ||
-    availability.status === "checking" ||
-    availability.status === "taken" ||
-    availability.status === "reserved" ||
-    !linkConfirmed;
-  const linkBlockedRef = useRef(linkBlocked);
-  linkBlockedRef.current = linkBlocked;
+    knownTaken;
 
-  function continueForward() {
-    if (linkBlockedRef.current) return;
-    void form.handleSubmit((values) => {
-      if (linkBlockedRef.current) return;
-      onContinue(values.username);
-    })();
+  async function continueForward() {
+    const current = gateRef.current;
+    if (current.resolving) return;
+    const value = current.handle.trim();
+    const parsed = handleSchema.shape.username.safeParse(value);
+    if (!parsed.success) return;
+    if (current.status === "taken" || current.status === "reserved") return;
+    const confirmed =
+      current.status === "available" ||
+      (savedHandle.trim().length > 0 &&
+        value.toLowerCase() === savedHandle.trim().toLowerCase());
+    if (confirmed) {
+      onContinue(parsed.data);
+      return;
+    }
+    setResolving(true);
+    const result = await onConfirm(value);
+    setResolving(false);
+    if (result.ok) {
+      onContinue(parsed.data);
+      return;
+    }
+    onError(
+      result.reason === "reserved"
+        ? "This link isn't available"
+        : result.reason === "error"
+          ? "Couldn't check availability. Try again."
+          : "This link is already taken",
+    );
   }
 
   return (
@@ -461,9 +618,8 @@ function HandleStep({
                       className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/65 md:text-sm"
                       {...field}
                       onChange={(event) => {
-                        setHandleTouched(true);
                         field.onChange(event);
-                        onError(null);
+                        onEdit(event.target.value);
                       }}
                     />
                   </FormControl>
@@ -473,22 +629,46 @@ function HandleStep({
                     <p className="text-[0.8rem] font-medium text-destructive">
                       {formatError}
                     </p>
-                  ) : availability.status === "idle" ? null : (
-                    <UsernameAvailabilityFeedback
-                      status={availability.status}
-                      animate={false}
-                      labels={{
-                        available: "Available",
-                        taken: "This link is already taken",
-                        reserved: "This link isn't available",
-                      }}
-                    />
+                  ) : status === "idle" ? null : (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <UsernameAvailabilityFeedback
+                        status={status}
+                        animate={false}
+                        labels={{
+                          checking: "Checking availability…",
+                          available: "Available",
+                          taken: "This link is already taken",
+                          reserved: "This link isn't available",
+                          error: "Couldn't check availability",
+                        }}
+                      />
+                      {status === "error" ? (
+                        <button
+                          type="button"
+                          className="text-[0.8rem] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          onClick={onRetry}
+                        >
+                          Try again
+                        </button>
+                      ) : null}
+                      {alternative ? (
+                        <button
+                          type="button"
+                          className="text-[0.8rem] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          onClick={() => onUseAlternative(alternative)}
+                        >
+                          Use {alternative}
+                        </button>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </FormItem>
             )}
           />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error && !knownTaken && status !== "error" ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : null}
         </div>
         <div className={cn("flex", formSpacing.stackGap)}>
           <Button
@@ -503,17 +683,22 @@ function HandleStep({
             type="submit"
             className={cn(
               "flex-1",
-              linkBlocked &&
+              continueBlocked &&
+                !resolving &&
                 "cursor-not-allowed opacity-50 disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-50",
+              resolving && "disabled:opacity-100",
             )}
-            disabled={linkBlocked}
-            aria-disabled={linkBlocked}
-            onClick={(event) => {
-              if (!linkBlockedRef.current) return;
-              event.preventDefault();
-            }}
+            disabled={continueBlocked}
+            aria-disabled={continueBlocked}
           >
-            Continue
+            {resolving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking
+              </>
+            ) : (
+              "Continue"
+            )}
           </Button>
         </div>
       </form>

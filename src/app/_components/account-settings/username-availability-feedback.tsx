@@ -21,6 +21,7 @@ const DEFAULT_LABELS = {
   available: "Handle is available",
   taken: "Handle is taken",
   reserved: "Handle is reserved",
+  error: "Couldn't check availability",
 };
 
 function AvailabilityCopy({
@@ -53,6 +54,10 @@ function AvailabilityCopy({
         {copy.available}
       </span>
     );
+  }
+
+  if (status === "error") {
+    return <span className={className}>{copy.error}</span>;
   }
 
   return (

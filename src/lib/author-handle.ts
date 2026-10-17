@@ -139,6 +139,11 @@ export function enumerateHandleCandidates(
   return candidates;
 }
 
+/** First valid handle for an author name. Does not check whether it is free. */
+export function suggestedHandleFromAuthorName(authorName: string): string {
+  return enumerateHandleCandidates(authorName, 1)[0] ?? "";
+}
+
 /** First `limit` candidates that pass format rules and `isTaken`. */
 export function suggestHandles(
   authorName: string,

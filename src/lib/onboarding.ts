@@ -9,6 +9,8 @@
 
 import {
   AUTHOR_NAME_MAX_LENGTH,
+  normalizeHandle,
+  suggestedHandleFromAuthorName,
   validateHandleFormat,
 } from "./author-handle.ts";
 
@@ -133,6 +135,28 @@ export function assertCompletedProfileUpdate(
     };
   }
   return { ok: true };
+}
+
+/**
+ * Replacement for an untouched generated handle that the server found was
+ * taken. Returns null when the person has edited the field, the current
+ * value is no longer the local suggestion, or the alternative is missing
+ * or unchanged.
+ */
+export function generatedHandleToApply(input: {
+  edited: boolean;
+  authorName: string;
+  currentHandle: string;
+  unavailable: boolean;
+  alternative: string | null;
+}): string | null {
+  if (input.edited || !input.unavailable) return null;
+  const next = input.alternative?.trim() ?? "";
+  if (!next) return null;
+  const local = suggestedHandleFromAuthorName(input.authorName);
+  if (normalizeHandle(input.currentHandle) !== local) return null;
+  if (normalizeHandle(next) === local) return null;
+  return next;
 }
 
 export function onboardingStepHref(step: OnboardingStep): string {
