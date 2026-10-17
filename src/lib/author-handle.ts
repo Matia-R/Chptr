@@ -18,6 +18,7 @@ export const RESERVED_HANDLES = [
   "login",
   "signup",
   "welcome",
+  "onboarding",
   "confirm-signup",
   "error",
   "auth",

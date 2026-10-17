@@ -55,12 +55,16 @@ export function useUsernameAvailability(
   );
 
   const isDebouncing = shouldCheck && !debouncedMatches;
+  const checkInFlight =
+    isDebouncing ||
+    query.isFetching ||
+    (queryEnabled && query.isPending && !query.isSuccess);
 
   let status: UsernameAvailabilityStatus = "idle";
   if (shouldCheck) {
-    if (isDebouncing || query.isFetching || (queryEnabled && query.isPending)) {
+    if (checkInFlight) {
       status = "checking";
-    } else if (query.isSuccess) {
+    } else if (query.isSuccess && debouncedMatches) {
       status = query.data.available
         ? "available"
         : query.data.reason === "reserved"

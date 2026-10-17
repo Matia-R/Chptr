@@ -1,62 +1,77 @@
-'use server'
+"use server";
 
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
-import { createClient } from '../../utils/supabase/server'
-import { getTrpcCaller } from '~/utils/trpc-utils'
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { isOnboardingComplete } from "~/lib/onboarding";
+import { getCurrentUserProfile } from "~/server/db";
+import { createClient } from "../../utils/supabase/server";
+import { getTrpcCaller } from "~/utils/trpc-utils";
 
 export async function login(formData: FormData) {
-    const supabase = await createClient()
+  const supabase = await createClient();
 
-    // type-casting here for convenience
-    // in practice, you should validate your inputs
-    const data = {
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
+  const data = {
+    email: formData.get("email") as string,
+    password: formData.get("password") as string,
+  };
+
+  const { data: signInData, error } =
+    await supabase.auth.signInWithPassword(data);
+
+  if (error) {
+    switch (error.message) {
+      case "Invalid login credentials":
+        return { error: "Invalid email or password" };
+      default:
+        return { error: error.message };
     }
+  }
 
-    const { error } = await supabase.auth.signInWithPassword(data)
+  revalidatePath("/", "layout");
 
-    // TODO: Add logging here for Error Codes so we know when things go wrong
-    if (error) {
-        switch (error.message) {
-            case 'Invalid login credentials':
-                return { error: 'Invalid email or password' }
-            default:
-                return { error: error.message }
-        }
-    }
+  const userId = signInData.user?.id;
+  if (!userId) {
+    return { redirectTo: "/onboarding" };
+  }
 
-    // Get the user's documents using TRPC
-    const caller = await getTrpcCaller();
-    const result = await caller.document.getDocumentIdsForAuthenticatedUser();
+  let onboarded = false;
+  try {
+    const profile = await getCurrentUserProfile({ supabase, userId });
+    onboarded = isOnboardingComplete(profile);
+  } catch {
+    onboarded = false;
+  }
 
-    revalidatePath('/', 'layout')
+  if (!onboarded) {
+    return { redirectTo: "/onboarding" };
+  }
 
-    // Redirect to the first document if available, otherwise go to documents page
-    if (result.success && result.documents?.[0]?.id) {
-        return { redirectTo: `/documents/${result.documents[0].id}` }
-    } else {
-        return { redirectTo: '/documents' }
-    }
+  const caller = await getTrpcCaller();
+  const result = await caller.document.getDocumentIdsForAuthenticatedUser();
+
+  if (result.success && result.documents?.[0]?.id) {
+    return { redirectTo: `/documents/${result.documents[0].id}` };
+  } else {
+    return { redirectTo: "/documents" };
+  }
 }
 
 export async function signup(formData: FormData) {
-    const supabase = await createClient()
+  const supabase = await createClient();
 
-    // type-casting here for convenience
-    // in practice, you should validate your inputs
-    const data = {
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
-    }
+  // type-casting here for convenience
+  // in practice, you should validate your inputs
+  const data = {
+    email: formData.get("email") as string,
+    password: formData.get("password") as string,
+  };
 
-    const { error } = await supabase.auth.signUp(data)
+  const { error } = await supabase.auth.signUp(data);
 
-    if (error) {
-        redirect('/error')
-    }
+  if (error) {
+    redirect("/error");
+  }
 
-    revalidatePath('/', 'layout')
-    redirect('/documents')
+  revalidatePath("/", "layout");
+  redirect("/confirm-signup");
 }

@@ -10,9 +10,8 @@ export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 72;
 
 /**
- * Empty means "no handle" — the profiles row stores `null` instead.
- * Account settings and incomplete profiles use this. Signup uses
- * `signupProfileSchema`, which requires both fields.
+ * Empty is only valid while a profile is still onboarding. Account settings
+ * and publication require both an author name and a handle.
  */
 export const usernameSchema = z
   .string()
@@ -28,7 +27,7 @@ export const usernameSchema = z
     message: "That handle is reserved",
   });
 
-/** Public byline. Empty is allowed on an incomplete profile. */
+/** Public byline. Empty is allowed only before onboarding is complete. */
 export const authorNameSchema = z.string().trim().max(AUTHOR_NAME_MAX_LENGTH, {
   message: "Author name must be at most 100 characters",
 });
@@ -38,7 +37,7 @@ export const profileSchema = z.object({
   username: usernameSchema,
 });
 
-/** Signup collects both before the account exists. The columns stay nullable. */
+/** Signup used to collect both before the account existed. Onboarding uses this too. */
 export const signupProfileSchema = z.object({
   author_name: z
     .string()
@@ -105,7 +104,7 @@ export const changePasswordSchema = z
   });
 
 /** Profile fields only — password changes use `changePasswordSchema` separately. */
-export const accountSettingsSchema = profileSchema;
+export const accountSettingsSchema = signupProfileSchema;
 
 export type ProfileValues = z.infer<typeof profileSchema>;
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;

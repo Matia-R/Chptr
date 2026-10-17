@@ -6,6 +6,11 @@ import {
 } from "~/lib/author-handle";
 import { AVATAR_BUCKET } from "~/lib/avatar-schema";
 import {
+  assertCompletedProfileUpdate,
+  isOnboardingComplete,
+  suggestedAvatarUrlFromAuthMetadata,
+} from "~/lib/onboarding";
+import {
   isValidOwnerPathSegment,
   publicationOwnerPathSegment,
 } from "~/lib/slug";
@@ -21,6 +26,8 @@ export type UserProfile = {
   last_name: string | null;
   default_avatar_background_color: string;
   username: string | null;
+  /** Set only by `complete_author_onboarding`. Null until identity is confirmed. */
+  onboarding_completed_at: string | null;
 };
 
 export type UpdateUserProfileInput = {
@@ -82,6 +89,15 @@ export async function updateUserProfile(
   auth: AuthContext,
   input: UpdateUserProfileInput,
 ): Promise<UserProfile> {
+  const current = await getCurrentUserProfile(auth);
+  const preserved = assertCompletedProfileUpdate(current, input);
+  if (!preserved.ok) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: preserved.message,
+    });
+  }
+
   const { data, error } = await auth.supabase
     .from("profiles")
     .upsert({
@@ -115,6 +131,157 @@ export async function updateUserProfile(
   // The sync itself does nothing when every publication already uses this handle.
   if (isValidOwnerPathSegment(nextSegment)) {
     await syncPublicationOwnerUsernameForCreator(auth, nextSegment);
+  }
+
+  return data;
+}
+
+export type OnboardingProgressInput = {
+  author_name?: string;
+  username?: string;
+};
+
+/**
+ * Persists a confirmed name or handle without marking onboarding complete.
+ * Omitted fields are left as they are.
+ */
+export async function saveOnboardingProgress(
+  auth: AuthContext,
+  input: OnboardingProgressInput,
+): Promise<UserProfile> {
+  const current = await getCurrentUserProfile(auth);
+  if (isOnboardingComplete(current)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Onboarding is already complete.",
+    });
+  }
+
+  const patch: {
+    author_name?: string;
+    username?: string;
+    updated_at: string;
+  } = { updated_at: new Date().toISOString() };
+  if (input.author_name !== undefined) patch.author_name = input.author_name;
+  if (input.username !== undefined) patch.username = input.username;
+
+  const { data, error } = await auth.supabase
+    .from("profiles")
+    .update(patch)
+    .eq("id", auth.userId)
+    .select("*")
+    .single<UserProfile>();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION || error.code === "23514") {
+      throw new TRPCError({
+        code: error.code === UNIQUE_VIOLATION ? "CONFLICT" : "BAD_REQUEST",
+        message: friendlyHandleError(error.message),
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to save onboarding progress",
+    });
+  }
+
+  return data;
+}
+
+/**
+ * Atomically stores the confirmed identity and the completion timestamp.
+ * The database function rejects a client-supplied timestamp on any other write.
+ */
+export async function completeOnboarding(
+  auth: AuthContext,
+  input: { author_name: string; username: string },
+): Promise<UserProfile> {
+  const { error } = await auth.supabase.rpc("complete_author_onboarding", {
+    p_author_name: input.author_name,
+    p_username: input.username,
+  });
+
+  if (error) {
+    const message = error.message ?? "";
+    if (error.code === "42501" || /not authenticated/i.test(message)) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+    if (/author name is required/i.test(message)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Author name is required.",
+      });
+    }
+    if (/handle is required/i.test(message)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "A handle is required.",
+      });
+    }
+    if (
+      error.code === UNIQUE_VIOLATION ||
+      error.code === "23514" ||
+      error.code === "23505" ||
+      /author name|handle|username|reserved|invalid/i.test(message)
+    ) {
+      throw new TRPCError({
+        code:
+          error.code === UNIQUE_VIOLATION || error.code === "23505"
+            ? "CONFLICT"
+            : "BAD_REQUEST",
+        message: friendlyHandleError(message),
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to finish onboarding",
+    });
+  }
+
+  const profile = await getCurrentUserProfile(auth);
+  if (!profile || !isOnboardingComplete(profile)) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to finish onboarding",
+    });
+  }
+  return profile;
+}
+
+/**
+ * Copies the signed-in user's provider photo onto the profile. The URL comes
+ * from auth metadata, not from the client.
+ */
+export async function acceptSuggestedAvatar(
+  auth: AuthContext,
+  metadata: unknown,
+): Promise<UserProfile> {
+  const avatarUrl = suggestedAvatarUrlFromAuthMetadata(metadata);
+  if (!avatarUrl) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "There is no photo to use.",
+    });
+  }
+
+  const { data, error } = await auth.supabase
+    .from("profiles")
+    .update({
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", auth.userId)
+    .select("*")
+    .single<UserProfile>();
+
+  if (error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to update avatar",
+    });
   }
 
   return data;

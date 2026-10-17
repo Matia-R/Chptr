@@ -48,6 +48,7 @@ type DocRow = {
 
 type ProfileNameRow = {
   username: string | null;
+  author_name?: string | null;
 };
 
 type PublicationIdRow = {
@@ -527,7 +528,7 @@ export async function publishDocument(
 
   const profileResult = await supabase
     .from("profiles")
-    .select("username")
+    .select("username, author_name")
     .eq("id", doc.creator_id)
     .maybeSingle();
 
@@ -542,12 +543,13 @@ export async function publishDocument(
   const ownerUsername = publicationOwnerPathSegment({
     username: profile?.username,
   });
+  const authorName = profile?.author_name?.trim() ?? "";
 
-  if (!isValidOwnerPathSegment(ownerUsername)) {
+  if (authorName.length === 0 || !isValidOwnerPathSegment(ownerUsername)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message:
-        "The document owner needs a handle (2–50 letters, numbers, hyphens, or underscores) before this document can be published. Update it in Account settings.",
+        "The document owner needs an author name and a handle before this document can be published. Update it in Account settings.",
     });
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { PostgrestError, User } from "@supabase/supabase-js";
+import { isOnboardingComplete } from "~/lib/onboarding";
 import {
   type createClientFromToken,
   getUserFromAccessToken,
@@ -23,7 +24,9 @@ export function getBearerToken(request: Request): string | null {
   return token ?? null;
 }
 
-export async function authenticatePartykitUser(request: Request): Promise<
+export async function authenticatePartykitUser(
+  request: Request,
+): Promise<
   | { ok: false; response: NextResponse }
   | { ok: true; token: string; user: User; supabase: PartykitSupabase }
 > {
@@ -38,7 +41,7 @@ export async function authenticatePartykitUser(request: Request): Promise<
       ok: false,
       response: NextResponse.json(
         { error: "Missing authorization token" },
-        { status: 401 }
+        { status: 401 },
       ),
     };
   }
@@ -49,7 +52,7 @@ export async function authenticatePartykitUser(request: Request): Promise<
       ok: false,
       response: NextResponse.json(
         { error: "Invalid or expired token" },
-        { status: 401 }
+        { status: 401 },
       ),
     };
   }
@@ -57,10 +60,31 @@ export async function authenticatePartykitUser(request: Request): Promise<
   return { ok: true, token, user, supabase };
 }
 
+/** Private document sockets stay closed until author onboarding is complete. */
+export async function requireOnboardedPartykitUser(
+  supabase: PartykitSupabase,
+  userId: string,
+): Promise<NextResponse | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("author_name, username, onboarding_completed_at")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !isOnboardingComplete(data)) {
+    return NextResponse.json(
+      { error: "Finish onboarding before using Chptr." },
+      { status: 403 },
+    );
+  }
+
+  return null;
+}
+
 export async function getDocumentPermission(
   supabase: PartykitSupabase,
   documentId: string,
-  userId: string
+  userId: string,
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("document_permissions")
@@ -80,7 +104,7 @@ export async function getDocumentPermission(
 /** False for missing and trashed documents. */
 export async function isDocumentActive(
   supabase: PartykitSupabase,
-  documentId: string
+  documentId: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from("documents")
@@ -93,7 +117,9 @@ export async function isDocumentActive(
     throw error;
   }
 
-  return data != null && (data as { deleted_at: string | null }).deleted_at == null;
+  return (
+    data != null && (data as { deleted_at: string | null }).deleted_at == null
+  );
 }
 
 /**
@@ -102,7 +128,7 @@ export async function isDocumentActive(
  */
 export async function documentExists(
   supabase: PartykitSupabase,
-  documentId: string
+  documentId: string,
 ): Promise<boolean> {
   const { data, error } = (await supabase.rpc("document_exists", {
     p_document_id: documentId,
@@ -119,7 +145,7 @@ export async function documentExists(
 export async function createDocumentAsOwner(
   supabase: PartykitSupabase,
   documentId: string,
-  name = "Untitled"
+  name = "Untitled",
 ): Promise<void> {
   const { error } = await supabase.rpc("create_document_with_owner", {
     p_document_id: documentId,

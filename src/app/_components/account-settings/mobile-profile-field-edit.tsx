@@ -15,7 +15,7 @@ import {
 } from "~/hooks/use-save-feedback";
 import { useToast } from "~/hooks/use-toast";
 import type { AccountProfileField } from "~/hooks/use-account-settings";
-import { usernameSchema } from "~/lib/account-schema";
+import { signupProfileSchema } from "~/lib/account-schema";
 import { authorDisplayName } from "~/lib/published-author";
 import { publicHandleUrl } from "~/lib/public-url";
 import { api } from "~/trpc/react";
@@ -104,11 +104,11 @@ export function MobileProfileFieldEdit({
 
   const trimmed = draft.trim();
   const dirty = trimmed !== initialValue.trim();
-  const usernameParse =
-    field === "username" && trimmed.length > 0
-      ? usernameSchema.safeParse(trimmed)
-      : null;
-  const usernameInvalid = usernameParse !== null && !usernameParse.success;
+  const parsed =
+    field === "author_name"
+      ? signupProfileSchema.shape.author_name.safeParse(trimmed)
+      : signupProfileSchema.shape.username.safeParse(trimmed);
+  const fieldInvalid = !parsed.success;
   const isBusy =
     feedback.inFlight ||
     feedback.state === "saving" ||
@@ -123,13 +123,13 @@ export function MobileProfileFieldEdit({
   const saveDisabled =
     !dirty ||
     isBusy ||
-    usernameInvalid ||
+    fieldInvalid ||
     (field === "username" && (availability.isTaken || availability.isChecking));
 
   const save = async () => {
     if (
       !dirty ||
-      usernameInvalid ||
+      fieldInvalid ||
       availability.isTaken ||
       availability.isChecking ||
       feedback.inFlight ||
@@ -165,8 +165,8 @@ export function MobileProfileFieldEdit({
     }
   };
 
-  const schemaError = usernameInvalid
-    ? usernameParse.error.issues[0]?.message
+  const schemaError = fieldInvalid
+    ? parsed.error.issues[0]?.message
     : undefined;
 
   const inputId = `account-settings-${field}`;

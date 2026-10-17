@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { authorDisplayName } from "~/lib/published-author";
+import { requireOnboardedUser } from "~/server/auth/onboarding-gate";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { WelcomeClient } from "../_components/welcome-client";
 
 export default async function WelcomePage() {
+  await requireOnboardedUser();
   const caller = await getTrpcCaller();
 
-  // TODO: Find a better way to handle this
   try {
     const userProfile = await caller.user.getCurrentUserProfile();
     const displayName = authorDisplayName(userProfile);
@@ -15,7 +16,6 @@ export default async function WelcomePage() {
 
     return <WelcomeClient userName={welcomeName} />;
   } catch {
-    // If user is not authenticated, redirect to login
     redirect("/login");
   }
 }

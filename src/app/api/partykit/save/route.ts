@@ -4,6 +4,7 @@ import {
   authenticatePartykitUser,
   getDocumentPermission,
   isDocumentActive,
+  requireOnboardedPartykitUser,
 } from "~/server/partykit/auth";
 
 function base64ToBytea(base64: string): string {
@@ -17,6 +18,12 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
+  const onboardingError = await requireOnboardedPartykitUser(
+    auth.supabase,
+    auth.user.id,
+  );
+  if (onboardingError) return onboardingError;
+
   try {
     const { documentId, state } = (await request.json()) as {
       documentId?: string;
@@ -26,14 +33,14 @@ export async function POST(request: Request) {
     if (!documentId || !state) {
       return NextResponse.json(
         { error: "Missing documentId or state" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const permission = await getDocumentPermission(
       auth.supabase,
       documentId,
-      auth.user.id
+      auth.user.id,
     );
     if (!canWrite(permission)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -41,7 +48,10 @@ export async function POST(request: Request) {
 
     const active = await isDocumentActive(auth.supabase, documentId);
     if (!active) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 },
+      );
     }
 
     const { error: upsertError } = await auth.supabase
@@ -52,14 +62,14 @@ export async function POST(request: Request) {
           state_data: base64ToBytea(state),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "document_id" }
+        { onConflict: "document_id" },
       );
 
     if (upsertError) {
       console.error("[PartyKit Save] Upsert error:", upsertError);
       return NextResponse.json(
         { error: "Failed to save document state" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -73,7 +83,7 @@ export async function POST(request: Request) {
     console.error("[PartyKit Save] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
