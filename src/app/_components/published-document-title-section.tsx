@@ -22,6 +22,12 @@ export type PublishedDocumentTitleSectionProps = {
   publishedAt: string;
   /** Phone-width preview: keep the smaller title even on a wide screen. */
   compact?: boolean;
+  /** Optional. Omitted on published pages. */
+  authorNameClassName?: string;
+  /** Optional. Omitted on published pages. */
+  avatarClassName?: string;
+  /** Optional. Omitted on published pages; otherwise derived from the byline. */
+  initials?: string;
 };
 
 export function PublishedDocumentTitleSection({
@@ -30,6 +36,9 @@ export function PublishedDocumentTitleSection({
   ownerUsername,
   publishedAt,
   compact = false,
+  authorNameClassName,
+  avatarClassName,
+  initials,
 }: PublishedDocumentTitleSectionProps) {
   const authorLabel = authorDisplayLabel(authorProfile, ownerUsername);
   const dateLabel = formatPublishedDate(publishedAt);
@@ -53,12 +62,19 @@ export function PublishedDocumentTitleSection({
           default_avatar_background_color={
             authorProfile?.default_avatar_background_color ?? null
           }
-          initials={authorInitials(authorLabel)}
           alt={authorLabel}
-          className="h-12 w-12 rounded-full"
+          initials={initials ?? authorInitials(authorLabel)}
+          className={cn("h-12 w-12 rounded-full", avatarClassName)}
         />
         <div className="min-w-0 text-left">
-          <p className="text-sm font-medium text-foreground">{authorLabel}</p>
+          <p
+            className={cn(
+              "text-sm font-medium text-foreground",
+              authorNameClassName,
+            )}
+          >
+            {authorLabel}
+          </p>
           <p className="text-sm text-muted-foreground">
             <time dateTime={publishedAt}>{dateLabel}</time>
           </p>

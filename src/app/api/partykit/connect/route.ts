@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { authenticatePartykitUser } from "~/server/partykit/auth";
+import {
+  authenticatePartykitUser,
+  requireOnboardedPartykitUser,
+} from "~/server/partykit/auth";
 import { connectDocument } from "~/server/partykit/connect-document";
 
 export async function POST(request: Request) {
@@ -7,6 +10,12 @@ export async function POST(request: Request) {
   if (!auth.ok) {
     return auth.response;
   }
+
+  const onboardingError = await requireOnboardedPartykitUser(
+    auth.supabase,
+    auth.user.id,
+  );
+  if (onboardingError) return onboardingError;
 
   try {
     const body = (await request.json()) as {
@@ -19,7 +28,7 @@ export async function POST(request: Request) {
     if (!documentId) {
       return NextResponse.json(
         { error: "Missing documentId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -33,7 +42,7 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error },
-        { status: result.status }
+        { status: result.status },
       );
     }
 
@@ -47,7 +56,7 @@ export async function POST(request: Request) {
     console.error("[PartyKit Connect] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

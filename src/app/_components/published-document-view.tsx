@@ -21,6 +21,9 @@ export function PublishedDocumentView({
   headerClassName,
   compact = false,
   embedded = false,
+  authorNameClassName,
+  avatarClassName,
+  initials,
 }: {
   title: string;
   authorProfile: PublishedAuthorProfileRow | null;
@@ -36,6 +39,12 @@ export function PublishedDocumentView({
   compact?: boolean;
   /** Inside a rounded preview frame. An opaque header keeps the corner clip clean. */
   embedded?: boolean;
+  /** Optional. Omitted on published pages. */
+  authorNameClassName?: string;
+  /** Optional. Omitted on published pages. */
+  avatarClassName?: string;
+  /** Optional. Omitted on published pages. */
+  initials?: string;
 }) {
   const fontId = resolveDocumentFontId(font);
 
@@ -67,16 +76,16 @@ export function PublishedDocumentView({
         </header>
       ) : null}
 
-      <div
-        className="document-type"
-        data-document-font={fontId}
-      >
+      <div className="document-type" data-document-font={fontId}>
         <PublishedDocumentTitleSection
           title={title}
           authorProfile={authorProfile}
           ownerUsername={ownerUsername}
           publishedAt={publishedAt}
           compact={compact}
+          authorNameClassName={authorNameClassName}
+          avatarClassName={avatarClassName}
+          initials={initials}
         />
 
         <main className="mx-auto max-w-3xl px-4 pb-24">
