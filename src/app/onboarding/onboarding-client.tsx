@@ -82,10 +82,17 @@ const STEP_INDEX: Record<OnboardingStep, number> = {
 };
 
 const STEP_SLIDE_PX = 24;
+const STEP_EASE = [0.22, 1, 0.36, 1] as const;
 
-const STEP_TRANSITION = {
-  duration: 0.32,
-  ease: [0.22, 1, 0.36, 1] as const,
+const STEP_LEAVE = {
+  duration: 0.18,
+  ease: STEP_EASE,
+};
+
+const STEP_ENTER = {
+  duration: 0.28,
+  delay: 0.16,
+  ease: STEP_EASE,
 };
 
 const STEP_COPY: Record<
@@ -241,10 +248,9 @@ export function OnboardingClient({
   );
 
   return (
-    <div className="min-h-dvh bg-background lg:grid lg:h-dvh lg:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] lg:overflow-hidden">
-      <section className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0">
-        <header className="flex items-center justify-between px-6 pt-6 sm:px-10 lg:px-12">
-          <p className="font-lora text-xl font-medium tracking-tight">Chptr</p>
+    <div className="relative min-h-dvh bg-background lg:grid lg:h-dvh lg:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] lg:overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-end px-6 pt-6 sm:px-10 lg:px-12">
+        <div className="pointer-events-auto flex h-7 items-center">
           <button
             type="button"
             className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
@@ -254,10 +260,15 @@ export function OnboardingClient({
           >
             Sign out
           </button>
+        </div>
+      </div>
+      <section className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0">
+        <header className="flex items-center px-6 pt-6 sm:px-10 lg:px-12">
+          <p className="font-lora text-2xl font-medium tracking-tight">Chptr</p>
         </header>
 
         <div className="flex flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
-          <div className="relative m-auto w-full max-w-sm overflow-x-clip">
+          <div className="relative m-auto grid w-full max-w-sm items-start overflow-x-clip">
             <StepPane step="name" active={step}>
               <div className={formSpacing.section}>
                 <StepIntro step="name" />
@@ -388,12 +399,12 @@ function StepPane({
         opacity: inactive ? 0 : 1,
         x: reduceMotion || !inactive ? 0 : delta * STEP_SLIDE_PX,
       }}
-      transition={reduceMotion ? { duration: 0 } : STEP_TRANSITION}
+      transition={
+        reduceMotion ? { duration: 0 } : inactive ? STEP_LEAVE : STEP_ENTER
+      }
       className={cn(
-        "w-full",
-        inactive
-          ? "pointer-events-none absolute inset-x-0 top-0"
-          : "relative z-10",
+        "col-start-1 row-start-1 w-full",
+        inactive ? "pointer-events-none z-20" : "z-10",
       )}
       aria-hidden={inactive}
       inert={inactive}
