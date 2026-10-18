@@ -1,3 +1,12 @@
+@media (max-width: 1279px) {
+  .onboarding-preview-article header > div,
+  .onboarding-preview-article .document-type > section,
+  .onboarding-preview-article .document-type > main {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
 .onboarding-preview-article header {
   height: 0;
   overflow: hidden;

@@ -242,7 +242,6 @@ export function OnboardingClient({
       handle={draftHandle}
       avatarUrl={draftAvatar}
       defaultAvatarColor={defaultAvatarColor}
-      variant="desktop"
       showPath={step !== "name"}
     />
   );
@@ -280,14 +279,6 @@ export function OnboardingClient({
                     setAuthError(null);
                     setStep("handle");
                   }}
-                  preview={
-                    <CompactPreview
-                      authorName={draftName}
-                      handle={draftHandle}
-                      avatarUrl={draftAvatar}
-                      defaultAvatarColor={defaultAvatarColor}
-                    />
-                  }
                 />
               </div>
             </StepPane>
@@ -343,14 +334,6 @@ export function OnboardingClient({
                   onAvatarChange={setDraftAvatar}
                   onBack={() => setStep("handle")}
                   onIncomplete={setStep}
-                  preview={
-                    <CompactPreview
-                      authorName={draftName}
-                      handle={draftHandle}
-                      avatarUrl={draftAvatar}
-                      defaultAvatarColor={defaultAvatarColor}
-                    />
-                  }
                 />
               </div>
             </StepPane>
@@ -414,29 +397,14 @@ function StepPane({
   );
 }
 
-function CompactPreview(props: {
-  authorName: string;
-  handle: string;
-  avatarUrl: string | null;
-  defaultAvatarColor: string;
-}) {
-  return (
-    <div className="overflow-hidden border-y border-border/60 lg:hidden">
-      <OnboardingArticlePreview {...props} variant="compact" />
-    </div>
-  );
-}
-
 function NameStep({
   initialName,
   onDraftChange,
   onContinue,
-  preview,
 }: {
   initialName: string;
   onDraftChange: (value: string) => void;
   onContinue: (name: string) => void;
-  preview: ReactNode;
 }) {
   const form = useForm<z.infer<typeof nameSchema>>({
     resolver: zodResolver(nameSchema),
@@ -485,7 +453,6 @@ function NameStep({
               </FormItem>
             )}
           />
-          {preview}
         </div>
         <Button type="submit" className="w-full" disabled={!parsedName.success}>
           Continue
@@ -728,7 +695,6 @@ function AvatarStep({
   onAvatarChange,
   onBack,
   onIncomplete,
-  preview,
 }: {
   authorName: string;
   username: string;
@@ -740,7 +706,6 @@ function AvatarStep({
   onAvatarChange: (url: string | null) => void;
   onBack: () => void;
   onIncomplete: (step: "name" | "handle") => void;
-  preview: ReactNode;
 }) {
   const router = useRouter();
   const feedback = useSaveFeedback();
@@ -849,7 +814,6 @@ function AvatarStep({
           </div>
         ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {preview}
       </div>
       <div className={cn("flex", formSpacing.stackGap)}>
         <Button

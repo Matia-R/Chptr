@@ -109,23 +109,20 @@ export function OnboardingArticlePreview({
   handle,
   avatarUrl,
   defaultAvatarColor,
-  variant,
   showPath = false,
 }: {
   authorName: string;
   handle: string;
   avatarUrl: string | null;
   defaultAvatarColor: string;
-  variant: "desktop" | "compact";
-  /** Desktop preview keeps the path collapsed until the link step. */
+  /** Keeps the path collapsed until the link step. */
   showPath?: boolean;
 }) {
   const trimmedName = authorName.trim();
   const hasName = trimmedName.length > 0;
   const displayName = hasName ? trimmedName : NAME_PLACEHOLDER;
   const handleValue = previewHandle(handle);
-  const desktop = variant === "desktop";
-  const path = usePreviewPath(desktop && showPath);
+  const path = usePreviewPath(showPath);
 
   const article = (
     <PublishedDocumentView
@@ -141,13 +138,11 @@ export function OnboardingArticlePreview({
         last_name: null,
       }}
       initials={authorInitials(hasName ? trimmedName : "")}
-      compact={!desktop}
       embedded
       className={cn(
-        "min-h-0 bg-background",
-        desktop && "onboarding-preview-article [&_header]:border-b-0",
-        desktop && path.motionOn && "onboarding-path-motion",
-        desktop && path.open && "onboarding-path-open",
+        "onboarding-preview-article min-h-0 bg-background [&_header]:border-b-0",
+        path.motionOn && "onboarding-path-motion",
+        path.open && "onboarding-path-open",
       )}
       authorNameClassName={
         !hasName ? "font-normal text-muted-foreground" : undefined
@@ -156,17 +151,6 @@ export function OnboardingArticlePreview({
       <SampleBody />
     </PublishedDocumentView>
   );
-
-  if (!desktop) {
-    return (
-      <div
-        className="pointer-events-none relative h-64 overflow-hidden bg-background [&_header]:hidden"
-        aria-hidden
-      >
-        <div className="absolute inset-x-0 top-0">{article}</div>
-      </div>
-    );
-  }
 
   return (
     <div
