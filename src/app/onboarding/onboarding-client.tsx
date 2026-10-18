@@ -749,9 +749,6 @@ function AvatarStep({
   const acceptPhoto = api.user.acceptSuggestedAvatar.useMutation();
   const complete = api.user.completeOnboarding.useMutation();
   const [suggestedSelected, setSuggestedSelected] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"finish" | "skip" | null>(
-    null,
-  );
   const busy =
     feedback.inFlight ||
     feedback.state === "saving" ||
@@ -781,7 +778,7 @@ function AvatarStep({
     onAvatarChange(displayUrl);
   }, [displayUrl, onAvatarChange]);
 
-  async function finish(skipAvatar: boolean) {
+  async function finish() {
     if (!nameSchema.safeParse({ author_name: authorName }).success) {
       onIncomplete("name");
       return;
@@ -792,16 +789,13 @@ function AvatarStep({
     }
 
     onError(null);
-    setPendingAction(skipAvatar ? "skip" : "finish");
     feedback.start();
     try {
-      if (!skipAvatar) {
-        const committed = await avatar.commit();
-        if (committed.changed) {
-          await updateAvatar.mutateAsync({ path: committed.path });
-        } else if (suggestedSelected && suggestedAvatarUrl) {
-          await acceptPhoto.mutateAsync();
-        }
+      const committed = await avatar.commit();
+      if (committed.changed) {
+        await updateAvatar.mutateAsync({ path: committed.path });
+      } else if (suggestedSelected && suggestedAvatarUrl) {
+        await acceptPhoto.mutateAsync();
       }
       await complete.mutateAsync({
         author_name: authorName,
@@ -857,45 +851,27 @@ function AvatarStep({
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {preview}
       </div>
-      <div className={formSpacing.stack}>
-        <div className={cn("flex", formSpacing.stackGap)}>
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            disabled={busy}
-            onClick={onBack}
-          >
-            Back
-          </Button>
-          <Button
-            type="button"
-            className="flex-1 disabled:opacity-100"
-            disabled={busy}
-            onClick={() => {
-              void finish(false);
-            }}
-          >
-            <SaveFeedbackLabel
-              state={pendingAction === "finish" ? feedback.state : "idle"}
-              idleLabel="Finish"
-              savingLabel="Finishing"
-              savedLabel="Done"
-            />
-          </Button>
-        </div>
+      <div className={cn("flex", formSpacing.stackGap)}>
         <Button
           type="button"
-          variant="ghost"
-          className="w-full disabled:opacity-100"
+          variant="outline"
+          className="flex-1"
+          disabled={busy}
+          onClick={onBack}
+        >
+          Back
+        </Button>
+        <Button
+          type="button"
+          className="flex-1 disabled:opacity-100"
           disabled={busy}
           onClick={() => {
-            void finish(true);
+            void finish();
           }}
         >
           <SaveFeedbackLabel
-            state={pendingAction === "skip" ? feedback.state : "idle"}
-            idleLabel="Skip for now"
+            state={feedback.state}
+            idleLabel="Finish"
             savingLabel="Finishing"
             savedLabel="Done"
           />
