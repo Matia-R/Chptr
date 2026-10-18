@@ -9,6 +9,7 @@ import {
   decideAccess,
   isOnboardingComplete,
   needsOnboardingLookup,
+  chooseFirstDocument,
   generatedHandleToApply,
   onboardingStepHref,
   onboardingStepMatchesRequest,
@@ -253,6 +254,41 @@ describe("onboarding steps", () => {
   });
 });
 
+describe("first document handoff", () => {
+  test("reuses an existing document instead of creating another", () => {
+    assert.deepEqual(
+      chooseFirstDocument({
+        existingDocumentIds: ["existing"],
+        rememberedId: "remembered",
+        generatedId: "generated",
+      }),
+      { id: "existing", isNew: false },
+    );
+  });
+
+  test("reuses a remembered id when the person has no documents yet", () => {
+    assert.deepEqual(
+      chooseFirstDocument({
+        existingDocumentIds: [],
+        rememberedId: "remembered",
+        generatedId: "generated",
+      }),
+      { id: "remembered", isNew: true },
+    );
+  });
+
+  test("uses a new id only for the first attempt", () => {
+    assert.deepEqual(
+      chooseFirstDocument({
+        existingDocumentIds: ["", "  "],
+        rememberedId: "  ",
+        generatedId: "generated",
+      }),
+      { id: "generated", isNew: true },
+    );
+  });
+});
+
 describe("provider suggestions", () => {
   test("missing Google metadata stays empty", () => {
     assert.equal(suggestedAuthorNameFromAuthMetadata(undefined), null);
@@ -304,7 +340,7 @@ describe("access redirects", () => {
     );
     assert.deepEqual(
       decideAccess({
-        pathname: "/welcome",
+        pathname: "/account",
         authenticated: true,
         onboarded: false,
       }),
@@ -348,7 +384,7 @@ describe("access redirects", () => {
     const cases: Array<[string, boolean, boolean, string]> = [
       ["/documents/abc", false, false, "/login"],
       ["/onboarding", false, false, "/login"],
-      ["/welcome", true, false, "/onboarding"],
+      ["/account", true, false, "/onboarding"],
       ["/documents", true, false, "/onboarding"],
       ["/onboarding?step=handle", true, false, "/onboarding?step=handle"],
       ["/onboarding", true, true, "/documents"],

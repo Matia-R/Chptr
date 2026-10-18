@@ -97,7 +97,7 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 | Path                                               | Who                    | What                                     |
 | -------------------------------------------------- | ---------------------- | ---------------------------------------- |
 | `/`                                                | Public                 | Placeholder                              |
-| `/login`, `/signup`, `/confirm-signup`, `/welcome` | Public                 | Sign-in and first-run                    |
+| `/login`, `/signup`, `/confirm-signup`             | Public                 | Sign-in                                  |
 | `/documents`                                       | Signed in              | Library; create a note                   |
 | `/documents/[documentId]`                          | Signed in, with access | Editor                                   |
 | `/[username]/[slug]`                               | Public                 | Published article                        |

@@ -26,7 +26,7 @@ export type OnboardingProfile = {
   onboarding_completed_at?: string | null;
 };
 
-const PRIVATE_PREFIXES = ["/documents", "/welcome", "/account"] as const;
+const PRIVATE_PREFIXES = ["/documents", "/account"] as const;
 
 const AUTH_EXACT_PATHS = new Set([
   "/login",
@@ -157,6 +157,22 @@ export function generatedHandleToApply(input: {
   if (normalizeHandle(input.currentHandle) !== local) return null;
   if (normalizeHandle(next) === local) return null;
   return next;
+}
+
+/**
+ * Opens a document the person already has, or reuses one id so a retry does
+ * not create a second note. `isNew` means the editor should create it.
+ */
+export function chooseFirstDocument(input: {
+  existingDocumentIds: readonly string[];
+  rememberedId: string | null;
+  generatedId: string;
+}): { id: string; isNew: boolean } {
+  const existing = input.existingDocumentIds.find((id) => id.trim().length > 0);
+  if (existing) return { id: existing, isNew: false };
+  const remembered = input.rememberedId?.trim() ?? "";
+  if (remembered.length > 0) return { id: remembered, isNew: true };
+  return { id: input.generatedId, isNew: true };
 }
 
 export function onboardingStepHref(step: OnboardingStep): string {

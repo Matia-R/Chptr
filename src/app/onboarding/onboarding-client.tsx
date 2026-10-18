@@ -29,10 +29,7 @@ import {
 import { Input } from "~/app/_components/input";
 import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
 import { UserAvatar } from "~/app/_components/user-avatar";
-import {
-  SAVE_FEEDBACK_SETTLE_MS,
-  useSaveFeedback,
-} from "~/hooks/use-save-feedback";
+import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { signupProfileSchema } from "~/lib/account-schema";
 import {
   normalizeHandle,
@@ -41,9 +38,13 @@ import {
 } from "~/lib/author-handle";
 import { formControlClassName } from "~/lib/form-control-styles";
 import { formSpacing } from "~/lib/form-spacing";
-import { generatedHandleToApply, type OnboardingStep } from "~/lib/onboarding";
+import {
+  chooseFirstDocument,
+  generatedHandleToApply,
+  type OnboardingStep,
+} from "~/lib/onboarding";
 import { PUBLIC_SITE_HOST } from "~/lib/public-url";
-import { cn } from "~/lib/utils";
+import { cn, randomUUID } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 
@@ -684,6 +685,25 @@ function HandleStep({
   );
 }
 
+const FIRST_DOCUMENT_KEY = "chptr:first-document";
+
+function readRememberedFirstDocumentId(): string | null {
+  try {
+    const value = sessionStorage.getItem(FIRST_DOCUMENT_KEY)?.trim() ?? "";
+    return value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberFirstDocumentId(id: string) {
+  try {
+    sessionStorage.setItem(FIRST_DOCUMENT_KEY, id);
+  } catch {
+    // Storage can be blocked. The in-memory id still covers this attempt.
+  }
+}
+
 function AvatarStep({
   authorName,
   username,
@@ -708,16 +728,15 @@ function AvatarStep({
   onIncomplete: (step: "name" | "handle") => void;
 }) {
   const router = useRouter();
-  const feedback = useSaveFeedback();
+  const utils = api.useUtils();
   const avatar = useAvatarDraft(avatarUrl);
   const updateAvatar = api.user.updateAvatar.useMutation();
   const acceptPhoto = api.user.acceptSuggestedAvatar.useMutation();
   const complete = api.user.completeOnboarding.useMutation();
   const [suggestedSelected, setSuggestedSelected] = useState(false);
-  const busy =
-    feedback.inFlight ||
-    feedback.state === "saving" ||
-    feedback.state === "saved";
+  const [finishing, setFinishing] = useState(false);
+  const profileSaved = useRef(false);
+  const pendingDocumentId = useRef<string | null>(null);
   const displayUrl =
     suggestedSelected && !avatar.isDirty
       ? suggestedAvatarUrl
@@ -743,37 +762,63 @@ function AvatarStep({
     onAvatarChange(displayUrl);
   }, [displayUrl, onAvatarChange]);
 
-  async function finish() {
-    if (!nameSchema.safeParse({ author_name: authorName }).success) {
-      onIncomplete("name");
-      return;
+  async function openFirstDocument() {
+    const listed =
+      await utils.document.getDocumentIdsForAuthenticatedUser.fetch();
+    const choice = chooseFirstDocument({
+      existingDocumentIds: listed.documents.map((document) => document.id),
+      rememberedId:
+        pendingDocumentId.current ?? readRememberedFirstDocumentId(),
+      generatedId: randomUUID(),
+    });
+    if (choice.isNew) {
+      pendingDocumentId.current = choice.id;
+      rememberFirstDocumentId(choice.id);
+      markDocumentAsNew(choice.id);
     }
-    if (!handleSchema.safeParse({ username }).success) {
-      onIncomplete("handle");
-      return;
+    router.push(`/documents/${choice.id}`);
+    router.refresh();
+  }
+
+  async function finish() {
+    if (finishing) return;
+
+    if (!profileSaved.current) {
+      if (!nameSchema.safeParse({ author_name: authorName }).success) {
+        onIncomplete("name");
+        return;
+      }
+      if (!handleSchema.safeParse({ username }).success) {
+        onIncomplete("handle");
+        return;
+      }
     }
 
     onError(null);
-    feedback.start();
+    setFinishing(true);
     try {
-      const committed = await avatar.commit();
-      if (committed.changed) {
-        await updateAvatar.mutateAsync({ path: committed.path });
-      } else if (suggestedSelected && suggestedAvatarUrl) {
-        await acceptPhoto.mutateAsync();
+      if (!profileSaved.current) {
+        const committed = await avatar.commit();
+        if (committed.changed) {
+          await updateAvatar.mutateAsync({ path: committed.path });
+        } else if (suggestedSelected && suggestedAvatarUrl) {
+          await acceptPhoto.mutateAsync();
+        }
+        await complete.mutateAsync({
+          author_name: authorName,
+          username,
+        });
+        profileSaved.current = true;
+        await utils.user.invalidate();
       }
-      await complete.mutateAsync({
-        author_name: authorName,
-        username,
-      });
-      await feedback.settle("saved");
-      feedback.runAfterResult(() => {
-        router.push("/welcome");
-        router.refresh();
-      }, SAVE_FEEDBACK_SETTLE_MS);
+      await openFirstDocument();
     } catch (caught) {
-      onError(linkSaveError(caught));
-      await feedback.settle("failed");
+      onError(
+        profileSaved.current
+          ? "Your profile is saved, but the document didn't open. Try again."
+          : linkSaveError(caught),
+      );
+      setFinishing(false);
     }
   }
 
@@ -792,7 +837,7 @@ function AvatarStep({
             draft={photo}
             name={authorName}
             defaultAvatarColor={defaultAvatarColor}
-            disabled={busy}
+            disabled={finishing}
           />
         </div>
         {showSuggestion ? (
@@ -806,7 +851,7 @@ function AvatarStep({
             <Button
               type="button"
               variant="outline"
-              disabled={busy}
+              disabled={finishing}
               onClick={useSuggestedPhoto}
             >
               Use this photo
@@ -820,7 +865,7 @@ function AvatarStep({
           type="button"
           variant="outline"
           className="flex-1"
-          disabled={busy}
+          disabled={finishing}
           onClick={onBack}
         >
           Back
@@ -828,16 +873,16 @@ function AvatarStep({
         <Button
           type="button"
           className="flex-1 disabled:opacity-100"
-          disabled={busy}
+          disabled={finishing}
           onClick={() => {
             void finish();
           }}
         >
           <SaveFeedbackLabel
-            state={feedback.state}
-            idleLabel="Finish"
-            savingLabel="Finishing"
-            savedLabel="Done"
+            state={finishing ? "saving" : "idle"}
+            idleLabel="Finish setup"
+            savingLabel="Finishing up"
+            savedLabel="Finish setup"
           />
         </Button>
       </div>
