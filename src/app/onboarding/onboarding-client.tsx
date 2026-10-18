@@ -156,8 +156,11 @@ export function OnboardingClient({
   const router = useRouter();
   const [step, setStep] = useState(initialStep);
   const [authError, setAuthError] = useState<string | null>(null);
+  const trimmedAuthorName = authorName.trim();
   const [draftName, setDraftName] = useState(
-    authorName.trim() || suggestedAuthorName || "",
+    trimmedAuthorName.length > 0
+      ? trimmedAuthorName
+      : (suggestedAuthorName ?? ""),
   );
   const [draftHandle, setDraftHandle] = useState(username);
   const [handleEdited, setHandleEdited] = useState(username.trim().length > 0);
@@ -560,7 +563,7 @@ function HandleStep({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          continueForward();
+          void continueForward();
         }}
         className={formSpacing.section}
       >

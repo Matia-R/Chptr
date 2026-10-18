@@ -24,7 +24,6 @@ import {
   DialogPortal,
   DialogTitle,
 } from "~/app/_components/dialog";
-import { DrawerTitle } from "~/app/_components/drawer";
 import { MobileMenuDrawer } from "~/app/_components/mobile-drawer";
 import { useCollaborativeDocStore } from "~/app/_components/editor/collaborative-doc-store";
 import { useDocumentPreviewStore } from "~/app/_components/editor/document-preview-store";
