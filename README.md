@@ -82,7 +82,7 @@ Supabase   documents, document_permissions, document_state
            document_publications (+ redirects) for the public page
 ```
 
-Signing in is Supabase Auth (email and password). Middleware refreshes the session and sends anonymous visitors away from `/documents`.
+Signing in is Supabase Auth (email and password). Middleware refreshes the session, sends anonymous visitors to `/login`, and sends authenticated users who have not completed onboarding to `/onboarding` before they can open `/documents`.
 
 Creating a note navigates straight to a new id. The row is created when the PartyKit room connects, after the connect route checks that the caller may create it. Later connections are authorized again. Saves run as that user, so row-level security still applies. The room debounces those writes; the stored blob is the full Y.Doc, not a change log.
 
@@ -94,15 +94,16 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 
 ### Routes
 
-| Path                                               | Who                    | What                                     |
-| -------------------------------------------------- | ---------------------- | ---------------------------------------- |
-| `/`                                                | Public                 | Placeholder                              |
-| `/login`, `/signup`, `/confirm-signup`             | Public                 | Sign-in                                  |
-| `/documents`                                       | Signed in              | Library; create a note                   |
-| `/documents/[documentId]`                          | Signed in, with access | Editor                                   |
-| `/[username]/[slug]`                               | Public                 | Published article                        |
-| `/api/trpc/[trpc]`                                 | —                      | tRPC                                     |
-| `/api/partykit/connect`, `/api/partykit/save`      | PartyKit server        | Load, create, and persist document state |
+| Path                                               | Who                               | What                                     |
+| -------------------------------------------------- | --------------------------------- | ---------------------------------------- |
+| `/`                                                | Public                            | Placeholder                              |
+| `/login`, `/signup`, `/confirm-signup`             | Public                            | Sign-in                                  |
+| `/onboarding`                                      | Signed in, not yet onboarded      | Author setup                             |
+| `/documents`                                       | Signed in, onboarded              | Library; create a note                   |
+| `/documents/[documentId]`                          | Signed in, onboarded, with access | Editor                                   |
+| `/[username]/[slug]`                               | Public                            | Published article                        |
+| `/api/trpc/[trpc]`                                 | —                                 | tRPC                                     |
+| `/api/partykit/connect`, `/api/partykit/save`      | PartyKit server                   | Load, create, and persist document state |
 
 ## Run it locally 💻
 
