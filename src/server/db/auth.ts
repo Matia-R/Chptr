@@ -190,7 +190,7 @@ export async function saveOnboardingProgress(
 
 /**
  * Atomically stores the confirmed identity and the completion timestamp.
- * The database function rejects a client-supplied timestamp on any other write.
+ * A profile that is already complete is left unchanged.
  */
 export async function completeOnboarding(
   auth: AuthContext,
@@ -203,6 +203,12 @@ export async function completeOnboarding(
 
   if (error) {
     const message = error.message ?? "";
+    if (/already complete/i.test(message)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Onboarding is already complete.",
+      });
+    }
     if (error.code === "42501" || /not authenticated/i.test(message)) {
       throw new TRPCError({
         code: "UNAUTHORIZED",

@@ -40,6 +40,10 @@ const connectRoute = readFileSync(
   new URL("../app/api/partykit/connect/route.ts", import.meta.url),
   "utf8",
 );
+const authDb = readFileSync(
+  new URL("../server/db/auth.ts", import.meta.url),
+  "utf8",
+);
 const saveRoute = readFileSync(
   new URL("../app/api/partykit/save/route.ts", import.meta.url),
   "utf8",
@@ -519,6 +523,24 @@ describe("onboarding migration and procedure gate", () => {
       "CREATE TRIGGER profiles_guard_onboarding",
     );
     assert.equal(backfillAt > 0 && backfillAt < triggerAt, true);
+
+    const completeFn = migrationSql.slice(
+      migrationSql.indexOf(
+        "CREATE OR REPLACE FUNCTION public.complete_author_onboarding",
+      ),
+    );
+    assert.match(completeFn, /AND onboarding_completed_at IS NULL/);
+    const alreadyAt = completeFn.indexOf("Onboarding is already complete");
+    const missingAt = completeFn.indexOf("Profile not found");
+    assert.equal(alreadyAt > 0 && alreadyAt < missingAt, true);
+
+    const completeHandler = authDb.slice(
+      authDb.indexOf("export async function completeOnboarding"),
+      authDb.indexOf("export async function acceptSuggestedAvatar"),
+    );
+    const forbiddenAt = completeHandler.indexOf('code: "FORBIDDEN"');
+    const unauthenticatedAt = completeHandler.indexOf('error.code === "42501"');
+    assert.equal(forbiddenAt > 0 && forbiddenAt < unauthenticatedAt, true);
   });
 
   test("private procedures require onboarding and identity procedures stay open", () => {

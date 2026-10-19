@@ -97,12 +97,16 @@ BEGIN
   SET
     author_name = NULLIF(btrim(p_author_name), ''),
     username = NULLIF(btrim(p_username), ''),
-    onboarding_completed_at = COALESCE(onboarding_completed_at, now()),
+    onboarding_completed_at = now(),
     updated_at = now()
   WHERE id = uid
+    AND onboarding_completed_at IS NULL
   RETURNING onboarding_completed_at INTO completed;
 
-  IF completed IS NULL THEN
+  IF NOT FOUND THEN
+    IF EXISTS (SELECT 1 FROM public.profiles WHERE id = uid) THEN
+      RAISE EXCEPTION 'Onboarding is already complete' USING ERRCODE = '42501';
+    END IF;
     RAISE EXCEPTION 'Profile not found' USING ERRCODE = 'P0002';
   END IF;
 
