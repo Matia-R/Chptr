@@ -1,0 +1,45 @@
+@media (max-width: 1279px) {
+  .onboarding-preview-article header > div,
+  .onboarding-preview-article .document-type > section,
+  .onboarding-preview-article .document-type > main {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.onboarding-preview-article header {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.onboarding-preview-article header p {
+  transform: translateY(-0.25rem);
+}
+
+.onboarding-preview-article.onboarding-path-motion header {
+  transition:
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-preview-article.onboarding-path-motion header p {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-preview-article.onboarding-path-open header {
+  /* py-4 plus the text-sm line. */
+  height: 3.25rem;
+  opacity: 1;
+}
+
+.onboarding-preview-article.onboarding-path-open header p {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-preview-article.onboarding-path-motion header,
+  .onboarding-preview-article.onboarding-path-motion header p {
+    transition: none;
+  }
+}

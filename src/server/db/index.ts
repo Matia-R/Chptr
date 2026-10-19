@@ -5,8 +5,12 @@ export {
   getHandleAvailability,
   isUsernameAvailable,
   suggestAvailableHandle,
+  acceptSuggestedAvatar,
+  completeOnboarding,
+  saveOnboardingProgress,
   updateUserAvatar,
   updateUserProfile,
+  type OnboardingProgressInput,
   type UpdateUserProfileInput,
   type UserProfile,
 } from "./auth";

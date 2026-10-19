@@ -9,6 +9,8 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { isOnboardingComplete } from "~/lib/onboarding";
+import { getCurrentUserProfile } from "~/server/db";
 import { createClient } from "~/utils/supabase/server";
 
 /**
@@ -134,13 +136,46 @@ export const protectedProcedure = t.procedure
   .use(authMiddleware);
 
 /**
+ * Authenticated procedure that also requires a completed author profile.
+ * Identity and onboarding mutations stay on `protectedProcedure`.
+ */
+const onboardingMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Not authenticated",
+    });
+  }
+
+  let profile: Awaited<ReturnType<typeof getCurrentUserProfile>> | undefined;
+  try {
+    profile = await getCurrentUserProfile({
+      supabase: ctx.supabase,
+      userId: ctx.user.id,
+    });
+  } catch {
+    profile = undefined;
+  }
+
+  if (!isOnboardingComplete(profile)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Finish onboarding before using Chptr.",
+    });
+  }
+
+  return next({
+    ctx: { ...ctx, user: ctx.user, profile },
+  });
+});
+
+export const onboardedProcedure = protectedProcedure.use(onboardingMiddleware);
+
+/**
  * In-memory per-user rate limit. Key: userId, value: { count, resetAt }.
  * Not shared across server instances; suitable for single-instance or best-effort limiting.
  */
-const rateLimitStore = new Map<
-  string,
-  { count: number; resetAt: number }
->();
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 /**
  * Returns middleware that rate-limits by ctx.user.id. Use only after authMiddleware (e.g. with protectedProcedure).

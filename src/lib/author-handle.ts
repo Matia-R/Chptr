@@ -18,6 +18,7 @@ export const RESERVED_HANDLES = [
   "login",
   "signup",
   "welcome",
+  "onboarding",
   "confirm-signup",
   "error",
   "auth",
@@ -136,6 +137,11 @@ export function enumerateHandleCandidates(
     candidates.push(candidate);
   }
   return candidates;
+}
+
+/** First valid handle for an author name. Does not check whether it is free. */
+export function suggestedHandleFromAuthorName(authorName: string): string {
+  return enumerateHandleCandidates(authorName, 1)[0] ?? "";
 }
 
 /** First `limit` candidates that pass format rules and `isTaken`. */

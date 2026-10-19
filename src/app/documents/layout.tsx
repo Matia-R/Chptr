@@ -7,6 +7,7 @@ import { SidebarInset } from "../_components/sidebar";
 import { SidebarProvider } from "../_components/sidebar";
 import { AppSidebar } from "../_components/app-sidebar";
 import { Toaster } from "../_components/ui/toaster";
+import { requireOnboardedUser } from "~/server/auth/onboarding-gate";
 import { getTrpcCaller } from "~/utils/trpc-utils";
 import { CommandMenu } from "../_components/command-menu";
 import { AccountSettings } from "../_components/account-settings";
@@ -45,6 +46,7 @@ async function getDocumentListSeed() {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  await requireOnboardedUser();
   const { documents, trashedDocuments } = await getDocumentListSeed();
 
   return (

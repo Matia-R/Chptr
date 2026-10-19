@@ -2,11 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
 import type { AuthContext } from "~/server/db";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, onboardedProcedure } from "~/server/api/trpc";
 import {
   createDocument,
   getDocumentById,
@@ -42,10 +38,10 @@ export interface Document {
 }
 
 export const documentRouter = createTRPCRouter({
-  createDocument: protectedProcedure.mutation(async ({ ctx }) => {
+  createDocument: onboardedProcedure.mutation(async ({ ctx }) => {
     return createDocument(authFromCtx(ctx));
   }),
-  updateDocumentName: protectedProcedure
+  updateDocumentName: onboardedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -55,7 +51,7 @@ export const documentRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       return updateDocumentName(input.id, input.name, authFromCtx(ctx));
     }),
-  getDocumentById: publicProcedure
+  getDocumentById: onboardedProcedure
     .input(z.string())
     .query(async ({ input, ctx }) => {
       const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
@@ -64,7 +60,7 @@ export const documentRouter = createTRPCRouter({
         supabase != null ? { supabase } : undefined,
       );
     }),
-  getDocumentLastUpdated: publicProcedure
+  getDocumentLastUpdated: onboardedProcedure
     .input(z.string())
     .query(async ({ input, ctx }) => {
       const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
@@ -73,7 +69,7 @@ export const documentRouter = createTRPCRouter({
         supabase != null ? { supabase } : undefined,
       );
     }),
-  getLastUpdatedTimestamp: publicProcedure
+  getLastUpdatedTimestamp: onboardedProcedure
     .input(z.string())
     .query(async ({ input, ctx }) => {
       const supabase = ctx.supabase as AuthContext["supabase"] | undefined;
@@ -82,21 +78,26 @@ export const documentRouter = createTRPCRouter({
         supabase != null ? { supabase } : undefined,
       );
     }),
-  getDocumentIdsForAuthenticatedUser: publicProcedure.query(async ({ ctx }) => {
-    return getDocumentsIdsForUser(
-      ctx.user && ctx.supabase
-        ? authFromCtx(
-            ctx as { user: { id: string }; supabase: AuthContext["supabase"] },
-          )
-        : undefined,
-    );
-  }),
+  getDocumentIdsForAuthenticatedUser: onboardedProcedure.query(
+    async ({ ctx }) => {
+      return getDocumentsIdsForUser(
+        ctx.user && ctx.supabase
+          ? authFromCtx(
+              ctx as {
+                user: { id: string };
+                supabase: AuthContext["supabase"];
+              },
+            )
+          : undefined,
+      );
+    },
+  ),
 
   /**
    * Snapshot of Y.Doc state for a document the caller can access.
    * Used to paint the editor before PartyKit sync (sidebar hover prefetch).
    */
-  getDocumentState: protectedProcedure
+  getDocumentState: onboardedProcedure
     .input(z.string().uuid())
     .query(async ({ input, ctx }) => {
       const result = await connectDocument({
@@ -114,20 +115,20 @@ export const documentRouter = createTRPCRouter({
       return { state: result.state };
     }),
 
-  getPublicationByDocumentId: protectedProcedure
+  getPublicationByDocumentId: onboardedProcedure
     .input(z.string().uuid())
     .query(async ({ input, ctx }) => {
       return getPublicationByDocumentId(input, authFromCtx(ctx));
     }),
 
   /** Owner's public URL prefix: the document owner's handle (`username`). */
-  getPublicationOwnerPathSegment: protectedProcedure
+  getPublicationOwnerPathSegment: onboardedProcedure
     .input(z.string().uuid())
     .query(async ({ input, ctx }) => {
       return getPublicationOwnerPathSegmentForDocument(input, authFromCtx(ctx));
     }),
 
-  publishDocument: protectedProcedure
+  publishDocument: onboardedProcedure
     .input(
       z.object({
         documentId: z.string().uuid(),
@@ -150,19 +151,19 @@ export const documentRouter = createTRPCRouter({
       );
     }),
 
-  unpublishDocument: protectedProcedure
+  unpublishDocument: onboardedProcedure
     .input(z.string().uuid())
     .mutation(async ({ input, ctx }) => {
       return unpublishDocument(input, authFromCtx(ctx));
     }),
 
-  trashDocument: protectedProcedure
+  trashDocument: onboardedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       return trashDocumentRecord(input.id, authFromCtx(ctx));
     }),
 
-  restoreDocument: protectedProcedure
+  restoreDocument: onboardedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       return restoreDocumentRecord(input.id, authFromCtx(ctx));

@@ -4,16 +4,20 @@ import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
+  onboardedProcedure,
   rateLimitMiddleware,
 } from "~/server/api/trpc";
 import {
+  acceptSuggestedAvatar,
+  completeOnboarding,
   getCurrentUserProfile,
   getHandleAvailability,
+  saveOnboardingProgress,
   suggestAvailableHandle,
   updateUserAvatar,
   updateUserProfile,
 } from "~/server/db";
-import { profileSchema } from "~/lib/account-schema";
+import { signupProfileSchema } from "~/lib/account-schema";
 import { avatarPathSchema } from "~/lib/avatar-schema";
 
 /** Username checks are cheap but spam-prone. */
@@ -49,8 +53,17 @@ function assertPublicHandleRateLimit(headers: Headers) {
   }
 }
 
-/** Empty strings from the settings forms are stored as NULL. */
-const nullIfEmpty = (value: string) => (value.length > 0 ? value : null);
+const onboardingProgressSchema = z
+  .object({
+    author_name: signupProfileSchema.shape.author_name.optional(),
+    username: signupProfileSchema.shape.username.optional(),
+  })
+  .refine(
+    (value) => value.author_name !== undefined || value.username !== undefined,
+    {
+      message: "Save an author name or a handle.",
+    },
+  );
 
 export const userRouter = createTRPCRouter({
   getCurrentUser: publicProcedure.query(async ({ ctx }) => {
@@ -126,17 +139,39 @@ export const userRouter = createTRPCRouter({
       );
       return { handle };
     }),
-  updateProfile: protectedProcedure
-    .input(profileSchema)
+  updateProfile: onboardedProcedure
+    .input(signupProfileSchema)
     .mutation(async ({ ctx, input }) => {
       return await updateUserProfile(
         { supabase: ctx.supabase, userId: ctx.user.id },
         {
-          author_name: nullIfEmpty(input.author_name),
-          username: nullIfEmpty(input.username),
+          author_name: input.author_name,
+          username: input.username,
         },
       );
     }),
+  saveOnboardingProgress: protectedProcedure
+    .input(onboardingProgressSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await saveOnboardingProgress(
+        { supabase: ctx.supabase, userId: ctx.user.id },
+        input,
+      );
+    }),
+  completeOnboarding: protectedProcedure
+    .input(signupProfileSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await completeOnboarding(
+        { supabase: ctx.supabase, userId: ctx.user.id },
+        input,
+      );
+    }),
+  acceptSuggestedAvatar: protectedProcedure.mutation(async ({ ctx }) => {
+    return await acceptSuggestedAvatar(
+      { supabase: ctx.supabase, userId: ctx.user.id },
+      ctx.user,
+    );
+  }),
   updateAvatar: protectedProcedure
     .input(avatarPathSchema)
     .mutation(async ({ ctx, input }) => {

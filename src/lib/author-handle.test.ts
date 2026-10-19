@@ -9,6 +9,7 @@ import {
   claimHandle,
   createHandleStore,
   enumerateHandleCandidates,
+  suggestedHandleFromAuthorName,
   suggestHandles,
   validateHandleFormat,
 } from "./author-handle.ts";
@@ -123,6 +124,9 @@ describe("suggested handles", () => {
       ["a-2"],
     );
     assert.equal(validateHandleFormat("Login").ok, false);
+    assert.equal(suggestedHandleFromAuthorName("Ada Lovelace"), "ada-lovelace");
+    assert.equal(suggestedHandleFromAuthorName("A"), "a-2");
+    assert.equal(suggestedHandleFromAuthorName("   "), "");
   });
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { UserRound } from "lucide-react";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/avatar";
@@ -62,6 +63,7 @@ function UserAvatarInner({
   );
 
   const initials = initialsProp ?? authorInitials(name);
+  const showUserIcon = initials.length === 0 || initials === "?";
 
   const fallbackAvatarBackgroundClass = getAvatarColorTailwindClass(
     default_avatar_background_color,
@@ -105,7 +107,11 @@ function UserAvatarInner({
           className={avatarFallbackClassName}
           style={avatarFallbackStyle}
         >
-          {initials}
+          {showUserIcon ? (
+            <UserRound className="h-1/2 w-1/2" aria-hidden />
+          ) : (
+            initials
+          )}
         </AvatarFallback>
       ) : null}
     </Avatar>

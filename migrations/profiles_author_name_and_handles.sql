@@ -86,6 +86,7 @@ VALUES
   ('login'),
   ('signup'),
   ('welcome'),
+  ('onboarding'),
   ('confirm-signup'),
   ('error'),
   ('auth')

@@ -1,33 +1,46 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- tRPC procedure chain types are correct but not inferred through middleware */
-import { createTRPCRouter, protectedProcedure, rateLimitMiddleware } from "../trpc";
+import {
+  createTRPCRouter,
+  onboardedProcedure,
+  rateLimitMiddleware,
+} from "../trpc";
 import { z } from "zod";
-import { streamText, smoothStream } from "ai"
-import { google } from "@ai-sdk/google"
+import { streamText, smoothStream } from "ai";
+import { google } from "@ai-sdk/google";
 import { AtAction, atActionsConfig } from "~/app/ai/prompt/at-actions";
 import { MAX_PROMPT_LENGTH } from "~/app/ai/prompt/constants";
 
-const DEFAULT_MODEL = 'gemini-flash-latest';
+const DEFAULT_MODEL = "gemini-flash-latest";
 
 const quickGenerateInputSchema = z.object({
-    action: z.nativeEnum(AtAction),
-    content: z.string()
+  action: z.nativeEnum(AtAction),
+  content: z.string(),
 });
 
 const generateForPromptInputSchema = z
-    .object({
-        prompt: z.string().max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" }),
-        documentContext: z.string().optional(),
-        previousResponse: z.string().optional(),
-        followUp: z.string().max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" }).optional(),
-    })
-    .refine(
-        (data) => {
-            const hasFollowUp = data.followUp != null && data.followUp !== "";
-            const hasPrevious = data.previousResponse != null && data.previousResponse !== "";
-            return hasFollowUp === hasPrevious;
-        },
-        { message: "previousResponse and followUp must both be provided for a follow-up" }
-    );
+  .object({
+    prompt: z
+      .string()
+      .max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" }),
+    documentContext: z.string().optional(),
+    previousResponse: z.string().optional(),
+    followUp: z
+      .string()
+      .max(MAX_PROMPT_LENGTH, { message: "Prompt is too long" })
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      const hasFollowUp = data.followUp != null && data.followUp !== "";
+      const hasPrevious =
+        data.previousResponse != null && data.previousResponse !== "";
+      return hasFollowUp === hasPrevious;
+    },
+    {
+      message:
+        "previousResponse and followUp must both be provided for a follow-up",
+    },
+  );
 
 type QuickGenerateInput = z.infer<typeof quickGenerateInputSchema>;
 type GenerateForPromptInput = z.infer<typeof generateForPromptInputSchema>;
@@ -36,71 +49,74 @@ type GenerateForPromptInput = z.infer<typeof generateForPromptInputSchema>;
 const aiRateLimit = rateLimitMiddleware(30, 60_000);
 
 export const aiPromptRouter = createTRPCRouter({
-    quickGenerateAction: protectedProcedure
-        .use(aiRateLimit)
-        .input(quickGenerateInputSchema)
-        .mutation(async function* ({ input }: { input: QuickGenerateInput }) {
-            const config = atActionsConfig[input.action];
-            const { textStream } = streamText({
-                model: google(DEFAULT_MODEL),
-                system: buildSystemPrompt(undefined),
-                prompt: `${config.prompt} ${input.content}`,
-                experimental_transform: smoothStream({
-                    delayInMs: 20,
-                    chunking: "word"
-                }),
-            });
-
-            for await (const text of textStream) {
-                yield text;
-            }
+  quickGenerateAction: onboardedProcedure
+    .use(aiRateLimit)
+    .input(quickGenerateInputSchema)
+    .mutation(async function* ({ input }: { input: QuickGenerateInput }) {
+      const config = atActionsConfig[input.action];
+      const { textStream } = streamText({
+        model: google(DEFAULT_MODEL),
+        system: buildSystemPrompt(undefined),
+        prompt: `${config.prompt} ${input.content}`,
+        experimental_transform: smoothStream({
+          delayInMs: 20,
+          chunking: "word",
         }),
+      });
 
-    generateForPrompt: protectedProcedure
-        .use(aiRateLimit)
-        .input(generateForPromptInputSchema)
-        .mutation(async function* ({ input }: { input: GenerateForPromptInput }) {
-            const isFollowUp =
-                input.followUp != null &&
-                input.followUp !== "" &&
-                input.previousResponse != null &&
-                input.previousResponse !== "";
+      for await (const text of textStream) {
+        yield text;
+      }
+    }),
 
-            const systemPromptWithContext = buildSystemPrompt(input.documentContext);
+  generateForPrompt: onboardedProcedure
+    .use(aiRateLimit)
+    .input(generateForPromptInputSchema)
+    .mutation(async function* ({ input }: { input: GenerateForPromptInput }) {
+      const isFollowUp =
+        input.followUp != null &&
+        input.followUp !== "" &&
+        input.previousResponse != null &&
+        input.previousResponse !== "";
 
-            const { textStream } = streamText({
-                model: google(DEFAULT_MODEL),
-                system: systemPromptWithContext,
-                ...(isFollowUp
-                    ? {
-                          messages: [
-                              { role: "user" as const, content: input.prompt },
-                              { role: "assistant" as const, content: input.previousResponse! },
-                              { role: "user" as const, content: input.followUp! },
-                          ],
-                      }
-                    : { prompt: input.prompt }),
-                experimental_transform: smoothStream({
-                    delayInMs: 20,
-                    chunking: "word",
-                }),
-            });
+      const systemPromptWithContext = buildSystemPrompt(input.documentContext);
 
-            for await (const text of textStream) {
-                yield text;
+      const { textStream } = streamText({
+        model: google(DEFAULT_MODEL),
+        system: systemPromptWithContext,
+        ...(isFollowUp
+          ? {
+              messages: [
+                { role: "user" as const, content: input.prompt },
+                {
+                  role: "assistant" as const,
+                  content: input.previousResponse!,
+                },
+                { role: "user" as const, content: input.followUp! },
+              ],
             }
+          : { prompt: input.prompt }),
+        experimental_transform: smoothStream({
+          delayInMs: 20,
+          chunking: "word",
         }),
+      });
+
+      for await (const text of textStream) {
+        yield text;
+      }
+    }),
 });
 
 function buildSystemPrompt(documentContext: string | undefined): string {
-    const base = `You are a professional writing assistant. Your task is to provide ONLY the requested content. 
+  const base = `You are a professional writing assistant. Your task is to provide ONLY the requested content. 
     If providing a code block, indicate the language (e.g., \`\`\`python).`;
 
-    if (documentContext == null || documentContext.trim() === "") {
-        return `${base}\n\nStrict Rule: Start your response immediately with the content. No "Sure," "Okay," or introductions.`;
-    }
+  if (documentContext == null || documentContext.trim() === "") {
+    return `${base}\n\nStrict Rule: Start your response immediately with the content. No "Sure," "Okay," or introductions.`;
+  }
 
-    return `${base}
+  return `${base}
 
 ## Document Context
 The user is editing a document. Use this for style and context:
@@ -116,5 +132,4 @@ ${documentContext.trim()}
 
 **Example of BAD response:** "Sure! Here is the list: 1. Item A..."
 **Example of GOOD response:** "1. Item A..."`;
-
 }
