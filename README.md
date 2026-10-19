@@ -8,17 +8,17 @@ This is a work in progress! An Early Access beta is set to go live Novemeber 202
 
 The goal for Chptr is to make a platform that focuses on the ergonomics of writing and sharing long-form content.
 
-Exisiting platforms like Medium and Substack are excellent solutions for distribution but are somewhat lacking in the inspiration department. With Chptr, we want to create an experience around the editor that facilitates the creative process from ideation, research, editing to sharing the finished work.
+Exisiting platforms like [Medium](https://medium.com/) and [Substack](https://substack.com/) are excellent solutions for distribution but are somewhat lacking in the inspiration department. With Chptr, the aim is to create an editor that facilitates the entire creative process - from ideation, research, editing and sharing the finished work.
 
-The process of writing an article is fragmented. The mission is to create something that unifies all the aspects of the workflow in one place so you don't need to context switch. What if your whiteboard, countless tabs of sources, thesarus and LLM where all in the document with you? What if your human editor, or collaborator could work with you in the same document **in realtime**?
+What if your whiteboard, countless tabs of sources, thesarus and LLM where all in the document with you? What if your human editor, or collaborator could work with you in the same document **in realtime**?
 
 The hope is that we can build something that simplifies all the most archaic aspects of writing while keeping the messy parts that make it great.
 
 ## Is Chptr open source?
 
-I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. This is also a passion project, so keeping it closed will help guide the direction in these very early stages.
+I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply). 
 
-On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply). That said, the code is fully available here to browse, or fork if you'd like! If you're really interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
+That said, the code is fully available here to browse, or fork if you'd like! If you're interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
 
 Thank you for your understanding 🫶
 
