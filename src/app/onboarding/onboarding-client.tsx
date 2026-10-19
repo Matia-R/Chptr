@@ -48,6 +48,7 @@ import { cn, randomUUID } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 
+import { ONBOARDING_LOAD_INTRO } from "./onboarding-motion";
 import { OnboardingArticlePreview } from "./onboarding-preview";
 
 const nameSchema = z.object({
@@ -247,6 +248,7 @@ export function OnboardingClient({
       avatarUrl={draftAvatar}
       defaultAvatarColor={defaultAvatarColor}
       showPath={step !== "name"}
+      intro={initialStep === "name"}
     />
   );
 
@@ -272,7 +274,11 @@ export function OnboardingClient({
 
         <div className="flex flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
           <div className="relative m-auto grid w-full max-w-sm items-start overflow-x-clip">
-            <StepPane step="name" active={step}>
+            <StepPane
+              step="name"
+              active={step}
+              intro={initialStep === "name"}
+            >
               <div className={formSpacing.section}>
                 <StepIntro step="name" />
                 <NameStep
@@ -369,25 +375,42 @@ function StepIntro({ step }: { step: OnboardingStep }) {
 function StepPane({
   step,
   active,
+  intro = false,
   children,
 }: {
   step: OnboardingStep;
   active: OnboardingStep;
+  /** Fade up once, on the first paint of this pane. Later visits use the slide. */
+  intro?: boolean;
   children: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const delta = STEP_INDEX[step] - STEP_INDEX[active];
   const inactive = delta !== 0;
+  const introPending = useRef(intro);
+  if (inactive) introPending.current = false;
+  const runIntro = introPending.current && !inactive;
 
   return (
     <motion.div
-      initial={false}
+      initial={
+        runIntro && !reduceMotion
+          ? { opacity: 0, y: ONBOARDING_LOAD_INTRO.y }
+          : false
+      }
       animate={{
         opacity: inactive ? 0 : 1,
         x: reduceMotion || !inactive ? 0 : delta * STEP_SLIDE_PX,
+        y: 0,
       }}
       transition={
-        reduceMotion ? { duration: 0 } : inactive ? STEP_LEAVE : STEP_ENTER
+        reduceMotion
+          ? { duration: 0 }
+          : runIntro
+            ? ONBOARDING_LOAD_INTRO.transition
+            : inactive
+              ? STEP_LEAVE
+              : STEP_ENTER
       }
       className={cn(
         "col-start-1 row-start-1 w-full",

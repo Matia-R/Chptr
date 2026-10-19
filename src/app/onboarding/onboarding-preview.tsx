@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { memo, useLayoutEffect, useRef, useState } from "react";
 
 import "~/app/_components/article/article.css";
@@ -9,6 +9,8 @@ import "./onboarding-preview.css";
 import { PublishedDocumentView } from "~/app/_components/published-document-view";
 import { authorInitials } from "~/lib/published-author";
 import { cn } from "~/lib/utils";
+
+import { ONBOARDING_LOAD_INTRO } from "./onboarding-motion";
 
 export const SAMPLE_ARTICLE_TITLE = "The Art of Paying Attention";
 const SAMPLE_PUBLISHED_AT = "2026-03-12T15:00:00.000Z";
@@ -110,6 +112,7 @@ export function OnboardingArticlePreview({
   avatarUrl,
   defaultAvatarColor,
   showPath = false,
+  intro = false,
 }: {
   authorName: string;
   handle: string;
@@ -117,12 +120,16 @@ export function OnboardingArticlePreview({
   defaultAvatarColor: string;
   /** Keeps the path collapsed until the link step. */
   showPath?: boolean;
+  /** Fade up once, together with the first step. Later steps leave it still. */
+  intro?: boolean;
 }) {
   const trimmedName = authorName.trim();
   const hasName = trimmedName.length > 0;
   const displayName = hasName ? trimmedName : NAME_PLACEHOLDER;
   const handleValue = previewHandle(handle);
   const path = usePreviewPath(showPath);
+  const reduceMotion = useReducedMotion();
+  const playIntro = intro && !reduceMotion;
 
   const article = (
     <PublishedDocumentView
@@ -153,9 +160,14 @@ export function OnboardingArticlePreview({
   );
 
   return (
-    <div
+    <motion.div
       className="pointer-events-none relative h-full overflow-hidden bg-background"
       aria-hidden
+      initial={playIntro ? { opacity: 0, y: ONBOARDING_LOAD_INTRO.y } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={
+        playIntro ? ONBOARDING_LOAD_INTRO.transition : { duration: 0 }
+      }
     >
       <div className="absolute inset-x-6 top-1/2 -translate-y-[42%] xl:inset-x-8">
         <div className="relative isolate">
@@ -166,6 +178,6 @@ export function OnboardingArticlePreview({
           <div className="absolute inset-x-0 top-[calc(100%-1px)] h-dvh border-x border-border bg-background" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
