@@ -253,21 +253,67 @@ function clipSuggestedName(value: string): string | null {
   return clipped.length > 0 ? clipped : null;
 }
 
-/** Provider photo URLs are suggestions. Only https URLs are offered. */
-export function suggestedAvatarUrlFromAuthMetadata(
-  metadata: unknown,
-): string | null {
-  const raw =
-    metadataString(metadata, "avatar_url") ??
-    metadataString(metadata, "picture");
+/**
+ * Google profile photos are served from these hosts. Other https URLs are
+ * rejected so a person cannot point the profile at an arbitrary address.
+ */
+const PROVIDER_AVATAR_HOST =
+  /^lh\d+\.googleusercontent\.com$/;
+
+function allowlistedHttpsAvatarUrl(raw: string | null): string | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:") return null;
+    if (url.username !== "" || url.password !== "") return null;
+    if (url.port !== "") return null;
+    const host = url.hostname.replace(/\.$/, "");
+    if (!PROVIDER_AVATAR_HOST.test(host)) return null;
     return url.toString();
   } catch {
     return null;
   }
+}
+
+function avatarUrlFromProviderIdentities(source: unknown): string | null {
+  if (!source || typeof source !== "object" || !("identities" in source)) {
+    return null;
+  }
+  const identities = (source as { identities?: unknown }).identities;
+  if (!Array.isArray(identities)) return null;
+
+  for (const identity of identities) {
+    if (!identity || typeof identity !== "object") continue;
+    const data = (identity as { identity_data?: unknown }).identity_data;
+    const safe = allowlistedHttpsAvatarUrl(
+      metadataString(data, "avatar_url") ?? metadataString(data, "picture"),
+    );
+    if (safe) return safe;
+  }
+  return null;
+}
+
+/**
+ * Provider photo URLs are suggestions. The picture is taken from provider
+ * identity data when the auth user is passed, and always has to be https on
+ * a known provider host before it can be stored.
+ */
+export function suggestedAvatarUrlFromAuthMetadata(
+  metadata: unknown,
+): string | null {
+  const fromIdentity = avatarUrlFromProviderIdentities(metadata);
+  if (fromIdentity) return fromIdentity;
+
+  const userMetadata =
+    metadata &&
+    typeof metadata === "object" &&
+    "user_metadata" in metadata
+      ? (metadata as { user_metadata?: unknown }).user_metadata
+      : metadata;
+  return allowlistedHttpsAvatarUrl(
+    metadataString(userMetadata, "avatar_url") ??
+      metadataString(userMetadata, "picture"),
+  );
 }
 
 export function decideAccess(input: {

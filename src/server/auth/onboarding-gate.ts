@@ -67,8 +67,6 @@ export async function requireOnboardingUser(requestedStep: string | null) {
     suggestedAuthorName: suggestedAuthorNameFromAuthMetadata(
       session.user.user_metadata,
     ),
-    suggestedAvatarUrl: suggestedAvatarUrlFromAuthMetadata(
-      session.user.user_metadata,
-    ),
+    suggestedAvatarUrl: suggestedAvatarUrlFromAuthMetadata(session.user),
   };
 }

@@ -325,6 +325,45 @@ describe("provider suggestions", () => {
       }),
       "https://lh3.googleusercontent.com/a/photo",
     );
+    assert.equal(
+      suggestedAvatarUrlFromAuthMetadata({
+        avatar_url: "https://example.com/a.png",
+      }),
+      null,
+    );
+    assert.equal(
+      suggestedAvatarUrlFromAuthMetadata({
+        avatar_url: "https://lh3.googleusercontent.com.evil.com/a.png",
+      }),
+      null,
+    );
+    assert.equal(
+      suggestedAvatarUrlFromAuthMetadata({
+        identities: [
+          {
+            identity_data: {
+              picture: "https://lh3.googleusercontent.com/a/provider",
+            },
+          },
+        ],
+        user_metadata: {
+          avatar_url: "https://example.com/planted.png",
+        },
+      }),
+      "https://lh3.googleusercontent.com/a/provider",
+    );
+    assert.equal(
+      suggestedAvatarUrlFromAuthMetadata({
+        identities: [
+          {
+            identity_data: {
+              picture: "https://evil.example/photo.png",
+            },
+          },
+        ],
+      }),
+      null,
+    );
   });
 });
 

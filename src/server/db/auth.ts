@@ -252,8 +252,10 @@ export async function completeOnboarding(
 }
 
 /**
- * Copies the signed-in user's provider photo onto the profile. The URL comes
- * from auth metadata, not from the client.
+ * Copies the signed-in user's provider photo onto the profile. The URL is
+ * taken from provider identity data, or from metadata only when it is an
+ * https URL on a known provider host. Anything else is rejected before the
+ * profile is updated.
  */
 export async function acceptSuggestedAvatar(
   auth: AuthContext,

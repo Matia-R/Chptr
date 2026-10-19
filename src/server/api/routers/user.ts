@@ -169,7 +169,7 @@ export const userRouter = createTRPCRouter({
   acceptSuggestedAvatar: protectedProcedure.mutation(async ({ ctx }) => {
     return await acceptSuggestedAvatar(
       { supabase: ctx.supabase, userId: ctx.user.id },
-      ctx.user.user_metadata,
+      ctx.user,
     );
   }),
   updateAvatar: protectedProcedure
