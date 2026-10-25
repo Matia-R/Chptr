@@ -28,12 +28,7 @@ export type OnboardingProfile = {
 
 const PRIVATE_PREFIXES = ["/documents", "/account"] as const;
 
-const AUTH_EXACT_PATHS = new Set([
-  "/login",
-  "/signup",
-  "/confirm-signup",
-  "/error",
-]);
+const AUTH_EXACT_PATHS = new Set(["/login", "/signup", "/error"]);
 
 export type AppPathArea = "api" | "public" | "auth" | "onboarding" | "private";
 
@@ -257,8 +252,7 @@ function clipSuggestedName(value: string): string | null {
  * Google profile photos are served from these hosts. Other https URLs are
  * rejected so a person cannot point the profile at an arbitrary address.
  */
-const PROVIDER_AVATAR_HOST =
-  /^lh\d+\.googleusercontent\.com$/;
+const PROVIDER_AVATAR_HOST = /^lh\d+\.googleusercontent\.com$/;
 
 function allowlistedHttpsAvatarUrl(raw: string | null): string | null {
   if (!raw) return null;
@@ -305,9 +299,7 @@ export function suggestedAvatarUrlFromAuthMetadata(
   if (fromIdentity) return fromIdentity;
 
   const userMetadata =
-    metadata &&
-    typeof metadata === "object" &&
-    "user_metadata" in metadata
+    metadata && typeof metadata === "object" && "user_metadata" in metadata
       ? (metadata as { user_metadata?: unknown }).user_metadata
       : metadata;
   return allowlistedHttpsAvatarUrl(

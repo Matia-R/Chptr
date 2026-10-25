@@ -48,7 +48,12 @@ import { cn, randomUUID } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { createClient } from "~/utils/supabase/client";
 
-import { ONBOARDING_LOAD_INTRO } from "./onboarding-motion";
+import {
+  ONBOARDING_LOAD_INTRO,
+  STEP_ENTER,
+  STEP_LEAVE,
+  STEP_SLIDE_PX,
+} from "./onboarding-motion";
 import { OnboardingArticlePreview } from "./onboarding-preview";
 
 const nameSchema = z.object({
@@ -81,20 +86,6 @@ const STEP_INDEX: Record<OnboardingStep, number> = {
   name: 0,
   handle: 1,
   avatar: 2,
-};
-
-const STEP_SLIDE_PX = 24;
-const STEP_EASE = [0.22, 1, 0.36, 1] as const;
-
-const STEP_LEAVE = {
-  duration: 0.18,
-  ease: STEP_EASE,
-};
-
-const STEP_ENTER = {
-  duration: 0.28,
-  delay: 0.16,
-  ease: STEP_EASE,
 };
 
 const STEP_COPY: Record<
@@ -274,11 +265,7 @@ export function OnboardingClient({
 
         <div className="flex flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
           <div className="relative m-auto grid w-full max-w-sm items-start overflow-x-clip">
-            <StepPane
-              step="name"
-              active={step}
-              intro={initialStep === "name"}
-            >
+            <StepPane step="name" active={step} intro={initialStep === "name"}>
               <div className={formSpacing.section}>
                 <StepIntro step="name" />
                 <NameStep

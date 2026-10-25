@@ -19,7 +19,6 @@ export const RESERVED_HANDLES = [
   "signup",
   "welcome",
   "onboarding",
-  "confirm-signup",
   "error",
   "auth",
 ] as const;

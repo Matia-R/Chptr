@@ -16,7 +16,7 @@ The hope is that we can build something that simplifies all the most archaic asp
 
 ## Is Chptr open source?
 
-I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply). 
+I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply).
 
 That said, the code is fully available here to browse, or fork if you'd like! If you're interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
 
@@ -45,7 +45,7 @@ In-editor AI calls Google Gemini through the [Vercel AI SDK](https://sdk.vercel.
 | Tailwind CSS, Radix     | UI                                            |
 | BlockNote               | Editor                                        |
 
-## Repository layout 📁  
+## Repository layout 📁
 
 ```
 src/app/                  Routes and UI
@@ -84,6 +84,8 @@ Supabase   documents, document_permissions, document_state
 
 Signing in is Supabase Auth (email and password). Middleware refreshes the session, sends anonymous visitors to `/login`, and sends authenticated users who have not completed onboarding to `/onboarding` before they can open `/documents`.
 
+Email signup stays on `/signup`. After the password form, Supabase emails a six-digit code and the same page asks for it, then continues to `/onboarding`. The **Confirm sign up** template in the Supabase dashboard (Authentication → Emails) has to include `{{ .Token }}` and must not use `{{ .ConfirmationURL }}`, or the message will still be a link. Custom SMTP is unchanged. Password reset and Google sign-in keep their own templates and `/auth/confirm`.
+
 Creating a note navigates straight to a new id. The row is created when the PartyKit room connects, after the connect route checks that the caller may create it. Later connections are authorized again. Saves run as that user, so row-level security still applies. The room debounces those writes; the stored blob is the full Y.Doc, not a change log.
 
 Publishing copies the current blocks into `document_publications`. The public page renders that snapshot (it does not open the live Y.Doc). Old username/slug pairs redirect to the current path.
@@ -94,16 +96,16 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 
 ### Routes
 
-| Path                                               | Who                               | What                                     |
-| -------------------------------------------------- | --------------------------------- | ---------------------------------------- |
-| `/`                                                | Public                            | Placeholder                              |
-| `/login`, `/signup`, `/confirm-signup`             | Public                            | Sign-in                                  |
-| `/onboarding`                                      | Signed in, not yet onboarded      | Author setup                             |
-| `/documents`                                       | Signed in, onboarded              | Library; create a note                   |
-| `/documents/[documentId]`                          | Signed in, onboarded, with access | Editor                                   |
-| `/[username]/[slug]`                               | Public                            | Published article                        |
-| `/api/trpc/[trpc]`                                 | —                                 | tRPC                                     |
-| `/api/partykit/connect`, `/api/partykit/save`      | PartyKit server                   | Load, create, and persist document state |
+| Path                                          | Who                               | What                                     |
+| --------------------------------------------- | --------------------------------- | ---------------------------------------- |
+| `/`                                           | Public                            | Placeholder                              |
+| `/login`, `/signup`                           | Public                            | Sign-in and email verification           |
+| `/onboarding`                                 | Signed in, not yet onboarded      | Author setup                             |
+| `/documents`                                  | Signed in, onboarded              | Library; create a note                   |
+| `/documents/[documentId]`                     | Signed in, onboarded, with access | Editor                                   |
+| `/[username]/[slug]`                          | Public                            | Published article                        |
+| `/api/trpc/[trpc]`                            | —                                 | tRPC                                     |
+| `/api/partykit/connect`, `/api/partykit/save` | PartyKit server                   | Load, create, and persist document state |
 
 ## Run it locally 💻
 
