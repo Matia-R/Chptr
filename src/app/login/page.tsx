@@ -65,95 +65,102 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className={cn("w-full max-w-sm", formSpacing.section)}
-          autoComplete="on"
-          method="POST"
-        >
-          <div className="w-full items-start text-left">
-            <h1 className="text-2xl font-bold">Login</h1>
-          </div>
-          <div className={formSpacing.stack}>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel
-                    htmlFor="email"
-                    className="block text-sm font-medium"
-                  >
-                    Email
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Email"
-                      {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setAuthError(null);
-                      }}
-                      type="email"
-                      name="email"
-                      autoComplete="username"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel
-                    htmlFor="password"
-                    className="block text-sm font-medium"
-                  >
-                    Password
-                  </FormLabel>
-                  <FormControl>
-                    <PasswordInput
-                      placeholder="Password"
-                      {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setAuthError(null);
-                      }}
-                      name="password"
-                      id="password"
-                      autoComplete="current-password"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {authError ? (
-              <div className="text-sm text-red-600">{authError}</div>
-            ) : null}
-          </div>
-          <div className={formSpacing.stack}>
-            <Button
-              type="submit"
-              className="w-full py-2 text-sm font-medium"
-              disabled={isLoading}
-            >
-              Login
-            </Button>
-            <div className="w-full items-start text-left text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-primary hover:underline">
-                Sign up
-              </Link>
+    <div className="flex h-dvh flex-col">
+      <header className="flex shrink-0 items-center px-6 pt-6 sm:px-10 lg:px-12">
+        <p className="font-lora text-2xl font-medium tracking-tight">Chptr</p>
+      </header>
+      <div className="flex min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={cn("m-auto w-full max-w-sm", formSpacing.section)}
+            autoComplete="on"
+            method="POST"
+          >
+            <div className="w-full items-start text-left">
+              <h1 className="font-lora text-3xl font-medium tracking-tight">
+                Log in
+              </h1>
             </div>
-          </div>
-        </form>
-      </Form>
+            <div className={formSpacing.stack}>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel
+                      htmlFor="email"
+                      className="block text-sm font-medium"
+                    >
+                      Email
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Email"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setAuthError(null);
+                        }}
+                        type="email"
+                        name="email"
+                        autoComplete="username"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel
+                      htmlFor="password"
+                      className="block text-sm font-medium"
+                    >
+                      Password
+                    </FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Password"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setAuthError(null);
+                        }}
+                        name="password"
+                        id="password"
+                        autoComplete="current-password"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {authError ? (
+                <div className="text-sm text-red-600">{authError}</div>
+              ) : null}
+            </div>
+            <div className={formSpacing.stack}>
+              <Button
+                type="submit"
+                className="w-full py-2 text-sm font-medium"
+                disabled={isLoading}
+              >
+                Log in
+              </Button>
+              <div className="w-full items-start text-left text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="text-primary hover:underline">
+                  Sign up
+                </Link>
+              </div>
+            </div>
+          </form>
+        </Form>
+      </div>
       {/* <div className="flex flex-col items-start">
                 <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
                     Don&apos;t have an account?{" "}

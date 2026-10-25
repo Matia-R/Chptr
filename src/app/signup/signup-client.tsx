@@ -210,185 +210,186 @@ export function SignUpClient({
     resendFeedback.state !== "idle" || resendCooldown > 0 || verifying;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="relative grid w-full max-w-sm items-start overflow-x-clip">
-        <SignupStage stage="credentials" active={stage}>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className={cn("w-full", formSpacing.section)}
-            >
-              <div
-                className={cn(
-                  "w-full items-start text-left",
-                  formSpacing.tight,
-                )}
+    <div className="flex h-dvh flex-col">
+      <header className="flex shrink-0 items-center px-6 pt-6 sm:px-10 lg:px-12">
+        <p className="font-lora text-2xl font-medium tracking-tight">Chptr</p>
+      </header>
+      <div className="flex min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
+        <div className="relative m-auto grid w-full max-w-sm items-start overflow-x-clip">
+          <SignupStage stage="credentials" active={stage}>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className={cn("w-full", formSpacing.section)}
               >
-                <h1 className="text-2xl font-bold">Signup</h1>
-                <p className="text-sm text-muted-foreground">
-                  You&apos;ll choose your author name and handle after
-                  confirming your email.
-                </p>
-              </div>
-              <div className={formSpacing.stack}>
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="block text-sm font-medium">
-                        Email
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="Email" type="email" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="block text-sm font-medium">
-                        Password
-                      </FormLabel>
-                      <FormControl>
-                        <PasswordInput placeholder="Password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="block text-sm font-medium">
-                        Confirm Password
-                      </FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          placeholder="Confirm Password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {authError ? (
-                  <div className="text-sm text-red-600">{authError}</div>
-                ) : null}
-              </div>
-              <div className={formSpacing.stack}>
-                <Button
-                  type="submit"
-                  className="w-full py-2 text-sm font-medium"
-                  disabled={isLoading}
-                >
-                  Submit
-                </Button>
-                <div className="w-full items-start text-left text-sm text-muted-foreground">
-                  Already have an account?{" "}
-                  <Link href="/login" className="text-primary hover:underline">
-                    Login
-                  </Link>
+                <div className="w-full items-start text-left">
+                  <h1 className="font-lora text-3xl font-medium tracking-tight">
+                    Sign up
+                  </h1>
                 </div>
-              </div>
-            </form>
-          </Form>
-        </SignupStage>
-
-        <SignupStage stage="verify" active={stage}>
-          <div className="w-full space-y-8 text-left">
-            <div className="space-y-4">
-              <h1 className="font-lora text-3xl font-medium tracking-tight">
-                Check your email
-              </h1>
-              <p className="break-words text-base leading-6 text-muted-foreground">
-                {[
-                  "We've sent a verification code to ",
-                  <span key="email" className="font-medium text-foreground">
-                    {pendingEmail}
-                  </span>,
-                  ". Enter it below to continue setting up your account.",
-                ]}
-              </p>
-            </div>
-            <div className="space-y-3">
-              <VerificationCodeInput
-                value={code}
-                onChange={setCode}
-                disabled={verifying}
-                invalid={Boolean(verifyError)}
-                errorId={verifyError ? "signup-code-error" : undefined}
-                autoFocus={stage === "verify"}
-              />
-              {verifying ? (
-                <p
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                  aria-live="polite"
-                >
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Checking code
-                </p>
-              ) : null}
-              {verifyError ? (
-                <p
-                  id="signup-code-error"
-                  role="alert"
-                  className="text-sm text-destructive"
-                >
-                  {verifyError}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <p className="text-sm leading-5 text-muted-foreground">
-                  Didn&apos;t receive the code?
-                </p>
-                <Button
-                  type="button"
-                  variant="ghostText"
-                  className="h-auto w-fit justify-start py-0 text-sm font-medium leading-5 text-foreground underline-offset-4 hover:underline focus-visible:ring-offset-2 disabled:opacity-100"
-                  disabled={resendDisabled}
-                  onClick={() => {
-                    void resend();
-                  }}
-                >
-                  <SaveFeedbackLabel
-                    state={resendFeedback.state}
-                    idleLabel={
-                      resendCooldown > 0
-                        ? `Resend code in ${resendCooldown}s`
-                        : "Resend code"
-                    }
-                    savingLabel="Sending"
-                    savedLabel="Sent"
+                <div className={formSpacing.stack}>
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="block text-sm font-medium">
+                          Email
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="Email" type="email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </Button>
-                {resendError ? (
-                  <p role="alert" className="text-sm text-destructive">
-                    {resendError}
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="block text-sm font-medium">
+                          Password
+                        </FormLabel>
+                        <FormControl>
+                          <PasswordInput placeholder="Password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="block text-sm font-medium">
+                          Confirm Password
+                        </FormLabel>
+                        <FormControl>
+                          <PasswordInput
+                            placeholder="Confirm Password"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {authError ? (
+                    <div className="text-sm text-red-600">{authError}</div>
+                  ) : null}
+                </div>
+                <div className={formSpacing.stack}>
+                  <Button
+                    type="submit"
+                    className="w-full py-2 text-sm font-medium"
+                    disabled={isLoading}
+                  >
+                    Create account
+                  </Button>
+                  <div className="w-full items-start text-left text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <Link
+                      href="/login"
+                      className="text-primary hover:underline"
+                    >
+                      Log in
+                    </Link>
+                  </div>
+                </div>
+              </form>
+            </Form>
+          </SignupStage>
+
+          <SignupStage stage="verify" active={stage}>
+            <div className="w-full space-y-8 text-left">
+              <div className="space-y-4">
+                <h1 className="font-lora text-3xl font-medium tracking-tight">
+                  Check your email
+                </h1>
+                <p className="break-words text-base leading-6 text-muted-foreground">
+                  {[
+                    "We've sent a verification code to ",
+                    <span key="email" className="font-medium text-foreground">
+                      {pendingEmail}
+                    </span>,
+                    ". Enter it below to continue setting up your account.",
+                  ]}
+                </p>
+              </div>
+              <div className="space-y-3">
+                <VerificationCodeInput
+                  value={code}
+                  onChange={setCode}
+                  disabled={verifying}
+                  invalid={Boolean(verifyError)}
+                  errorId={verifyError ? "signup-code-error" : undefined}
+                  autoFocus={stage === "verify"}
+                />
+                {verifying ? (
+                  <p
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Checking code
+                  </p>
+                ) : null}
+                {verifyError ? (
+                  <p
+                    id="signup-code-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
+                    {verifyError}
                   </p>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                variant="ghostText"
-                className="h-auto w-fit justify-start py-0 text-sm font-medium leading-5 text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-offset-2"
-                disabled={verifying}
-                onClick={goBack}
-              >
-                Back
-              </Button>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <p className="text-sm leading-5 text-muted-foreground">
+                    Didn&apos;t receive the code?
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghostText"
+                    className="h-auto w-fit justify-start py-0 text-sm font-medium leading-5 text-foreground underline-offset-4 hover:underline focus-visible:ring-offset-2 disabled:opacity-100"
+                    disabled={resendDisabled}
+                    onClick={() => {
+                      void resend();
+                    }}
+                  >
+                    <SaveFeedbackLabel
+                      state={resendFeedback.state}
+                      idleLabel={
+                        resendCooldown > 0
+                          ? `Resend code in ${resendCooldown}s`
+                          : "Resend code"
+                      }
+                      savingLabel="Sending"
+                      savedLabel="Sent"
+                    />
+                  </Button>
+                  {resendError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {resendError}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghostText"
+                  className="h-auto w-fit justify-start py-0 text-sm font-medium leading-5 text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-offset-2"
+                  disabled={verifying}
+                  onClick={goBack}
+                >
+                  Back
+                </Button>
+              </div>
             </div>
-          </div>
-        </SignupStage>
+          </SignupStage>
+        </div>
       </div>
     </div>
   );
