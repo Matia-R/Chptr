@@ -75,6 +75,10 @@ export function verificationCodeError(message: string, code?: string): string {
   return "Couldn't verify that code. Try again.";
 }
 
+export type ResendCodeResult =
+  | { ok: true }
+  | { ok: false; error: string; retryAfterSeconds: number | null };
+
 /** Seconds from a Supabase rate-limit message, when it includes them. */
 export function resendCooldownSeconds(message: string): number | null {
   const match = /(\d+)\s*seconds?/i.exec(message);

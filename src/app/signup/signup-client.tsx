@@ -26,7 +26,10 @@ import {
   STEP_LEAVE,
   STEP_SLIDE_PX,
 } from "~/app/onboarding/onboarding-motion";
-import { useSaveFeedback } from "~/hooks/use-save-feedback";
+import {
+  SAVE_FEEDBACK_SETTLE_MS,
+  useSaveFeedback,
+} from "~/hooks/use-save-feedback";
 import { formSpacing } from "~/lib/form-spacing";
 import type { PendingSignupStage } from "~/lib/pending-signup";
 import { cn } from "~/lib/utils";
@@ -74,14 +77,14 @@ export function SignUpClient({
   const [stage, setStage] = useState<PendingSignupStage>(initialStage);
   const [pendingEmail, setPendingEmail] = useState(initialEmail);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const signupFeedback = useSaveFeedback();
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
   const submittedCode = useRef<string | null>(null);
   const requestId = useRef(0);
+  const resendRequest = useRef(0);
   const resendFeedback = useSaveFeedback();
   const form = useForm<SignupValues>({
     resolver: zodResolver(formSchema),
@@ -93,12 +96,10 @@ export function SignUpClient({
   });
 
   useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timeout = window.setTimeout(() => {
-      setResendCooldown((seconds) => Math.max(0, seconds - 1));
-    }, 1000);
-    return () => window.clearTimeout(timeout);
-  }, [resendCooldown]);
+    return () => {
+      resendRequest.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (stage !== "verify") return;
@@ -133,12 +134,13 @@ export function SignUpClient({
   }, [code, pendingEmail, router, stage]);
 
   async function onSubmit(values: SignupValues) {
+    if (signupFeedback.state !== "idle") return;
     setAuthError(null);
     const formData = new FormData();
     formData.append("email", values.email);
     formData.append("password", values.password);
 
-    setIsLoading(true);
+    signupFeedback.start();
     try {
       const result = await signup(formData);
       if ("error" in result) {
@@ -147,45 +149,43 @@ export function SignUpClient({
             ? "Couldn't send the verification email. Try again."
             : result.error,
         );
+        await signupFeedback.settle("failed");
         return;
       }
-      if ("verify" in result) {
-        submittedCode.current = null;
-        requestId.current += 1;
-        setPendingEmail(result.email);
-        setCode("");
-        setVerifyError(null);
-        setResendError(null);
-        setStage("verify");
-        return;
-      }
-      router.push(result.redirectTo);
-      router.refresh();
+      await signupFeedback.settle("saved");
+      window.setTimeout(() => {
+        if ("verify" in result) {
+          submittedCode.current = null;
+          requestId.current += 1;
+          setPendingEmail(result.email);
+          setCode("");
+          setVerifyError(null);
+          setResendError(null);
+          setStage("verify");
+          return;
+        }
+        router.push(result.redirectTo);
+        router.refresh();
+      }, SAVE_FEEDBACK_SETTLE_MS);
     } catch {
       setAuthError("Couldn't send the verification email. Try again.");
-    } finally {
-      setIsLoading(false);
+      await signupFeedback.settle("failed");
     }
   }
 
   async function resend() {
-    if (
-      !pendingEmail ||
-      resendFeedback.state !== "idle" ||
-      resendCooldown > 0
-    ) {
-      return;
-    }
+    if (!pendingEmail || resendFeedback.state !== "idle") return;
+
+    const request = ++resendRequest.current;
     setResendError(null);
     resendFeedback.start();
     try {
-      const result = await resendSignupCode(pendingEmail);
+      const result = await resendUntilAccepted(pendingEmail, () => {
+        return request === resendRequest.current;
+      });
+      if (request !== resendRequest.current) return;
       if (!result.ok) {
-        if (result.retryAfterSeconds) {
-          setResendCooldown(result.retryAfterSeconds);
-        } else {
-          setResendError(result.error);
-        }
+        setResendError(result.error);
         await resendFeedback.settle("failed");
         return;
       }
@@ -195,6 +195,7 @@ export function SignUpClient({
       setVerifyError(null);
       await resendFeedback.settle("saved");
     } catch {
+      if (request !== resendRequest.current) return;
       setResendError("Couldn't send a new code. Try again.");
       await resendFeedback.settle("failed");
     }
@@ -206,8 +207,7 @@ export function SignUpClient({
     void returnToSignupForm(pendingEmail || form.getValues("email"));
   }
 
-  const resendDisabled =
-    resendFeedback.state !== "idle" || resendCooldown > 0 || verifying;
+  const resendDisabled = resendFeedback.state !== "idle" || verifying;
 
   return (
     <div className="flex h-dvh flex-col">
@@ -283,10 +283,15 @@ export function SignUpClient({
                 <div className={formSpacing.stack}>
                   <Button
                     type="submit"
-                    className="w-full py-2 text-sm font-medium"
-                    disabled={isLoading}
+                    className="w-full py-2 text-sm font-medium disabled:opacity-100"
+                    disabled={signupFeedback.state !== "idle"}
                   >
-                    Create account
+                    <SaveFeedbackLabel
+                      state={signupFeedback.state}
+                      idleLabel="Create account"
+                      savingLabel="Creating account"
+                      savedLabel="Account created"
+                    />
                   </Button>
                   <div className="w-full items-start text-left text-sm text-muted-foreground">
                     Already have an account?{" "}
@@ -310,11 +315,11 @@ export function SignUpClient({
                 </h1>
                 <p className="break-words text-base leading-6 text-muted-foreground">
                   {[
-                    "We've sent a verification code to ",
+                    "We've sent a six-digit verification code to ",
                     <span key="email" className="font-medium text-foreground">
                       {pendingEmail}
                     </span>,
-                    ". Enter it below to continue setting up your account.",
+                    ".",
                   ]}
                 </p>
               </div>
@@ -362,11 +367,7 @@ export function SignUpClient({
                   >
                     <SaveFeedbackLabel
                       state={resendFeedback.state}
-                      idleLabel={
-                        resendCooldown > 0
-                          ? `Resend code in ${resendCooldown}s`
-                          : "Resend code"
-                      }
+                      idleLabel="Resend code"
                       savingLabel="Sending"
                       savedLabel="Sent"
                     />
@@ -395,6 +396,58 @@ export function SignUpClient({
   );
 }
 
+/** Supabase often refuses a resend for a few seconds. Wait that out and try again without leaving the spinner. */
+const RESEND_ATTEMPTS = 3;
+
+type ResendCodeResult =
+  | { ok: true }
+  | { ok: false; error: string; retryAfterSeconds: number | null };
+
+async function resendUntilAccepted(
+  email: string,
+  isCurrent: () => boolean,
+): Promise<ResendCodeResult> {
+  let result = await requestResendCode(email);
+  for (let attempt = 1; attempt < RESEND_ATTEMPTS; attempt++) {
+    if (result.ok || !result.retryAfterSeconds || !isCurrent()) return result;
+    const waitMs = result.retryAfterSeconds * 1000;
+    await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+    if (!isCurrent()) return result;
+    result = await requestResendCode(email);
+  }
+  return result;
+}
+
+async function requestResendCode(email: string): Promise<ResendCodeResult> {
+  const raw: unknown = await resendSignupCode(email);
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    !("ok" in raw) ||
+    (raw.ok !== true && raw.ok !== false)
+  ) {
+    return {
+      ok: false,
+      error: "Couldn't send a new code. Try again.",
+      retryAfterSeconds: null,
+    };
+  }
+  if (raw.ok === true) return { ok: true };
+  return {
+    ok: false,
+    error:
+      "error" in raw && typeof raw.error === "string"
+        ? raw.error
+        : "Couldn't send a new code. Try again.",
+    retryAfterSeconds:
+      "retryAfterSeconds" in raw &&
+      (raw.retryAfterSeconds === null ||
+        typeof raw.retryAfterSeconds === "number")
+        ? raw.retryAfterSeconds
+        : null,
+  };
+}
+
 function SignupStage({
   stage,
   active,
@@ -407,6 +460,13 @@ function SignupStage({
   const reduceMotion = useReducedMotion();
   const delta = STAGE_INDEX[stage] - STAGE_INDEX[active];
   const inactive = delta !== 0;
+  const transition = (
+    reduceMotion ? { duration: 0 } : inactive ? STEP_LEAVE : STEP_ENTER
+  ) as {
+    duration: number;
+    delay?: number;
+    ease?: [number, number, number, number];
+  };
 
   return (
     <motion.div
@@ -416,9 +476,7 @@ function SignupStage({
         x: reduceMotion || !inactive ? 0 : delta * STEP_SLIDE_PX,
         y: 0,
       }}
-      transition={
-        reduceMotion ? { duration: 0 } : inactive ? STEP_LEAVE : STEP_ENTER
-      }
+      transition={transition}
       className={cn(
         "col-start-1 row-start-1 w-full",
         inactive ? "pointer-events-none z-20" : "z-10",

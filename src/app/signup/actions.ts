@@ -10,6 +10,7 @@ import {
   resendCodeError,
   resendCooldownSeconds,
   verificationCodeError,
+  type ResendCodeResult,
 } from "~/lib/pending-signup";
 import { createClient } from "~/utils/supabase/server";
 
@@ -97,9 +98,7 @@ export async function verifySignupCode(
 
 export async function resendSignupCode(
   email: string,
-): Promise<
-  { ok: true } | { ok: false; error: string; retryAfterSeconds: number | null }
-> {
+): Promise<ResendCodeResult> {
   const parsedEmail = emailSchema.safeParse(email);
   if (!parsedEmail.success) {
     return {

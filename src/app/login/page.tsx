@@ -16,6 +16,11 @@ import {
 } from "../_components/form";
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
+import { SaveFeedbackLabel } from "../_components/save-feedback-label";
+import {
+  SAVE_FEEDBACK_SETTLE_MS,
+  useSaveFeedback,
+} from "~/hooks/use-save-feedback";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 import { useRouter } from "next/navigation";
@@ -34,7 +39,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const feedback = useSaveFeedback();
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,17 +56,20 @@ export default function LoginPage() {
     formData.append("email", values.email);
     formData.append("password", values.password);
 
-    setIsLoading(true);
-
+    feedback.start();
     const result = await login(formData);
-
-    setIsLoading(false);
 
     if (result?.error) {
       setAuthError(result.error);
-    } else {
-      router.push(result.redirectTo!);
+      await feedback.settle("failed");
+      return;
     }
+
+    await feedback.settle("saved");
+    window.setTimeout(() => {
+      router.push(result.redirectTo!);
+      router.refresh();
+    }, SAVE_FEEDBACK_SETTLE_MS);
   }
 
   return (
@@ -146,10 +154,15 @@ export default function LoginPage() {
             <div className={formSpacing.stack}>
               <Button
                 type="submit"
-                className="w-full py-2 text-sm font-medium"
-                disabled={isLoading}
+                className="w-full py-2 text-sm font-medium disabled:opacity-100"
+                disabled={feedback.state !== "idle"}
               >
-                Log in
+                <SaveFeedbackLabel
+                  state={feedback.state}
+                  idleLabel="Log in"
+                  savingLabel="Logging in"
+                  savedLabel="Logged in"
+                />
               </Button>
               <div className="w-full items-start text-left text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}

@@ -377,6 +377,19 @@ function StepPane({
   const introPending = useRef(intro);
   if (inactive) introPending.current = false;
   const runIntro = introPending.current && !inactive;
+  const transition = (
+    reduceMotion
+      ? { duration: 0 }
+      : runIntro
+        ? ONBOARDING_LOAD_INTRO.transition
+        : inactive
+          ? STEP_LEAVE
+          : STEP_ENTER
+  ) as {
+    duration: number;
+    delay?: number;
+    ease?: [number, number, number, number];
+  };
 
   return (
     <motion.div
@@ -390,15 +403,7 @@ function StepPane({
         x: reduceMotion || !inactive ? 0 : delta * STEP_SLIDE_PX,
         y: 0,
       }}
-      transition={
-        reduceMotion
-          ? { duration: 0 }
-          : runIntro
-            ? ONBOARDING_LOAD_INTRO.transition
-            : inactive
-              ? STEP_LEAVE
-              : STEP_ENTER
-      }
+      transition={transition}
       className={cn(
         "col-start-1 row-start-1 w-full",
         inactive ? "pointer-events-none z-20" : "z-10",
