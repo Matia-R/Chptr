@@ -57,19 +57,24 @@ export default function LoginPage() {
     formData.append("password", values.password);
 
     feedback.start();
-    const result = await login(formData);
+    try {
+      const result = await login(formData);
 
-    if (result?.error) {
-      setAuthError(result.error);
+      if (result?.error) {
+        setAuthError(result.error);
+        await feedback.settle("failed");
+        return;
+      }
+
+      await feedback.settle("saved");
+      window.setTimeout(() => {
+        router.push(result.redirectTo!);
+        router.refresh();
+      }, SAVE_FEEDBACK_SETTLE_MS);
+    } catch {
+      setAuthError("Couldn't log in. Try again.");
       await feedback.settle("failed");
-      return;
     }
-
-    await feedback.settle("saved");
-    window.setTimeout(() => {
-      router.push(result.redirectTo!);
-      router.refresh();
-    }, SAVE_FEEDBACK_SETTLE_MS);
   }
 
   return (
