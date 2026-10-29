@@ -5,7 +5,13 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -460,6 +466,12 @@ function SignupStage({
   const reduceMotion = useReducedMotion();
   const delta = STAGE_INDEX[stage] - STAGE_INDEX[active];
   const inactive = delta !== 0;
+  const setInert = useCallback(
+    (node: HTMLDivElement | null) => {
+      node?.toggleAttribute("inert", inactive);
+    },
+    [inactive],
+  );
   const transition = (
     reduceMotion ? { duration: 0 } : inactive ? STEP_LEAVE : STEP_ENTER
   ) as {
@@ -481,8 +493,8 @@ function SignupStage({
         "col-start-1 row-start-1 w-full",
         inactive ? "pointer-events-none z-20" : "z-10",
       )}
+      ref={setInert}
       aria-hidden={inactive}
-      inert={inactive}
     >
       {children}
     </motion.div>

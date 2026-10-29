@@ -4,7 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, useReducedMotion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -377,6 +383,12 @@ function StepPane({
   const introPending = useRef(intro);
   if (inactive) introPending.current = false;
   const runIntro = introPending.current && !inactive;
+  const setInert = useCallback(
+    (node: HTMLDivElement | null) => {
+      node?.toggleAttribute("inert", inactive);
+    },
+    [inactive],
+  );
   const transition = (
     reduceMotion
       ? { duration: 0 }
@@ -408,8 +420,8 @@ function StepPane({
         "col-start-1 row-start-1 w-full",
         inactive ? "pointer-events-none z-20" : "z-10",
       )}
+      ref={setInert}
       aria-hidden={inactive}
-      inert={inactive}
     >
       {children}
     </motion.div>
