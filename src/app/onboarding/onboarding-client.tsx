@@ -5,8 +5,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
-  useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -383,12 +383,10 @@ function StepPane({
   const introPending = useRef(intro);
   if (inactive) introPending.current = false;
   const runIntro = introPending.current && !inactive;
-  const setInert = useCallback(
-    (node: HTMLDivElement | null) => {
-      node?.toggleAttribute("inert", inactive);
-    },
-    [inactive],
-  );
+  const nodeRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    nodeRef.current?.toggleAttribute("inert", inactive);
+  }, [inactive]);
   const transition = (
     reduceMotion
       ? { duration: 0 }
@@ -420,7 +418,7 @@ function StepPane({
         "col-start-1 row-start-1 w-full",
         inactive ? "pointer-events-none z-20" : "z-10",
       )}
-      ref={setInert}
+      ref={nodeRef}
       aria-hidden={inactive}
     >
       {children}
