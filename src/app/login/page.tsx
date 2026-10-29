@@ -16,6 +16,11 @@ import {
 } from "../_components/form";
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
+import { SaveFeedbackLabel } from "../_components/save-feedback-label";
+import {
+  SAVE_FEEDBACK_SETTLE_MS,
+  useSaveFeedback,
+} from "~/hooks/use-save-feedback";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 import { useRouter } from "next/navigation";
@@ -34,7 +39,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const feedback = useSaveFeedback();
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,109 +56,129 @@ export default function LoginPage() {
     formData.append("email", values.email);
     formData.append("password", values.password);
 
-    setIsLoading(true);
+    feedback.start();
+    try {
+      const result = await login(formData);
 
-    const result = await login(formData);
+      if (result?.error) {
+        setAuthError(result.error);
+        await feedback.settle("failed");
+        return;
+      }
 
-    setIsLoading(false);
-
-    if (result?.error) {
-      setAuthError(result.error);
-    } else {
-      router.push(result.redirectTo!);
+      await feedback.settle("saved");
+      window.setTimeout(() => {
+        router.push(result.redirectTo!);
+        router.refresh();
+      }, SAVE_FEEDBACK_SETTLE_MS);
+    } catch {
+      setAuthError("Couldn't log in. Try again.");
+      await feedback.settle("failed");
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className={cn("w-full max-w-sm", formSpacing.section)}
-          autoComplete="on"
-          method="POST"
-        >
-          <div className="w-full items-start text-left">
-            <h1 className="text-2xl font-bold">Login</h1>
-          </div>
-          <div className={formSpacing.stack}>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel
-                    htmlFor="email"
-                    className="block text-sm font-medium"
-                  >
-                    Email
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Email"
-                      {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setAuthError(null);
-                      }}
-                      type="email"
-                      name="email"
-                      autoComplete="username"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel
-                    htmlFor="password"
-                    className="block text-sm font-medium"
-                  >
-                    Password
-                  </FormLabel>
-                  <FormControl>
-                    <PasswordInput
-                      placeholder="Password"
-                      {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        setAuthError(null);
-                      }}
-                      name="password"
-                      id="password"
-                      autoComplete="current-password"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {authError ? (
-              <div className="text-sm text-red-600">{authError}</div>
-            ) : null}
-          </div>
-          <div className={formSpacing.stack}>
-            <Button
-              type="submit"
-              className="w-full py-2 text-sm font-medium"
-              disabled={isLoading}
-            >
-              Login
-            </Button>
-            <div className="w-full items-start text-left text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-primary hover:underline">
-                Sign up
-              </Link>
+    <div className="flex h-dvh flex-col">
+      <header className="flex shrink-0 items-center px-6 pt-6 sm:px-10 lg:px-12">
+        <p className="font-lora text-2xl font-medium tracking-tight">Chptr</p>
+      </header>
+      <div className="flex min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 lg:px-12">
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={cn("m-auto w-full max-w-sm", formSpacing.section)}
+            autoComplete="on"
+            method="POST"
+          >
+            <div className="w-full items-start text-left">
+              <h1 className="font-lora text-3xl font-medium tracking-tight">
+                Log in
+              </h1>
             </div>
-          </div>
-        </form>
-      </Form>
+            <div className={formSpacing.stack}>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel
+                      htmlFor="email"
+                      className="block text-sm font-medium"
+                    >
+                      Email
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Email"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setAuthError(null);
+                        }}
+                        type="email"
+                        name="email"
+                        autoComplete="username"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel
+                      htmlFor="password"
+                      className="block text-sm font-medium"
+                    >
+                      Password
+                    </FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Password"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setAuthError(null);
+                        }}
+                        name="password"
+                        id="password"
+                        autoComplete="current-password"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {authError ? (
+                <div className="text-sm text-red-600">{authError}</div>
+              ) : null}
+            </div>
+            <div className={formSpacing.stack}>
+              <Button
+                type="submit"
+                className="w-full py-2 text-sm font-medium disabled:opacity-100"
+                disabled={feedback.state !== "idle"}
+              >
+                <SaveFeedbackLabel
+                  state={feedback.state}
+                  idleLabel="Log in"
+                  savingLabel="Logging in"
+                  savedLabel="Logged in"
+                />
+              </Button>
+              <div className="w-full items-start text-left text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="text-primary hover:underline">
+                  Sign up
+                </Link>
+              </div>
+            </div>
+          </form>
+        </Form>
+      </div>
       {/* <div className="flex flex-col items-start">
                 <div className="items-start w-full mt-6 text-left text-sm text-muted-foreground">
                     Don&apos;t have an account?{" "}

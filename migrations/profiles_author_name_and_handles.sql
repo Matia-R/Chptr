@@ -87,7 +87,6 @@ VALUES
   ('signup'),
   ('welcome'),
   ('onboarding'),
-  ('confirm-signup'),
   ('error'),
   ('auth')
 ON CONFLICT (handle) DO NOTHING;
