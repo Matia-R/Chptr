@@ -1,7 +1,17 @@
-import type * as Party from "partykit/server";
-import { onConnect, type YPartyKitOptions } from "y-partykit";
+import {
+  routePartykitRequest,
+  type Connection,
+  type ConnectionContext,
+} from "partyserver";
+import { YServer } from "y-partyserver";
 import * as Y from "yjs";
 import { canWrite } from "../src/lib/document-permission";
+
+interface Env {
+  APP_URL?: string;
+  PARTYKIT_SECRET?: string;
+  Main: DurableObjectNamespace<DocumentParty>;
+}
 
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64.trim());
@@ -26,7 +36,7 @@ function jwtLooksExpired(token: string): boolean {
     const parts = token.split(".");
     if (parts.length !== 3) return true;
     const payload = JSON.parse(
-      atob(parts[1]!.replace(/-/g, "+").replace(/_/g, "/"))
+      atob(parts[1]!.replace(/-/g, "+").replace(/_/g, "/")),
     ) as { exp?: number };
     if (!payload.exp) return true;
     return Date.now() >= payload.exp * 1000;
@@ -36,7 +46,13 @@ function jwtLooksExpired(token: string): boolean {
 }
 
 type ConnectResult =
-  | { ok: true; userId: string; permission: string; created: boolean; state: string | null }
+  | {
+      ok: true;
+      userId: string;
+      permission: string;
+      created: boolean;
+      state: string | null;
+    }
   | { ok: false; errorCode: number; errorMessage: string };
 
 type AuthorizedClient = {
@@ -64,19 +80,47 @@ function closeCodeFromHttpStatus(status: number): {
   return { errorCode: 4005, errorMessage: "Failed to authorize" };
 }
 
-export default class DocumentParty implements Party.Server {
-  loadedDoc: Y.Doc | null = null;
-  isLoaded = false;
-  authorizedByConnection = new Map<string, AuthorizedClient>();
+function readAuth(connection: Connection): AuthorizedClient | null {
+  const state = connection.state;
+  if (!state || typeof state !== "object") return null;
+  const record = state as Record<string, unknown>;
+  const token = typeof record.token === "string" ? record.token : null;
+  const userId = typeof record.userId === "string" ? record.userId : null;
+  const permission =
+    typeof record.permission === "string" ? record.permission : null;
+  if (!token || !userId || !permission) return null;
+  return { token, userId, permission };
+}
 
-  constructor(readonly room: Party.Room) {}
+export class DocumentParty extends YServer<Env> {
+  static override options = { hibernate: false };
+  static override callbackOptions = {
+    debounceWait: 1000,
+    debounceMaxWait: 5000,
+  };
+
+  private loaded = false;
+  private loadTail: Promise<void> = Promise.resolve();
+  /** Last writer credential. A debounced save can run after that socket is gone. */
+  private saveCredential: { token: string; permission: string } | null = null;
+  /** Trash and 404 invalidation must not persist the unsaved tail. */
+  private persistSuspended = false;
+  /** The trailing debounce after a flushed disconnect has no credential on purpose. */
+  private missingTokenExpected = false;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // YServer builds the doc with gc on. Keep tombstones, matching the
+    // documents already stored in Postgres.
+    this.document.gc = false;
+  }
 
   get appUrl(): string {
-    return (this.room.env.APP_URL as string) || "http://localhost:3000";
+    return this.env.APP_URL || "http://localhost:3000";
   }
 
   get partykitSecret(): string {
-    return (this.room.env.PARTYKIT_SECRET as string) || "";
+    return this.env.PARTYKIT_SECRET || "";
   }
 
   async connectDocument(token: string, isNew: boolean): Promise<ConnectResult> {
@@ -89,17 +133,17 @@ export default class DocumentParty implements Party.Server {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          documentId: this.room.id,
+          documentId: this.name,
           isNew,
         }),
       });
 
       if (!response.ok) {
         const { errorCode, errorMessage } = closeCodeFromHttpStatus(
-          response.status
+          response.status,
         );
         console.log(
-          `[PartyKit] Connect failed for ${this.room.id}: ${response.status}`
+          `[PartyKit] Connect failed for ${this.name}: ${response.status}`,
         );
         return { ok: false, errorCode, errorMessage };
       }
@@ -119,8 +163,8 @@ export default class DocumentParty implements Party.Server {
       };
     } catch (error) {
       console.error(
-        `[PartyKit] Connect request failed for ${this.room.id}:`,
-        error
+        `[PartyKit] Connect request failed for ${this.name}:`,
+        error,
       );
       return {
         ok: false,
@@ -131,33 +175,34 @@ export default class DocumentParty implements Party.Server {
   }
 
   kickAll(reason = "Document not found"): void {
-    for (const conn of this.room.getConnections()) {
+    this.persistSuspended = true;
+    this.saveCredential = null;
+    this.missingTokenExpected = true;
+    for (const conn of this.getConnections()) {
       try {
         conn.close(4004, reason);
       } catch {
         // Connection may already be closing.
       }
     }
-    this.authorizedByConnection.clear();
-    this.loadedDoc = null;
-    this.isLoaded = false;
+    // Next authorized connect merges the saved snapshot into this document.
+    this.loaded = false;
   }
 
   /** Close only sockets that used this save token (lost write access). */
   invalidateTokenSessions(token: string): void {
-    for (const conn of this.room.getConnections()) {
-      const client = this.authorizedByConnection.get(conn.id);
+    for (const conn of this.getConnections()) {
+      const client = readAuth(conn);
       if (!client || client.token !== token) continue;
       try {
         conn.close(4003, "Access denied");
       } catch {
         // Connection may already be closing.
       }
-      this.authorizedByConnection.delete(conn.id);
     }
   }
 
-  async onRequest(req: Party.Request): Promise<Response> {
+  async onRequest(req: Request): Promise<Response> {
     const secret = req.headers.get("X-Partykit-Secret");
     if (!this.partykitSecret || secret !== this.partykitSecret) {
       return new Response("Unauthorized", { status: 401 });
@@ -187,26 +232,58 @@ export default class DocumentParty implements Party.Server {
     });
   }
 
-  pickSaveToken(): string | null {
-    let fallback: string | null = null;
-    for (const client of this.authorizedByConnection.values()) {
-      if (!canWrite(client.permission)) continue;
-      fallback = client.token;
-      if (!jwtLooksExpired(client.token)) {
-        return client.token;
-      }
+  private rememberSaveCredential(credential: {
+    token: string;
+    permission: string;
+  }): void {
+    if (!canWrite(credential.permission)) return;
+    this.saveCredential = credential;
+    this.missingTokenExpected = false;
+  }
+
+  /** Prefer a live non-expired writer. `exceptId` is a socket already closing. */
+  private liveWriterCredential(exceptId?: string): {
+    token: string;
+    permission: string;
+  } | null {
+    let fallback: { token: string; permission: string } | null = null;
+    for (const conn of this.getConnections()) {
+      if (exceptId && conn.id === exceptId) continue;
+      const client = readAuth(conn);
+      if (!client || !canWrite(client.permission)) continue;
+      const credential = {
+        token: client.token,
+        permission: client.permission,
+      };
+      fallback = credential;
+      if (!jwtLooksExpired(client.token)) return credential;
     }
     return fallback;
   }
 
-  async saveDocument(ydoc: Y.Doc): Promise<void> {
+  pickSaveToken(): string | null {
+    const live = this.liveWriterCredential();
+    if (live) {
+      this.rememberSaveCredential(live);
+      return live.token;
+    }
+    // The debounced save can fire after the last writer socket has closed.
+    if (this.saveCredential && canWrite(this.saveCredential.permission)) {
+      return this.saveCredential.token;
+    }
+    return null;
+  }
+
+  async saveDocument(ydoc: Y.Doc): Promise<boolean> {
     const token = this.pickSaveToken();
     if (!token) {
-      console.error("[PartyKit] No authorized token available for save");
-      return;
+      if (!this.missingTokenExpected) {
+        console.error("[PartyKit] No authorized token available for save");
+      }
+      return false;
     }
 
-    const documentId = this.room.id;
+    const documentId = this.name;
     const stateUpdate = Y.encodeStateAsUpdate(ydoc);
     const stateBase64 = uint8ArrayToBase64(stateUpdate);
 
@@ -234,13 +311,90 @@ export default class DocumentParty implements Party.Server {
       }
 
       console.log(`[PartyKit] Saved document ${documentId}`);
+      return true;
     } catch (error) {
       console.error(`[PartyKit] Failed to save document ${documentId}:`, error);
+      return false;
     }
   }
 
-  async onConnect(conn: Party.Connection): Promise<void> {
-    const url = new URL(conn.uri, "http://dummy");
+  override async onClose(
+    connection: Connection,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ): Promise<void> {
+    const closing = readAuth(connection);
+    super.onClose(connection, code, reason, wasClean);
+    if (this.persistSuspended) return;
+    if (!closing || !canWrite(closing.permission)) return;
+
+    const remaining = this.liveWriterCredential(connection.id);
+    if (remaining) {
+      this.rememberSaveCredential(remaining);
+      return;
+    }
+
+    this.rememberSaveCredential({
+      token: closing.token,
+      permission: closing.permission,
+    });
+    const saved = await this.saveDocument(this.document);
+    if (this.liveWriterCredential()) return;
+    if (!saved) return;
+    this.saveCredential = null;
+    this.missingTokenExpected = true;
+  }
+
+  override async onSave(): Promise<void> {
+    await this.saveDocument(this.document);
+  }
+
+  override isReadOnly(connection: Connection): boolean {
+    return !canWrite(readAuth(connection)?.permission);
+  }
+
+  /**
+   * Apply the snapshot from a connect response that already succeeded.
+   * YServer.onLoad runs when the room wakes, before any socket or JWT, so it
+   * must stay empty. Permissions are enforced by /api/partykit/connect.
+   */
+  private ensureLoaded(auth: {
+    created: boolean;
+    state: string | null;
+  }): Promise<void> {
+    const job = this.loadTail.then(() => {
+      this.installState(auth);
+    });
+    this.loadTail = job.then(
+      () => undefined,
+      () => undefined,
+    );
+    return job;
+  }
+
+  private installState(auth: { created: boolean; state: string | null }): void {
+    if (this.loaded) return;
+
+    const bytes =
+      !auth.created && auth.state ? base64ToUint8Array(auth.state) : null;
+    if (bytes) Y.applyUpdate(this.document, bytes);
+
+    this.loaded = true;
+    if (bytes) {
+      console.log(
+        `[PartyKit] Loaded document ${this.name} with existing state (${bytes.length} bytes)`,
+      );
+    } else {
+      console.log(`[PartyKit] Document ${this.name} starting with empty state`);
+    }
+  }
+
+  override async onConnect(
+    conn: Connection,
+    ctx: ConnectionContext,
+  ): Promise<void> {
+    const url = new URL(ctx.request.url);
     const token = url.searchParams.get("token");
     const isNew = url.searchParams.get("isNew") === "true";
 
@@ -256,52 +410,31 @@ export default class DocumentParty implements Party.Server {
       return;
     }
 
-    this.authorizedByConnection.set(conn.id, {
+    conn.setState((prev: Record<string, unknown> | null) => ({
+      ...(prev ?? {}),
       token,
       userId: auth.userId,
       permission: auth.permission,
-    });
+    }));
 
-    if (!this.isLoaded) {
-      if (auth.created || !auth.state) {
-        this.loadedDoc = null;
-        this.isLoaded = true;
-        console.log(
-          `[PartyKit] Document ${this.room.id} starting with empty state`
-        );
-      } else {
-        const ydoc = new Y.Doc();
-        const stateBytes = base64ToUint8Array(auth.state);
-        Y.applyUpdate(ydoc, stateBytes);
-        this.loadedDoc = ydoc;
-        this.isLoaded = true;
-        console.log(
-          `[PartyKit] Loaded document ${this.room.id} with existing state (${stateBytes.length} bytes)`
-        );
-      }
+    this.persistSuspended = false;
+    if (canWrite(auth.permission)) {
+      this.rememberSaveCredential({
+        token,
+        permission: auth.permission,
+      });
     }
 
-    const loadedDoc = this.loadedDoc;
-
-    const options: YPartyKitOptions = {
-      gc: false,
-      readOnly: !canWrite(auth.permission),
-      load: async () => {
-        return loadedDoc;
-      },
-      callback: {
-        handler: async (ydoc: Y.Doc) => {
-          await this.saveDocument(ydoc);
-        },
-        debounceWait: 1000,
-        debounceMaxWait: 5000,
-      },
-    };
-
-    return onConnect(conn, this.room, options);
-  }
-
-  onClose(conn: Party.Connection): void {
-    this.authorizedByConnection.delete(conn.id);
+    await this.ensureLoaded(auth);
+    await super.onConnect(conn, ctx);
   }
 }
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return (
+      (await routePartykitRequest(request, env)) ??
+      new Response("Not Found", { status: 404 })
+    );
+  },
+} satisfies ExportedHandler<Env>;

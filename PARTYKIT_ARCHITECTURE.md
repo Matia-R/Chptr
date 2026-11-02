@@ -25,15 +25,15 @@ This document provides a comprehensive overview of the PartyKit-based real-time 
 
 Real-time collaboration uses PartyKit for a **server-mediated WebSocket** architecture on Cloudflare's edge:
 
-| Benefit                    | Description                                            |
-| -------------------------- | ------------------------------------------------------ |
-| **Star topology**          | N clients = N connections (to central server)          |
-| **Universal connectivity** | WebSocket works through all firewalls                  |
-| **Single writer**          | Only PartyKit server persists to database              |
-| **Simple schema**          | One table, full Y.Doc state per document               |
-| **Free tier**              | PartyKit Individual (managed `*.partykit.dev`): 10 live projects; room storage cleared every 24h; small workloads only |
+| Benefit                    | Description                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| **Star topology**          | N clients = N connections (to central server)                                         |
+| **Universal connectivity** | WebSocket works through all firewalls                                                 |
+| **Single writer**          | Only PartyKit server persists to database                                             |
+| **Simple schema**          | One table, full Y.Doc state per document                                              |
+| **Free tier**              | Cloudflare Workers / Durable Objects on our account. Document bytes live in Supabase. |
 
-Those are PartyKit **managed-plan** limits, not Cloudflare Workers Free quotas. This repo deploys one project (`chptr-collab`) to that runtime. See [Deployment capacity](#deployment-capacity).
+The room is a PartyServer Durable Object in our Cloudflare account (`chptr-collab`). Document state is in Supabase, not in PartyKit room storage. See [Deployment capacity](#deployment-capacity).
 
 ---
 
@@ -524,15 +524,15 @@ The hash is `length:fnv1a(fragment.toJSON())`. It is written with transaction or
 
 `useCollaborativeDocStore` (`src/app/_components/editor/collaborative-doc-store.ts`):
 
-| Field               | Meaning                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `documentId`        | Route this store is bound to. Queries also require this to match `params.documentId` so a stale bind cannot fetch the wrong id. |
-| `ydoc`              | The live Y.Doc from the PartyKit hook.                                                                                          |
-| `isPersisted`       | The `documents` row exists. Safe to run `getDocumentById` / publication queries.                                                |
-| `isYjsContentDirty` | Live body hash ≠ published hash (or ≠ session baseline if no hash yet).                                                         |
-| `hasYjsPublishHash` | `chptr-publish.contentHash` is present in this Y.Doc.                                                                           |
-| `isYjsPublishReady` | First post-sync comparison has run for the **bound** doc.                                                                       |
-| `yjsPublishByDocumentId` | Last live comparison per id. Survives `reset` / navigate. The header uses this on the first paint of a recently visited doc. |
+| Field                    | Meaning                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `documentId`             | Route this store is bound to. Queries also require this to match `params.documentId` so a stale bind cannot fetch the wrong id. |
+| `ydoc`                   | The live Y.Doc from the PartyKit hook.                                                                                          |
+| `isPersisted`            | The `documents` row exists. Safe to run `getDocumentById` / publication queries.                                                |
+| `isYjsContentDirty`      | Live body hash ≠ published hash (or ≠ session baseline if no hash yet).                                                         |
+| `hasYjsPublishHash`      | `chptr-publish.contentHash` is present in this Y.Doc.                                                                           |
+| `isYjsPublishReady`      | First post-sync comparison has run for the **bound** doc.                                                                       |
+| `yjsPublishByDocumentId` | Last live comparison per id. Survives `reset` / navigate. The header uses this on the first paint of a recently visited doc.    |
 
 `useDocumentIsPersisted(documentId)` is true only when `boundId === documentId && isPersisted`.
 
@@ -716,10 +716,10 @@ The header is a **sibling** of the page and stays mounted across `/documents/{id
 │  ─────────────────────────────────────────────────────────────────      │
 │                                                                         │
 │  1. Network drops (or laptop sleeps)                                    │
-│  2. WebSocket disconnects (1001/1006). PartyKit may log                 │
+│  2. WebSocket disconnects (1001/1006). The worker may log              │
 │     "Network connection lost" — that connection cannot be recovered     │
-│  3. Hook pauses y-partykit's built-in retry (it would reuse the stale   │
-│     JWT in the last WebSocket URL)                                      │
+│  3. Hook pauses the provider's built-in retry (params() would reuse     │
+│     the JWT still sitting in tokenRef)                                  │
 │  4. Hook refreshes the Supabase session and calls provider.connect()    │
 │     so query params are rebuilt with a live JWT                         │
 │  5. Editor stays mounted (read-only) with a "Connection lost" banner.   │
@@ -884,38 +884,21 @@ New document creation feels instant because:
 
 ## Deployment capacity
 
-Capacity depends on **where** PartyKit is hosted. Do not treat Cloudflare Workers Free (100,000 requests/day, 10 ms CPU/invocation) or Durable Objects Free (100,000 requests/day, 13,000 GB-s/day) as quotas for the managed PartyKit runtime.
+`npm run deploy:partykit` publishes the Worker `chptr-collab` to our Cloudflare account. The managed `*.partykit.dev` host shut down on 23 October 2026. Document bytes are in Postgres, so losing PartyKit room storage did not drop `document_state`.
 
-### Managed PartyKit (this deployment)
+Hibernation is disabled. The Y.Doc stays in memory for the life of the Durable Object and is loaded again from Supabase on the next authorized connection. A room supports about 100 connections and ~128 MiB. Duration accrues while sockets stay connected.
 
-`npm run deploy:partykit` publishes to PartyKit’s Individual plan at `chptr-collab.partykit.dev` ([partykit.io](https://www.partykit.io/)):
+Current Workers Free / Durable Objects Free allotments (reset 00:00 UTC; confirm on Cloudflare’s pages before planning):
 
-| Limit                         | Current Individual plan                          |
-| ----------------------------- | ------------------------------------------------ |
-| Price                         | Free                                             |
-| Live projects                 | Up to 10 (this app uses 1: `chptr-collab`)       |
-| PartyKit room storage         | Cleared every 24 hours                           |
-| Stated fit                    | Small projects                                   |
-| Connections per room          | ~100 without hibernation (this server)           |
-| Memory per room               | ~128 MiB                                         |
-
-That is suitable only for a **small** collaboration workload: one managed project, document state in Postgres, and well under 100 sockets per open document. Grow past that (many concurrent editors on one doc, many always-on rooms, or production SLAs) by moving off Individual — typically to PartyKit Commercial / [cloud-prem](https://docs.partykit.io/guides/deploy-to-cloudflare/) on your own Cloudflare account.
-
-### Self-managed Cloudflare (cloud-prem) only
-
-If you deploy with `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` onto your own account, the PartyKit **platform fee is $0**. Usage is then limited and billed by Cloudflare, not by PartyKit’s Individual caps. Current Workers Free / Durable Objects Free allotments (reset 00:00 UTC; confirm on Cloudflare’s pages before planning):
-
-| Resource                         | Workers / DO Free (self-managed) | Paid (self-managed)                                      |
-| -------------------------------- | -------------------------------- | -------------------------------------------------------- |
-| Worker requests                  | 100,000 / day                    | 10 million / month included, then usage rates            |
-| Worker CPU / invocation          | 10 ms                            | Default 30 s, configurable up to 5 min                   |
-| Durable Object requests          | 100,000 / day                    | 1 million / month included; WebSocket messages included  |
-| Durable Object duration          | 13,000 GB-s / day                | 400,000 GB-s / month included                            |
-| Durable Object SQL storage       | 5 GB total; 5M row reads / 100k writes per day | Higher monthly inclusions                          |
+| Resource                   | Workers / DO Free (self-managed)               | Paid (self-managed)                                     |
+| -------------------------- | ---------------------------------------------- | ------------------------------------------------------- |
+| Worker requests            | 100,000 / day                                  | 10 million / month included, then usage rates           |
+| Worker CPU / invocation    | 10 ms                                          | Default 30 s, configurable up to 5 min                  |
+| Durable Object requests    | 100,000 / day                                  | 1 million / month included; WebSocket messages included |
+| Durable Object duration    | 13,000 GB-s / day                              | 400,000 GB-s / month included                           |
+| Durable Object SQL storage | 5 GB total; 5M row reads / 100k writes per day | Higher monthly inclusions                               |
 
 Sources: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/), [Durable Objects limits](https://developers.cloudflare.com/durable-objects/platform/limits/). WebSocket **upgrade** counts as a Worker request; on Durable Objects, incoming WebSocket **messages** count toward DO requests (Cloudflare applies a 20:1 billing ratio for message size). This collaboration server keeps the Y.Doc in memory and cannot hibernate, so DO duration can accrue while sockets stay connected.
-
-These Cloudflare numbers are **not** the capacity of `*.partykit.dev`.
 
 ---
 
@@ -1013,18 +996,18 @@ Future: Notify users when:
 
 ## Summary
 
-| Aspect               | Implementation                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------- |
-| **Sync Protocol**    | Yjs over WebSocket via PartyKit                                                              |
-| **Topology**         | Star (all clients → PartyKit → database)                                                     |
-| **Persistence**      | Server-side only, debounced 1s                                                               |
-| **Schema**           | Single `document_state` table                                                                |
-| **Security**         | Per-connection authorize + permission row; RLS on load/save                                  |
-| **New Doc UX**       | Instant editor + Publish; tRPC waits until connect creates the row                           |
-| **Existing Doc UX**  | Delayed skeleton (500ms threshold)                                                           |
-| **Publish / Update** | Shared Yjs `contentHash` in `chptr-publish`; all connected clients see the same button state |
-| **Multi-tab**        | Fully supported via PartyKit sync (including publish dirty)                                  |
-| **Offline**          | Limited (local Y.Doc only, no IndexedDB)                                                     |
+| Aspect               | Implementation                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sync Protocol**    | Yjs over WebSocket via PartyKit                                                                                                             |
+| **Topology**         | Star (all clients → PartyKit → database)                                                                                                    |
+| **Persistence**      | Server-side only, debounced 1s                                                                                                              |
+| **Schema**           | Single `document_state` table                                                                                                               |
+| **Security**         | Per-connection authorize + permission row; RLS on load/save                                                                                 |
+| **New Doc UX**       | Instant editor + Publish; tRPC waits until connect creates the row                                                                          |
+| **Existing Doc UX**  | Delayed skeleton (500ms threshold)                                                                                                          |
+| **Publish / Update** | Shared Yjs `contentHash` in `chptr-publish`; all connected clients see the same button state                                                |
+| **Multi-tab**        | Fully supported via PartyKit sync (including publish dirty)                                                                                 |
+| **Offline**          | Limited (local Y.Doc only, no IndexedDB)                                                                                                    |
 | **Cost / capacity**  | PartyKit Individual: free for a small managed workload (10 projects, 24h room storage); Workers/DO limits only if self-hosted on Cloudflare |
 
 This architecture provides a solid foundation for collaborative editing: one Y.Doc per document, per-connection auth, and a publish snapshot that lives in that same document.

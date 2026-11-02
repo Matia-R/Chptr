@@ -21,8 +21,11 @@ next-env.d.ts
 # production
 /build
 
-# partykit
+# collab worker (wrangler)
 .partykit
+.wrangler
+.dev.vars
+.dev.vars.*
 
 # misc
 .DS_Store
@@ -47,6 +50,3 @@ yarn-error.log*
 
 # idea files
 .idea
-
-# partykit
-.partykit

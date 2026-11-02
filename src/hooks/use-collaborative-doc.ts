@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
-import YPartyKitProvider from "y-partykit/provider";
+import YProvider from "y-partyserver/provider";
 import {
   DocumentAccessError,
   getDocumentErrorCode,
@@ -31,7 +31,7 @@ interface UseCollaborativeDocOptions {
 
 interface UseCollaborativeDocResult {
   ydoc: Y.Doc | null;
-  provider: YPartyKitProvider | null;
+  provider: YProvider | null;
   isReady: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -104,7 +104,7 @@ function accessErrorFromTrpc(error: unknown): DocumentAccessError | null {
   return null;
 }
 
-function stopReconnect(provider: YPartyKitProvider) {
+function stopReconnect(provider: YProvider) {
   provider.shouldConnect = false;
   try {
     provider.disconnect();
@@ -124,12 +124,12 @@ async function readAccessToken() {
   return data.session?.access_token ?? null;
 }
 
-function socketIsOpen(provider: YPartyKitProvider) {
+function socketIsOpen(provider: YProvider) {
   return provider.wsconnected && provider.ws?.readyState === WebSocket.OPEN;
 }
 
-/** Prevent y-partykit's 30s idle timer from killing a socket after a frozen tab. */
-function markSocketAlive(provider: YPartyKitProvider) {
+/** An open socket on a focused tab is still live. Do not reconnect. */
+function markSocketAlive(provider: YProvider) {
   if (!socketIsOpen(provider) || !provider.ws) return false;
   provider.wsLastMessageReceived = Date.now();
   return true;
@@ -142,7 +142,7 @@ export function useCollaborativeDoc({
   const utils = api.useUtils();
   const [state, setState] = useState<{
     ydoc: Y.Doc;
-    provider: YPartyKitProvider;
+    provider: YProvider;
   } | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -172,7 +172,7 @@ export function useCollaborativeDoc({
     }
   }, []);
 
-  // y-partykit "connected" is only TCP open — PartyKit may drop the socket
+  // "connected" is only the WebSocket upgrade — the room may drop the socket
   // immediately (process down, auth still running). Hide the banner only after
   // Yjs sync. Once shown, keep it through connecting/disconnected retries.
   useEffect(() => {
@@ -277,18 +277,14 @@ export function useCollaborativeDoc({
           paintedFromPrefetch = true;
         }
 
-        const provider = new YPartyKitProvider(
-          PARTYKIT_HOST,
-          documentId,
-          ydoc,
-          {
-            connect: true,
-            params: () => ({
-              token: tokenRef.current,
-              isNew: isNew ? "true" : "false",
-            }),
-          },
-        );
+        const provider = new YProvider(PARTYKIT_HOST, documentId, ydoc, {
+          connect: true,
+          party: "main",
+          params: () => ({
+            token: tokenRef.current,
+            isNew: isNew ? "true" : "false",
+          }),
+        });
 
         const failFatal = (accessError: DocumentAccessError) => {
           closedForAuth = true;
@@ -318,10 +314,9 @@ export function useCollaborativeDoc({
           metaChannel.addEventListener("message", onDocumentMeta);
         }
 
-        // y-partykit's built-in retry calls setupWS with the URL from the last
-        // connect(), so a sleep/wake reconnect would reuse an expired JWT.
-        // Pause that retry and reconnect through provider.connect() so params()
-        // runs again with a refreshed token.
+        // The provider retries with whatever params() returns. params() reads
+        // tokenRef, which stays stale until we refresh the session. Pause that
+        // retry and reconnect through provider.connect() after a new JWT.
         const isBrowserOffline = () =>
           typeof navigator !== "undefined" && navigator.onLine === false;
 
@@ -366,13 +361,13 @@ export function useCollaborativeDoc({
 
             tokenRef.current = token;
             if (cancelled || closedForAuth) return;
-            provider.connect();
+            await provider.connect();
           } catch (err) {
             console.error("[PartyKit] Failed to resume connection:", err);
             consecutiveFailures += 1;
             if (!cancelled && !closedForAuth && tokenRef.current) {
               try {
-                provider.connect();
+                await provider.connect();
               } catch {
                 // Next visibility/online/retry will try again.
               }
@@ -440,8 +435,8 @@ export function useCollaborativeDoc({
             if (closedForAuth || cancelled) return;
             setConnection(status);
             if (status === "connected") {
-              // Do not reset consecutiveFailures here. y-partykit fires
-              // "connected" on WebSocket upgrade, before PartyKit has
+              // Do not reset consecutiveFailures here. The provider fires
+              // "connected" on WebSocket upgrade, before the room has
               // finished /api/partykit/connect. A 4005 close after that
               // would otherwise look like the first failure forever.
               setEverConnected(true);
@@ -514,8 +509,7 @@ export function useCollaborativeDoc({
             return;
           }
           if (isBrowserOffline()) return;
-          // Tab focus is not a disconnect. Keep an open socket and reset
-          // y-partykit's idle timer so a frozen tab does not look dead.
+          // Tab focus is not a disconnect. Keep an open socket.
           if (markSocketAlive(provider)) return;
           consecutiveFailures = 0;
           void resumeWithFreshToken({ immediate: true });

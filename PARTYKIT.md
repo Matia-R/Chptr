@@ -4,7 +4,7 @@ This document describes the PartyKit integration for real-time collaborative edi
 
 ## Overview
 
-Document sync uses a server-mediated WebSocket architecture on PartyKit (Cloudflare Workers):
+Document sync uses a server-mediated WebSocket room on PartyServer (a Cloudflare Worker with a Durable Object per document):
 
 - **Reliable sync**: WebSocket works through firewalls where peer-to-peer often fails
 - **Single persistence point**: Only the PartyKit server writes to the database
@@ -23,7 +23,7 @@ Document sync uses a server-mediated WebSocket architecture on PartyKit (Cloudfl
                            │ WebSocket + JWT
                            ▼
               ┌────────────────────────┐
-              │   PartyKit Server      │
+              │   PartyServer room     │
               │   - Authorize each     │
               │     connection         │
               │   - Manage Y.Doc       │
@@ -48,7 +48,7 @@ Authorization is a **per-connection** decision. Persistence is a **room** decisi
 
 1. **Client authenticates with Supabase** and receives a JWT
 2. **Client connects to PartyKit** with that JWT in query params
-3. **PartyKit calls `/api/partykit/connect` on every connect** (secret + JWT + document id + `isNew`)
+3. **The room calls `/api/partykit/connect` on every connect** (secret + JWT + document id + `isNew`)
 4. **Connect validates the JWT** with Supabase Auth (`getUser`), checks `document_permissions`, and returns Y.Doc state in the same response
 5. **403 vs 404** uses the `document_exists` RPC (SECURITY DEFINER). A normal SELECT cannot tell these apart because RLS hides unauthorized rows as "not found"
 6. **`isNew` only creates** when the document truly does not exist. If it exists and the user has no permission row, the socket is closed with 4003
@@ -57,7 +57,7 @@ Authorization is a **per-connection** decision. Persistence is a **room** decisi
 9. **Saves** use a token from a currently connected authorized client (prefer one that is not expired), not a single room-level JWT
 10. **Existing docs** can paint from a prefetched `getDocumentState` snapshot (sidebar hover) before PartyKit sync finishes
 
-The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the verifier. PartyKit will not join a connection until connect returns 200.
+The JWT is not cryptographically verified inside the worker. Supabase Auth is the verifier. The room will not join a connection until connect returns 200.
 
 ### Error Codes
 
@@ -69,76 +69,75 @@ The JWT is not cryptographically verified inside PartyKit. Supabase Auth is the 
 | 400                 | 4000            | Bad URL                                                                              |
 | 500                 | 4005            | Connection lost; retry (do not unmount the editor)                                   |
 
-The document page maps `DocumentAccessError.code` onto those alerts. Fatal close codes (4000/4003/4004) disable y-partykit reconnect. 4001 is a stale JWT on reconnect after sleep or a dropped socket — refresh then reconnect. Transport closes (1001/1006) keep the local Y.Doc visible, lock the editor, and show a reconnecting banner.
+The document page maps `DocumentAccessError.code` onto those alerts. Fatal close codes (4000/4003/4004) disable provider reconnect. 4001 is a stale JWT on reconnect after sleep or a dropped socket — refresh then reconnect. Transport closes (1001/1006) keep the local Y.Doc visible, lock the editor, and show a reconnecting banner.
 
 ## Setup
 
-### 1. Install PartyKit CLI
+The hosted PartyKit platform (`*.partykit.dev`, `npx partykit deploy`) shut down on 23 October 2026. This worker runs on our own Cloudflare account via Wrangler. Document bytes stay in Supabase; the Durable Object only holds the live Y.Doc.
+
+### 1. Install
+
+Dependencies are already in this repo (`partyserver`, `y-partyserver`, `wrangler`). From the project root:
 
 ```bash
-npm install -g partykit
+npm install
 ```
 
-### 2. Login to PartyKit
-
-```bash
-npx partykit login
-```
-
-### 3. Configure Environment Variables
+### 2. Configure environment variables
 
 Add to your `.env` file:
 
 ```env
-# PartyKit host (for client-side)
+# Collab worker host (client)
 NEXT_PUBLIC_PARTYKIT_HOST=localhost:1999  # dev
-# NEXT_PUBLIC_PARTYKIT_HOST=chptr-collab.partykit.dev  # prod
+# NEXT_PUBLIC_PARTYKIT_HOST=chptr-collab.<account>.workers.dev  # prod
 
 # Shared secret for server-to-server auth
 PARTYKIT_SECRET=your-secret-here  # Generate with: openssl rand -base64 32
 
-# App URL for PartyKit server callbacks
+# App URL the worker calls back to
 APP_URL=http://localhost:3000  # dev
 # APP_URL=https://your-app.vercel.app  # prod
 ```
 
-### 4. Local Development
+`npm run dev:partykit` loads `.env` and `.env.local` (the same files Next.js uses).
 
-Run both the Next.js dev server and PartyKit dev server:
+### 3. Local development
+
+Run both the Next.js dev server and the collab worker:
 
 ```bash
 # Terminal 1: Next.js
 npm run dev
 
-# Terminal 2: PartyKit (use npm script, not npx!)
+# Terminal 2: collab worker
 npm run dev:partykit
 ```
 
-**Important:** Use `npm run dev:partykit` instead of `npx partykit dev`. The npx version downloads a fresh PartyKit that can't see your project's dependencies.
+The worker listens on `localhost:1999`. Rooms are served at `/parties/main/:documentId`.
 
-PartyKit dev server runs on `localhost:1999` by default.
-
-### 5. Deploy PartyKit
+### 4. Deploy
 
 ```bash
+npx wrangler login
 npm run deploy:partykit
 ```
 
-This deploys to PartyKit's free tier at `chptr-collab.partykit.dev`.
+This deploys the Worker named `chptr-collab`. Wrangler prints a `*.workers.dev` host.
 
-### 6. Configure PartyKit Environment Variables
+### 5. Configure worker secrets
 
-After deploying, set the environment variables for the PartyKit server:
+Secrets are not in `wrangler.jsonc`. Set the same values the Next.js app uses:
 
 ```bash
-npx partykit env add APP_URL
+npx wrangler secret put APP_URL
 # Enter: https://your-app.vercel.app
 
-npx partykit env add PARTYKIT_SECRET
-# Enter: your-secret-here (same as in your Next.js .env)
+npx wrangler secret put PARTYKIT_SECRET
+# Enter: your-secret-here (same as in the Next.js env)
 ```
 
-Note: For `env` commands, `npx partykit` is fine since it doesn't need to bundle code.
+Then set `NEXT_PUBLIC_PARTYKIT_HOST` on the Next.js host to the worker hostname, with no `https://`. Rebuild and redeploy the Next.js app afterward. That variable is embedded in the client bundle at build time, so a runtime env change alone does not reach the browser.
 
 ## Database Schema
 
@@ -162,8 +161,8 @@ Each save stores the full Y.Doc state (no change-log compaction). Saves also bum
 
 | File                                                    | Purpose                                                                                           |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `partykit.json`                                         | PartyKit configuration                                                                            |
-| `party/document.ts`                                     | PartyKit server (per-connection connect, Y.Doc, save token pool)                                  |
+| `wrangler.jsonc`                                        | Worker name, Durable Object binding (`Main`), SQLite migration                                    |
+| `party/document.ts`                                     | Room (per-connection connect, Y.Doc, save token pool)                                             |
 | `src/hooks/use-collaborative-doc.ts`                    | Client hook (JWT, prefetch snapshot, close codes, token refresh, persist flag, Yjs publish-dirty) |
 | `src/hooks/use-prefetch-document-state.ts`              | Sidebar/command-menu hover prefetch                                                               |
 | `src/hooks/use-document-publish.tsx`                    | Header publish button: queries gated on persist, Yjs hash after publish                           |
@@ -184,10 +183,10 @@ Each save stores the full Y.Doc state (no change-log compaction). Saves also bum
 ### Client Connection
 
 1. Client gets Supabase session (`access_token`)
-2. `useCollaborativeDoc` creates a Y.Doc and `YPartyKitProvider`
+2. `useCollaborativeDoc` creates a Y.Doc and a `y-partyserver` provider
 3. **New documents:** the editor is ready immediately (does not wait for PartyKit `sync`). Connect/create run in the background
 4. **Existing documents:** if `getDocumentState` is already cached (sidebar hover) or returns first, apply the snapshot and show the editor. Otherwise wait for PartyKit `sync`
-5. Provider connects to PartyKit with JWT + `isNew` in query params
+5. Provider connects to the worker with JWT + `isNew` in query params
 6. On `TOKEN_REFRESHED`, the hook reconnects with the same Y.Doc and a fresh JWT
 7. On 4003/4004/4000, reconnect is disabled and the document page shows the matching alert
 8. On drop (1001/1006), 4005, or 4001, the hook refreshes the JWT, reconnects through `provider.connect()` (so query params are rebuilt), and the page keeps the editor visible but not editable, with a "Connection lost" banner. Login is only shown if there is no session
@@ -197,12 +196,12 @@ Each save stores the full Y.Doc state (no change-log compaction). Saves also bum
 ### Server Lifecycle
 
 1. Every client connect → `POST /api/partykit/connect` (auth + state in one hop)
-2. Unauthorized / forbidden / missing document → close the socket; do not call `y-partykit`
+2. Unauthorized / forbidden / missing document → close the socket; do not sync the Y.Doc
 3. First successful connect caches the Y.Doc in the room (`created` or empty state → empty doc)
 4. Later authorized connections reuse the in-memory Y.Doc (they still go through connect)
 5. Edits broadcast to authorized clients in the room
 6. Debounced save (1s / 5s max) uses a live authorized client's JWT
-7. `onClose` drops that connection's token from the save pool
+7. Closing a socket drops that connection. The save pool reads tokens from sockets that are still open
 
 ### Permission Enforcement
 
@@ -215,8 +214,8 @@ Each save stores the full Y.Doc state (no change-log compaction). Saves also bum
 
 The header is in the documents layout; the Y.Doc is created on the document page. They share `useCollaborativeDocStore`.
 
-- **New document:** show **Publish** immediately. Do not call `getDocumentById` until `isPersisted` (PartyKit `connected`). The UUID is not a row yet.
-- **After publish:** `publishDocument` writes `document_publications`, then `writeYjsPublishedContentHash` sets `chptr-publish.contentHash` on the live Y.Doc. PartyKit broadcasts that map update; every client recomputes dirty from the same snapshot.
+- **New document:** show **Publish** immediately. Do not call `getDocumentById` until `isPersisted` (room `connected`). The UUID is not a row yet.
+- **After publish:** `publishDocument` writes `document_publications`, then `writeYjsPublishedContentHash` sets `chptr-publish.contentHash` on the live Y.Doc. The room broadcasts that map update; every client recomputes dirty from the same snapshot.
 - **Edits (any user):** a change to `document-store` changes the hash → **Update**. Title/slug still come from Postgres.
 - **Older publications** with no hash yet: fall back to `last_updated` vs `publication.updated_at` until the next publish writes the hash.
 
@@ -224,8 +223,4 @@ See [PARTYKIT_ARCHITECTURE.md](./PARTYKIT_ARCHITECTURE.md#publish-ui-and-new-doc
 
 ## Costs
 
-This app deploys to PartyKit’s **managed Individual** plan (`chptr-collab.partykit.dev`), not Cloudflare Workers Free.
-
-Current Individual limits ([partykit.io](https://www.partykit.io/)): up to 10 live projects, PartyKit room storage cleared every 24 hours, intended for small projects. Document state is saved to Supabase, so the 24-hour room-storage clear does not drop `document_state`. Without hibernation, a room supports about 100 connections and ~128 MiB.
-
-Cloudflare Workers and Durable Objects request/CPU/duration limits apply **only** if you deploy PartyKit to your own Cloudflare account (cloud-prem). See [Deployment capacity](./PARTYKIT_ARCHITECTURE.md#deployment-capacity).
+`npm run deploy:partykit` publishes a Worker named `chptr-collab` to our Cloudflare account. The hosted `*.partykit.dev` platform is gone. Usage is Cloudflare Workers and Durable Objects pricing. Hibernation is off, because the Y.Doc and per-connection auth live in memory and are reloaded from Supabase when a room starts. See [Deployment capacity](./PARTYKIT_ARCHITECTURE.md#deployment-capacity).
