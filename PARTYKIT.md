@@ -137,7 +137,7 @@ npx wrangler secret put PARTYKIT_SECRET
 # Enter: your-secret-here (same as in the Next.js env)
 ```
 
-Then set `NEXT_PUBLIC_PARTYKIT_HOST` on the Next.js host to the worker hostname, with no `https://`.
+Then set `NEXT_PUBLIC_PARTYKIT_HOST` on the Next.js host to the worker hostname, with no `https://`. Rebuild and redeploy the Next.js app afterward. That variable is embedded in the client bundle at build time, so a runtime env change alone does not reach the browser.
 
 ## Database Schema
 

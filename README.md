@@ -110,7 +110,7 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 
 ## Run it locally 💻
 
-You need Node.js 18.18 or newer (this repo uses npm 10) and a Supabase project you can point the app at.
+You need Node.js 22 or newer (this repo uses npm 10) and a Supabase project you can point the app at. The collab worker’s Wrangler release requires that runtime.
 
 1. Install dependencies.
 

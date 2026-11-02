@@ -101,6 +101,12 @@ export class DocumentParty extends YServer<Env> {
 
   private loaded = false;
   private loadTail: Promise<void> = Promise.resolve();
+  /** Last writer credential. A debounced save can run after that socket is gone. */
+  private saveCredential: { token: string; permission: string } | null = null;
+  /** Trash and 404 invalidation must not persist the unsaved tail. */
+  private persistSuspended = false;
+  /** The trailing debounce after a flushed disconnect has no credential on purpose. */
+  private missingTokenExpected = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -169,6 +175,9 @@ export class DocumentParty extends YServer<Env> {
   }
 
   kickAll(reason = "Document not found"): void {
+    this.persistSuspended = true;
+    this.saveCredential = null;
+    this.missingTokenExpected = true;
     for (const conn of this.getConnections()) {
       try {
         conn.close(4004, reason);
@@ -223,24 +232,55 @@ export class DocumentParty extends YServer<Env> {
     });
   }
 
-  pickSaveToken(): string | null {
-    let fallback: string | null = null;
+  private rememberSaveCredential(credential: {
+    token: string;
+    permission: string;
+  }): void {
+    if (!canWrite(credential.permission)) return;
+    this.saveCredential = credential;
+    this.missingTokenExpected = false;
+  }
+
+  /** Prefer a live non-expired writer. `exceptId` is a socket already closing. */
+  private liveWriterCredential(exceptId?: string): {
+    token: string;
+    permission: string;
+  } | null {
+    let fallback: { token: string; permission: string } | null = null;
     for (const conn of this.getConnections()) {
+      if (exceptId && conn.id === exceptId) continue;
       const client = readAuth(conn);
       if (!client || !canWrite(client.permission)) continue;
-      fallback = client.token;
-      if (!jwtLooksExpired(client.token)) {
-        return client.token;
-      }
+      const credential = {
+        token: client.token,
+        permission: client.permission,
+      };
+      fallback = credential;
+      if (!jwtLooksExpired(client.token)) return credential;
     }
     return fallback;
   }
 
-  async saveDocument(ydoc: Y.Doc): Promise<void> {
+  pickSaveToken(): string | null {
+    const live = this.liveWriterCredential();
+    if (live) {
+      this.rememberSaveCredential(live);
+      return live.token;
+    }
+    // The debounced save can fire after the last writer socket has closed.
+    if (this.saveCredential && canWrite(this.saveCredential.permission)) {
+      return this.saveCredential.token;
+    }
+    return null;
+  }
+
+  async saveDocument(ydoc: Y.Doc): Promise<boolean> {
     const token = this.pickSaveToken();
     if (!token) {
-      console.error("[PartyKit] No authorized token available for save");
-      return;
+      if (!this.missingTokenExpected) {
+        console.error("[PartyKit] No authorized token available for save");
+      }
+      return false;
     }
 
     const documentId = this.name;
@@ -271,9 +311,39 @@ export class DocumentParty extends YServer<Env> {
       }
 
       console.log(`[PartyKit] Saved document ${documentId}`);
+      return true;
     } catch (error) {
       console.error(`[PartyKit] Failed to save document ${documentId}:`, error);
+      return false;
     }
+  }
+
+  override async onClose(
+    connection: Connection,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ): Promise<void> {
+    const closing = readAuth(connection);
+    super.onClose(connection, code, reason, wasClean);
+    if (this.persistSuspended) return;
+    if (!closing || !canWrite(closing.permission)) return;
+
+    const remaining = this.liveWriterCredential(connection.id);
+    if (remaining) {
+      this.rememberSaveCredential(remaining);
+      return;
+    }
+
+    this.rememberSaveCredential({
+      token: closing.token,
+      permission: closing.permission,
+    });
+    const saved = await this.saveDocument(this.document);
+    if (this.liveWriterCredential()) return;
+    if (!saved) return;
+    this.saveCredential = null;
+    this.missingTokenExpected = true;
   }
 
   override async onSave(): Promise<void> {
@@ -346,6 +416,14 @@ export class DocumentParty extends YServer<Env> {
       userId: auth.userId,
       permission: auth.permission,
     }));
+
+    this.persistSuspended = false;
+    if (canWrite(auth.permission)) {
+      this.rememberSaveCredential({
+        token,
+        permission: auth.permission,
+      });
+    }
 
     await this.ensureLoaded(auth);
     await super.onConnect(conn, ctx);

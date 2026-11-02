@@ -25,6 +25,7 @@ next-env.d.ts
 .partykit
 .wrangler
 .dev.vars
+.dev.vars.*
 
 # misc
 .DS_Store

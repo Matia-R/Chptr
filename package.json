@@ -75,7 +75,7 @@
     "zustand": "^5.0.4"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261029.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@types/eslint": "^8.56.10",
     "@types/lodash": "^4.17.21",
     "@types/node": "^20.14.10",
@@ -95,5 +95,8 @@
   "ct3aMetadata": {
     "initVersion": "7.38.1"
   },
-  "packageManager": "npm@10.9.0"
+  "packageManager": "npm@10.9.0",
+  "engines": {
+    "node": ">=22.0.0"
+  }
 }
