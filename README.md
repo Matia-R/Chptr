@@ -16,9 +16,9 @@ The hope is that we can build something that simplifies all the most archaic asp
 
 ## Is Chptr open source?
 
-I'm not actively accepting contributions and don't have plans to make this an OSS repo. I would be very grateful for any interest, but I don't have the resources to maintain a community at this time. On a practical note, our current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply).
+Yep! all of the code is available to read, fork or contribute. That said, the current infrastructure, hosting and CI doesn't lend itself to having many developers working on it at the same time (at least not cheaply). 
 
-That said, the code is fully available here to browse, or fork if you'd like! If you're interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
+If you're interested in helping with the project, please reach out myself directly: [Matia Raspopovic](https://github.com/Matia-R).
 
 Thank you for your understanding 🫶
 
