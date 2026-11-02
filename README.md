@@ -25,7 +25,7 @@ Thank you for your understanding 🫶
 ## How it works ⚙️
 
 - **Write.** Documents open in a [BlockNote](https://www.blocknotejs.org/) editor (slash commands, code blocks with syntax highlighting, alert blocks, and an in-editor AI prompt).
-- **Keep drafts in sync.** The editor is backed by a [Yjs](https://yjs.dev/) document. Open sessions connect to a [PartyKit](https://www.partykit.io/) room, which is the only process that writes the live document back to the database.
+- **Keep drafts in sync.** The editor is backed by a [Yjs](https://yjs.dev/) document. Open sessions connect to a PartyServer room on Cloudflare, which is the only process that writes the live document back to the database.
 - **Publish.** A published snapshot is a public article. Changing the author’s username or the slug leaves a redirect from the old path.
 - **Organize.** The sidebar lists documents. Trashed documents can be restored; expired trash is removed on a schedule in the database.
 - **Account.** Email and password sign-up, profile (name, username, avatar), and password change.
@@ -41,7 +41,7 @@ In-editor AI calls Google Gemini through the [Vercel AI SDK](https://sdk.vercel.
 | Next.js 15 (App Router) | UI, server actions, route handlers            |
 | tRPC + TanStack Query   | Typed API between the client and `src/server` |
 | Supabase                | Auth, Postgres, row-level security            |
-| PartyKit + Yjs          | Real-time document room                       |
+| PartyServer + Yjs       | Real-time document room (Cloudflare Worker)   |
 | Tailwind CSS, Radix     | UI                                            |
 | BlockNote               | Editor                                        |
 
@@ -53,13 +53,14 @@ src/app/                  Routes and UI
   [username]/[slug]/      Public published article
   account/, login/, …     Auth and settings
   api/trpc/               tRPC endpoint
-  api/partykit/           Connect and save callbacks for the PartyKit room
+  api/partykit/           Connect and save callbacks for the collab room
   _components/            Shared UI, including the editor
-src/server/               tRPC routers, database access, PartyKit auth helpers
+src/server/               tRPC routers, database access, collab auth helpers
 src/hooks/                Client hooks (collab session, publish, trash, …)
 src/lib/                  Shared helpers (slugs, permissions, publish hashing)
 src/utils/supabase/       Browser, server, and middleware Supabase clients
-party/document.ts         PartyKit room: authorize, sync Y.Doc, debounce saves
+party/document.ts         Collab room: authorize, sync Y.Doc, debounce saves
+wrangler.jsonc            Cloudflare Worker config for that room
 migrations/               SQL source of truth (applied to Supabase separately)
 ```
 
@@ -71,7 +72,7 @@ tRPC routers live in `src/server/api/routers/` and are mounted in `src/server/ap
 Browser (BlockNote + Y.Doc)
         │  WebSocket + Supabase access token
         ▼
-PartyKit room  (party/document.ts, one room per document)
+PartyServer room  (party/document.ts, one room per document)
         │  HTTPS + shared secret + that user's token
         ▼
 Next.js  /api/partykit/connect   load or create
@@ -86,7 +87,7 @@ Signing in is Supabase Auth (email and password). Middleware refreshes the sessi
 
 Email signup stays on `/signup`. After the password form, Supabase emails a six-digit code and the same page asks for it, then continues to `/onboarding`. The **Confirm sign up** template in the Supabase dashboard (Authentication → Emails) has to include `{{ .Token }}` and must not use `{{ .ConfirmationURL }}`, or the message will still be a link. Custom SMTP is unchanged. Password reset and Google sign-in keep their own templates and `/auth/confirm`.
 
-Creating a note navigates straight to a new id. The row is created when the PartyKit room connects, after the connect route checks that the caller may create it. Later connections are authorized again. Saves run as that user, so row-level security still applies. The room debounces those writes; the stored blob is the full Y.Doc, not a change log.
+Creating a note navigates straight to a new id. The row is created when the collab room connects, after the connect route checks that the caller may create it. Later connections are authorized again. Saves run as that user, so row-level security still applies. The room debounces those writes; the stored blob is the full Y.Doc, not a change log.
 
 Publishing copies the current blocks into `document_publications`. The public page renders that snapshot (it does not open the live Y.Doc). Old username/slug pairs redirect to the current path.
 
@@ -105,7 +106,7 @@ Details, close codes, and edge cases: [PARTYKIT.md](./PARTYKIT.md) and [PARTYKIT
 | `/documents/[documentId]`                     | Signed in, onboarded, with access | Editor                                   |
 | `/[username]/[slug]`                          | Public                            | Published article                        |
 | `/api/trpc/[trpc]`                            | —                                 | tRPC                                     |
-| `/api/partykit/connect`, `/api/partykit/save` | PartyKit server                   | Load, create, and persist document state |
+| `/api/partykit/connect`, `/api/partykit/save` | Collab worker                     | Load, create, and persist document state |
 
 ## Run it locally 💻
 
@@ -119,14 +120,14 @@ You need Node.js 18.18 or newer (this repo uses npm 10) and a Supabase project y
 
 2. Copy `[.env.example](./.env.example)` to `.env` and fill in your own values. Do not commit `.env`.
 
-   | Variable                        | Purpose                                                                        |
-   | ------------------------------- | ------------------------------------------------------------------------------ |
-   | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL                                                           |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (client and server)                                          |
-   | `NEXT_PUBLIC_PARTYKIT_HOST`     | PartyKit host. Local default: `localhost:1999`                                 |
-   | `PARTYKIT_SECRET`               | Shared secret. The Next.js app and the PartyKit worker must use the same value |
-   | `APP_URL`                       | URL the PartyKit worker calls back to. Local: `http://localhost:3000`          |
-   | `GOOGLE_GENERATIVE_AI_API_KEY`  | Google AI key for in-editor prompts. Optional for everything else              |
+   | Variable                        | Purpose                                                               |
+   | ------------------------------- | --------------------------------------------------------------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL                                                  |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (client and server)                                 |
+   | `NEXT_PUBLIC_PARTYKIT_HOST`     | Collab worker host. Local default: `localhost:1999`                   |
+   | `PARTYKIT_SECRET`               | Shared secret. The Next.js app and the worker must use the same value |
+   | `APP_URL`                       | URL the worker calls back to. Local: `http://localhost:3000`          |
+   | `GOOGLE_GENERATIVE_AI_API_KEY`  | Google AI key for in-editor prompts. Optional for everything else     |
 
 3. Apply the SQL in `[migrations/](./migrations/)`. `npm run dev` does not migrate the database. Follow [migrations/README.md](./migrations/README.md): most files go through Supabase `apply_migration`; two index files cannot run inside a transaction.
 
@@ -137,33 +138,34 @@ You need Node.js 18.18 or newer (this repo uses npm 10) and a Supabase project y
    npm run dev:partykit
    ```
 
-   Next.js is at [http://localhost:3000](http://localhost:3000) (Turbopack). PartyKit listens on port 1999.
-
-   Use `npm run dev:partykit`, not `npx partykit dev`. A freshly downloaded CLI cannot see this project’s dependencies.
+   Next.js is at [http://localhost:3000](http://localhost:3000) (Turbopack). The collab worker listens on port 1999. `npm run dev:partykit` reads `APP_URL` and `PARTYKIT_SECRET` from `.env` and `.env.local`.
 
 ## Serve it ☁️
 
-The Next.js app and the PartyKit worker are deployed separately. They must share `PARTYKIT_SECRET`, and the worker’s `APP_URL` must be the public URL of the Next.js app. The client’s `NEXT_PUBLIC_PARTYKIT_HOST` must be the deployed worker host. The PartyKit project name is `chptr-collab` (`partykit.json`).
+The Next.js app and the collab worker are deployed separately. They must share `PARTYKIT_SECRET`, and the worker’s `APP_URL` must be the public URL of the Next.js app. The client’s `NEXT_PUBLIC_PARTYKIT_HOST` must be the deployed worker host (no scheme). The Worker name is `chptr-collab` (`wrangler.jsonc`).
 
 ```bash
 npm run build
 npm run start          # or: npm run preview  (build, then start)
+npx wrangler login
 npm run deploy:partykit
+npx wrangler secret put APP_URL
+npx wrangler secret put PARTYKIT_SECRET
 ```
 
-Set `APP_URL` and `PARTYKIT_SECRET` on the PartyKit project after deploy (`npx partykit env add …`). Step-by-step notes are in [PARTYKIT.md](./PARTYKIT.md).
+Step-by-step notes are in [PARTYKIT.md](./PARTYKIT.md).
 
 ## Scripts 📄
 
 | Script                                  | What it does                |
 | --------------------------------------- | --------------------------- |
 | `npm run dev`                           | Next.js dev server          |
-| `npm run dev:partykit`                  | Local PartyKit worker       |
+| `npm run dev:partykit`                  | Local collab worker         |
 | `npm run build` / `start` / `preview`   | Production build and server |
-| `npm run deploy:partykit`               | Deploy the PartyKit worker  |
+| `npm run deploy:partykit`               | Deploy the collab worker    |
 | `npm run check`                         | Lint and typecheck          |
 | `npm run lint` / `lint:fix`             | ESLint                      |
-| `npm run typecheck`                     | `tsc --noEmit`              |
+| `npm run typecheck`                     | App and collab worker       |
 | `npm run format:check` / `format:write` | Prettier                    |
 
 ## More documentation
