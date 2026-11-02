@@ -98,5 +98,10 @@
   "packageManager": "npm@10.9.0",
   "engines": {
     "node": ">=22.0.0"
+  },
+  "overrides": {
+    "wrangler": {
+      "@cloudflare/workers-types": "$@cloudflare/workers-types"
+    }
   }
 }
