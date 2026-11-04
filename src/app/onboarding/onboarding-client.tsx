@@ -34,6 +34,7 @@ import {
 } from "~/app/_components/form";
 import { Input } from "~/app/_components/input";
 import { SaveFeedbackLabel } from "~/app/_components/save-feedback-label";
+import { UrlPathField } from "~/app/_components/url-path-field";
 import { UserAvatar } from "~/app/_components/user-avatar";
 import { markDocumentAsNew } from "~/hooks/use-new-document-flag";
 import { signupProfileSchema } from "~/lib/account-schema";
@@ -42,7 +43,6 @@ import {
   suggestedHandleFromAuthorName,
   validateHandleFormat,
 } from "~/lib/author-handle";
-import { formControlClassName } from "~/lib/form-control-styles";
 import { formSpacing } from "~/lib/form-spacing";
 import {
   chooseFirstDocument,
@@ -599,38 +599,16 @@ function HandleStep({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Your link</FormLabel>
-                <div
-                  className={cn(
-                    "flex h-9 w-full items-center rounded-md px-3",
-                    formControlClassName,
-                    "focus-within:border-foreground/40 focus-within:outline-none focus-within:ring-1 focus-within:ring-foreground/10",
-                  )}
-                  onMouseDown={(event) => {
-                    if (event.target instanceof HTMLInputElement) return;
-                    event.preventDefault();
-                    event.currentTarget.querySelector("input")?.focus();
-                  }}
-                >
-                  <span
-                    className="shrink-0 select-none text-base text-muted-foreground md:text-sm"
-                    aria-hidden
-                  >
-                    {PUBLIC_SITE_HOST}/
-                  </span>
-                  <FormControl>
-                    <input
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/65 md:text-sm"
-                      {...field}
-                      onChange={(event) => {
-                        field.onChange(event);
-                        onEdit(event.target.value);
-                      }}
-                    />
-                  </FormControl>
-                </div>
+                <FormControl>
+                  <UrlPathField
+                    prefix={`${PUBLIC_SITE_HOST}/`}
+                    {...field}
+                    onChange={(event) => {
+                      field.onChange(event);
+                      onEdit(event.target.value);
+                    }}
+                  />
+                </FormControl>
                 <div className="min-h-5">
                   {formatError ? (
                     <p className="text-[0.8rem] font-medium text-destructive">

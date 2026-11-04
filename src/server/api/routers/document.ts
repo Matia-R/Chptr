@@ -14,6 +14,7 @@ import {
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,
+  updatePublicationSlug,
   unpublishDocument,
 } from "~/server/db";
 import type { PartykitSupabase } from "~/server/partykit/auth";
@@ -149,6 +150,17 @@ export const documentRouter = createTRPCRouter({
         },
         authFromCtx(ctx),
       );
+    }),
+
+  updatePublicationSlug: onboardedProcedure
+    .input(
+      z.object({
+        documentId: z.string().uuid(),
+        slug: z.string().min(1).max(200),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      return updatePublicationSlug(input, authFromCtx(ctx));
     }),
 
   unpublishDocument: onboardedProcedure

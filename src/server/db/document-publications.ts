@@ -690,6 +690,123 @@ export async function publishDocument(
   };
 }
 
+/** Changes the public path only. Content, title, and publish time stay as they are. */
+export async function updatePublicationSlug(
+  input: { documentId: string; slug: string },
+  auth: AuthContext,
+) {
+  const { supabase, userId } = auth;
+
+  const { data: permission, error: permError } = await supabase
+    .from("document_permissions")
+    .select("id")
+    .eq("document_id", input.documentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (permError) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: permError.message,
+    });
+  }
+
+  if (!permission) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You do not have permission to edit this document",
+    });
+  }
+
+  const { data: existingRaw, error: existingError } = await supabase
+    .from("document_publications")
+    .select("document_id, creator_id, owner_username, slug")
+    .eq("document_id", input.documentId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: existingError.message,
+    });
+  }
+
+  const existing = existingRaw as Pick<
+    DocumentPublicationRow,
+    "document_id" | "creator_id" | "owner_username" | "slug"
+  > | null;
+
+  if (!existing) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "This document is not published",
+    });
+  }
+
+  const requested = input.slug.trim();
+  if (!requested) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Enter a URL slug",
+    });
+  }
+
+  const finalSlug = await allocateSlug(
+    supabase,
+    existing.owner_username,
+    slugifyTitle(requested),
+    input.documentId,
+  );
+
+  if (finalSlug === existing.slug) {
+    return {
+      success: true as const,
+      slug: finalSlug,
+      publicPath: `/${existing.owner_username}/${finalSlug}`,
+    };
+  }
+
+  const { error: updateError } = await supabase
+    .from("document_publications")
+    .update({ slug: finalSlug })
+    .eq("document_id", input.documentId);
+
+  if (updateError) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: updateError.message,
+    });
+  }
+
+  await recordPublicationPathRedirect(supabase, {
+    fromOwnerUsername: existing.owner_username,
+    fromSlug: existing.slug,
+    toOwnerUsername: existing.owner_username,
+    toSlug: finalSlug,
+    documentId: input.documentId,
+    creatorId: existing.creator_id,
+  });
+
+  const { error: liveRedirectDeleteError } = await supabase
+    .from("document_publication_redirects")
+    .delete()
+    .eq("from_owner_username", existing.owner_username)
+    .eq("from_slug", finalSlug);
+
+  if (liveRedirectDeleteError) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: liveRedirectDeleteError.message,
+    });
+  }
+
+  revalidatePath(`/${existing.owner_username}/${existing.slug}`);
+  const publicPath = `/${existing.owner_username}/${finalSlug}`;
+  revalidatePath(publicPath);
+
+  return { success: true as const, slug: finalSlug, publicPath };
+}
+
 export async function unpublishDocument(documentId: string, auth: AuthContext) {
   const { supabase, userId } = auth;
 

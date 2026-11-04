@@ -32,6 +32,7 @@ export {
   getPublicationByDocumentId,
   getPublicationOwnerPathSegmentForDocument,
   publishDocument,
+  updatePublicationSlug,
   unpublishDocument,
   type DocumentPublicationRow,
   type PublishedAuthorProfileRow,

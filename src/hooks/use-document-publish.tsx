@@ -20,8 +20,8 @@ import {
 import { useRouteDocumentId } from "~/hooks/use-route-document-id";
 
 import { Button } from "~/app/_components/button";
-import { ToastAction } from "~/app/_components/toast";
 import { Input } from "~/app/_components/input";
+import { ToastAction } from "~/app/_components/toast";
 import {
   SAVE_FEEDBACK_MIN_SAVING_MS,
   SAVE_FEEDBACK_RESULT_MS,
@@ -30,6 +30,7 @@ import {
 import { useToast } from "~/hooks/use-toast";
 import { useNewDocumentFlag } from "~/hooks/use-new-document-flag";
 import { PUBLIC_SITE_HOST } from "~/lib/public-url";
+import { formControlClassName } from "~/lib/form-control-styles";
 import { slugifyTitle } from "~/lib/slug";
 import { cn } from "~/lib/utils";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -96,10 +97,13 @@ export type DocumentPublishValue = {
       value?: string;
       onChange?: (value: string) => void;
       inputRef?: Ref<HTMLInputElement>;
+      disabled?: boolean;
     },
   ) => ReactNode;
   unpublish: () => void;
   unpublishPending: boolean;
+  /** Saves the public slug without republishing document content. */
+  savePublicationSlug: (slug: string) => Promise<boolean>;
   /** Effective path segment for the public URL (slug override or publication). */
   publicSlugSegment: string;
   /** Slug field differs from last published / default — counts toward publish. */
@@ -381,7 +385,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         documentId,
         title,
         blocksJson,
-        slug: slugOverride.trim() || undefined,
+        slug: slugOverride.trim() || publication?.slug,
         font,
       });
 
@@ -447,11 +451,15 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         value?: string;
         onChange?: (value: string) => void;
         inputRef?: Ref<HTMLInputElement>;
+        disabled?: boolean;
       },
     ) => {
       const isDrawerMobileSurface = surface === "mobile";
       const isControlled = options?.value !== undefined && !!options.onChange;
-      const inputValue = isControlled ? options.value : slugOverride;
+      const inputValue = (isControlled ? options?.value : slugOverride) ?? "";
+      // The suggested slug is real text, not a placeholder, so the caret can
+      // move through it. An empty override still means "use the suggestion".
+      const shownValue = inputValue.length > 0 ? inputValue : slugPlaceholder;
       const inputId =
         options?.inputId ??
         (isDrawerMobileSurface ? "publish-slug-mobile" : "publish-slug");
@@ -470,18 +478,22 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                     "focus-within:ring-1 focus-within:ring-ring",
                   )
                 : cn(
-                    "min-h-9 rounded-md border border-input",
-                    "dark:border-sidebar-border",
-                    "focus-within:border-foreground/40 focus-within:ring-1 focus-within:ring-foreground/10",
+                    "h-9 items-center rounded-md pl-3",
+                    showInlineRevert ? "pr-1" : "pr-3",
+                    formControlClassName,
+                    "focus-within:border-foreground/40 focus-within:outline-none focus-within:ring-1 focus-within:ring-foreground/10",
                   ),
             )}
           >
             <span
               className={cn(
-                "inline-flex shrink-0 items-center border-r px-2 py-1.5 text-xs sm:text-sm",
+                "shrink-0 select-none font-normal",
                 isDrawerMobileSurface
-                  ? "border-sidebar-border/60 bg-muted/30 text-muted-foreground dark:border-white/[0.1] dark:bg-white/[0.06]"
-                  : "border-input bg-muted/40 text-muted-foreground dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground/70",
+                  ? cn(
+                      "inline-flex items-center border-r px-2 py-1.5 text-xs sm:text-sm",
+                      "border-sidebar-border/60 bg-muted/30 text-muted-foreground dark:border-white/[0.1] dark:bg-white/[0.06]",
+                    )
+                  : "whitespace-nowrap text-base text-muted-foreground md:text-sm",
               )}
               title={urlPrefixTitle}
               aria-hidden
@@ -498,12 +510,18 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               spellCheck={false}
               enterKeyHint="done"
               className={cn(
-                "min-w-0 flex-1 border-0 bg-[hsl(var(--input-background))] px-2 py-1 text-sidebar-foreground shadow-none focus-visible:ring-0",
-                isDrawerMobileSurface ? "h-10 text-base" : "h-9",
-                showInlineRevert ? "rounded-none" : "rounded-r-md",
+                "min-w-0 flex-1 shadow-none",
+                isDrawerMobileSurface
+                  ? cn(
+                      "h-10 rounded-r-md border-0 bg-[hsl(var(--input-background))] px-2 py-1 text-base text-sidebar-foreground focus-visible:ring-0",
+                    )
+                  : cn(
+                      "h-9 rounded-none border-0 bg-transparent px-0 font-normal text-foreground",
+                      "focus-visible:border-transparent focus-visible:ring-0",
+                    ),
               )}
               placeholder={slugPlaceholder}
-              value={inputValue}
+              value={shownValue}
               onChange={(e) => {
                 const next = e.target.value.replace(/\s+/g, "-");
                 if (isControlled) {
@@ -512,16 +530,16 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                   setSlugOverride(next);
                 }
               }}
-              disabled={busy}
+              disabled={busy || options?.disabled}
             />
             {showInlineRevert ? (
               <Button
                 type="button"
-                variant="ghost"
+                variant="ghostText"
                 size="icon"
                 disabled={busy}
                 title="Revert URL slug"
-                className="h-9 w-9 shrink-0 rounded-none rounded-r-md border-l border-input bg-[hsl(var(--input-background))] text-muted-foreground transition-colors hover:text-foreground dark:border-sidebar-border"
+                className="size-7 shrink-0 self-center disabled:opacity-100"
                 onClick={revertSlugStore}
               >
                 <Undo2 className="h-4 w-4" aria-hidden />
@@ -550,6 +568,35 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       urlPrefixDisplay,
       urlPrefixTitle,
     ],
+  );
+
+  const updateSlugMutation = api.document.updatePublicationSlug.useMutation({
+    onSuccess: (result) => {
+      if (!documentId) return;
+      utils.document.getPublicationByDocumentId.setData(documentId, (current) =>
+        current ? { ...current, slug: result.slug } : current,
+      );
+      void utils.document.getPublicationByDocumentId.invalidate(documentId);
+    },
+  });
+
+  const savePublicationSlug = useCallback(
+    async (slug: string) => {
+      if (!documentId) return false;
+      try {
+        await updateSlugMutation.mutateAsync({ documentId, slug });
+        setSlugOverride("");
+        return true;
+      } catch (err: unknown) {
+        toast({
+          variant: "destructive",
+          title: "Couldn't update the URL",
+          description: getErrorMessage(err),
+        });
+        return false;
+      }
+    },
+    [documentId, setSlugOverride, toast, updateSlugMutation],
   );
 
   const unpublish = useCallback(() => {
@@ -583,6 +630,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
       buildUrlSlugCluster,
       unpublish,
       unpublishPending: unpublishMutation.isPending,
+      savePublicationSlug,
       publicSlugSegment: previewSlugSegment,
       hasPendingSlugChange,
       revertSlug: revertSlugStore,
@@ -608,6 +656,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
     publishButtonLabel,
     publishFeedback,
     revertSlugStore,
+    savePublicationSlug,
     showPublishedPopoverActions,
     unpublish,
     unpublishMutation.isPending,
