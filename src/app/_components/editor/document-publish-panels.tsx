@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
-  Copy,
   CloudUpload,
   ExternalLink,
   BookOpen,
@@ -21,8 +20,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "~/app/_components/button";
-import { Label } from "~/app/_components/label";
-import { PanelHeader } from "~/app/_components/panel-header";
 import {
   publishFeedbackToSaveState,
   SaveFeedbackContent,
@@ -416,7 +413,6 @@ function PublishedArticleSection({
   hasChangesToPublish,
   unpublish,
   unpublishPending,
-  copyPublicUrl,
 }: {
   publication: NonNullable<DocumentPublishValue["publication"]>;
   buildUrlSlugCluster: DocumentPublishValue["buildUrlSlugCluster"];
@@ -429,7 +425,6 @@ function PublishedArticleSection({
   hasChangesToPublish: boolean;
   unpublish: DocumentPublishValue["unpublish"];
   unpublishPending: boolean;
-  copyPublicUrl: DocumentPublishValue["copyPublicUrl"];
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(publication.slug);
@@ -482,7 +477,7 @@ function PublishedArticleSection({
         <div className="grid min-w-0 gap-2">
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <span
-              className="size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
+              className="size-2 shrink-0 rounded-full bg-emerald-500"
               aria-hidden
             />
             Live at
@@ -499,10 +494,7 @@ function PublishedArticleSection({
                   aria-hidden
                 />
               </span>
-              <span className="flex shrink-0 gap-0.5">
-                <span className="size-9" />
-                <span className="size-9" />
-              </span>
+              <span className="size-9 shrink-0" />
             </div>
             <AnimatePresence mode="wait" initial={false}>
               {editing ? (
@@ -579,28 +571,15 @@ function PublishedArticleSection({
                       aria-hidden
                     />
                   </Link>
-                  <div className="flex shrink-0 gap-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Copy link"
-                      onClick={() => {
-                        void copyPublicUrl();
-                      }}
-                    >
-                      <Copy aria-hidden />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Edit URL"
-                      onClick={beginEdit}
-                    >
-                      <Pencil aria-hidden />
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Edit URL"
+                    onClick={beginEdit}
+                  >
+                    <Pencil aria-hidden />
+                  </Button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -653,15 +632,6 @@ function PublishedArticleSection({
   );
 }
 
-function ArticleUrlField({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid min-w-0 gap-2">
-      <Label htmlFor="publish-slug">Article URL</Label>
-      {children}
-    </div>
-  );
-}
-
 /** Desktop publish popover body. Render inside `<PopoverContent className="grid gap-6 …">`. */
 export function DocumentPublishPopoverPanel() {
   const ctx = useDocumentPublish();
@@ -681,7 +651,6 @@ export function DocumentPublishPopoverPanel() {
     savePublicationSlug,
     unpublish,
     unpublishPending,
-    copyPublicUrl,
   } = ctx;
 
   const pub = publication;
@@ -689,10 +658,6 @@ export function DocumentPublishPopoverPanel() {
 
   return (
     <>
-      <PanelHeader
-        title={!showPublishedPopoverActions || !pub ? "Publish" : "Published"}
-      />
-
       {showPublishedPopoverActions && pub ? (
         <PublishedArticleSection
           publication={pub}
@@ -706,10 +671,9 @@ export function DocumentPublishPopoverPanel() {
           hasChangesToPublish={hasChangesToPublish}
           unpublish={unpublish}
           unpublishPending={unpublishPending}
-          copyPublicUrl={copyPublicUrl}
         />
       ) : (
-        <ArticleUrlField>{buildUrlSlugCluster("popover")}</ArticleUrlField>
+        buildUrlSlugCluster("popover")
       )}
 
       {showPublishedPopoverActions ? null : (

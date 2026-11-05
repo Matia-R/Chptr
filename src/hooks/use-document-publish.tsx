@@ -573,8 +573,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
   const updateSlugMutation = api.document.updatePublicationSlug.useMutation({
     onSuccess: (result) => {
       if (!documentId) return;
-      utils.document.getPublicationByDocumentId.setData(documentId, (current) =>
-        current ? { ...current, slug: result.slug } : current,
+      utils.document.getPublicationByDocumentId.setData(
+        documentId,
+        (current) => (current ? { ...current, slug: result.slug } : current),
       );
       void utils.document.getPublicationByDocumentId.invalidate(documentId);
     },
