@@ -80,6 +80,7 @@ function closeCodeFromHttpStatus(status: number): {
   return { errorCode: 4005, errorMessage: "Failed to authorize" };
 }
 
+/** Reads the connection's authorized client, if authorize already stored one. */
 function readAuth(connection: Connection): AuthorizedClient | null {
   const state = connection.state;
   if (!state || typeof state !== "object") return null;
