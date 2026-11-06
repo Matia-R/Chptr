@@ -58,6 +58,21 @@ import { useOpenDocumentPreview } from "~/app/_components/document-preview";
 import { useCopyDocumentLink } from "~/hooks/use-copy-document-link";
 import { useTrashDocument } from "~/hooks/use-trash-document";
 
+/** Same fade as save feedback, a quarter faster. */
+const URL_EDIT_TRANSITION = {
+  duration: SAVE_FEEDBACK_CONTENT_TRANSITION.duration * 0.75,
+  ease: SAVE_FEEDBACK_CONTENT_TRANSITION.ease,
+};
+
+function isUrlEditEnterComplete(definition: unknown) {
+  return (
+    typeof definition === "object" &&
+    definition !== null &&
+    "opacity" in definition &&
+    definition.opacity === 1
+  );
+}
+
 function MobilePublishActionRow({
   extraDisabled = false,
 }: {
@@ -432,15 +447,13 @@ function PublishedArticleSection({
   const feedback = useSaveFeedback();
   const liveUrl = `${PUBLIC_SITE_HOST}/${publication.owner_username}/${publication.slug}`;
 
-  useEffect(() => {
-    if (!editing) return;
-    const frame = window.requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      const length = inputRef.current?.value.length ?? 0;
-      inputRef.current?.setSelectionRange(length, length);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [editing]);
+  function focusSlugAtEnd() {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+  }
 
   function beginEdit() {
     setDraft(publication.slug);
@@ -503,7 +516,11 @@ function PublishedArticleSection({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
+                  transition={URL_EDIT_TRANSITION}
+                  onAnimationComplete={(definition) => {
+                    if (!isUrlEditEnterComplete(definition)) return;
+                    focusSlugAtEnd();
+                  }}
                   className="absolute inset-0 flex items-center gap-1"
                 >
                   <div className="min-w-0 flex-1">
@@ -554,7 +571,7 @@ function PublishedArticleSection({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  transition={SAVE_FEEDBACK_CONTENT_TRANSITION}
+                  transition={URL_EDIT_TRANSITION}
                   className="absolute inset-0 flex items-center gap-2"
                 >
                   <Link
