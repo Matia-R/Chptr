@@ -98,6 +98,8 @@ export type DocumentPublishValue = {
       onChange?: (value: string) => void;
       inputRef?: Ref<HTMLInputElement>;
       disabled?: boolean;
+      /** Accessible name when the field has no visible label. */
+      ariaLabel?: string;
     },
   ) => ReactNode;
   unpublish: () => void;
@@ -452,6 +454,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         onChange?: (value: string) => void;
         inputRef?: Ref<HTMLInputElement>;
         disabled?: boolean;
+        ariaLabel?: string;
       },
     ) => {
       const isDrawerMobileSurface = surface === "mobile";
@@ -521,6 +524,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                     ),
               )}
               placeholder={slugPlaceholder}
+              aria-label={options?.ariaLabel}
               value={shownValue}
               onChange={(e) => {
                 const next = e.target.value.replace(/\s+/g, "-");
@@ -577,10 +581,14 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         documentId,
         (current) => (current ? { ...current, slug: result.slug } : current),
       );
+    },
+    onSettled: () => {
+      if (!documentId) return;
       void utils.document.getPublicationByDocumentId.invalidate(documentId);
     },
   });
 
+  /** Saves a slug without republishing. Returns false when the request fails. */
   const savePublicationSlug = useCallback(
     async (slug: string) => {
       if (!documentId) return false;

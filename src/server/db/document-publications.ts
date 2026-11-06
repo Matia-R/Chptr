@@ -690,7 +690,10 @@ export async function publishDocument(
   };
 }
 
-/** Changes the public path only. Content, title, and publish time stay as they are. */
+/**
+ * Changes the public path only. Content, title, and publish time stay as they are.
+ * The slug update and redirect bookkeeping commit in one database function.
+ */
 export async function updatePublicationSlug(
   input: { documentId: string; slug: string },
   auth: AuthContext,
@@ -766,37 +769,36 @@ export async function updatePublicationSlug(
     };
   }
 
-  const { error: updateError } = await supabase
-    .from("document_publications")
-    .update({ slug: finalSlug })
-    .eq("document_id", input.documentId);
+  const { error: slugUpdateError } = (await supabase.rpc(
+    "update_publication_slug_with_redirect",
+    {
+      p_document_id: input.documentId,
+      p_slug: finalSlug,
+    },
+  )) as { error: { code?: string; message: string } | null };
 
-  if (updateError) {
+  if (slugUpdateError) {
+    if (slugUpdateError.code === "23505") {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "That URL is already in use. Try a different slug.",
+      });
+    }
+    if (slugUpdateError.code === "42501") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You do not have permission to edit this document",
+      });
+    }
+    if (slugUpdateError.code === "P0002") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "This document is not published",
+      });
+    }
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: updateError.message,
-    });
-  }
-
-  await recordPublicationPathRedirect(supabase, {
-    fromOwnerUsername: existing.owner_username,
-    fromSlug: existing.slug,
-    toOwnerUsername: existing.owner_username,
-    toSlug: finalSlug,
-    documentId: input.documentId,
-    creatorId: existing.creator_id,
-  });
-
-  const { error: liveRedirectDeleteError } = await supabase
-    .from("document_publication_redirects")
-    .delete()
-    .eq("from_owner_username", existing.owner_username)
-    .eq("from_slug", finalSlug);
-
-  if (liveRedirectDeleteError) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: liveRedirectDeleteError.message,
+      message: slugUpdateError.message,
     });
   }
 

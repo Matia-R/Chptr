@@ -64,6 +64,7 @@ const URL_EDIT_TRANSITION = {
   ease: SAVE_FEEDBACK_CONTENT_TRANSITION.ease,
 };
 
+/** True when the slug editor's enter animation has finished, not its exit. */
 function isUrlEditEnterComplete(definition: unknown) {
   return (
     typeof definition === "object" &&
@@ -416,6 +417,7 @@ export function DocumentPublishMobileDrawer({
   );
 }
 
+/** Published popover: live URL, slug editor, and unpublish / update actions. */
 function PublishedArticleSection({
   publication,
   buildUrlSlugCluster,
@@ -447,6 +449,7 @@ function PublishedArticleSection({
   const feedback = useSaveFeedback();
   const liveUrl = `${PUBLIC_SITE_HOST}/${publication.owner_username}/${publication.slug}`;
 
+  /** Puts the caret at the end of the slug after the edit transition. */
   function focusSlugAtEnd() {
     const input = inputRef.current;
     if (!input) return;
@@ -455,17 +458,20 @@ function PublishedArticleSection({
     input.setSelectionRange(end, end);
   }
 
+  /** Opens the slug editor with the currently published slug. */
   function beginEdit() {
     setDraft(publication.slug);
     setEditing(true);
   }
 
+  /** Closes the slug editor and restores the published slug. */
   function cancelEdit() {
     if (feedback.inFlight || feedback.state === "saved") return;
     setDraft(publication.slug);
     setEditing(false);
   }
 
+  /** Saves a changed slug, or closes the editor when the slug is unchanged. */
   async function confirmEdit() {
     if (feedback.inFlight) return;
     const next = draft.trim();
@@ -528,6 +534,7 @@ function PublishedArticleSection({
                       value: draft,
                       onChange: setDraft,
                       inputRef,
+                      ariaLabel: "Article URL",
                       disabled: feedback.inFlight || feedback.state === "saved",
                     })}
                   </div>
@@ -549,7 +556,11 @@ function PublishedArticleSection({
                     aria-label={
                       feedback.state === "saving" ? "Saving URL" : "Save URL"
                     }
-                    disabled={feedback.inFlight || feedback.state === "saved"}
+                    disabled={
+                      busy ||
+                      feedback.inFlight ||
+                      feedback.state === "saved"
+                    }
                     onClick={() => {
                       void confirmEdit();
                     }}
@@ -610,7 +621,7 @@ function PublishedArticleSection({
         <Button
           type="button"
           variant="outline"
-          disabled={busy || publicationLoading}
+          disabled={busy || publicationLoading || feedback.inFlight}
           className="min-w-0 flex-1 !px-4 transition-[transform,background-color,color,opacity] duration-200 ease-out active:scale-[0.98]"
           onClick={unpublish}
         >
@@ -628,6 +639,7 @@ function PublishedArticleSection({
           )}
           disabled={
             busy ||
+            feedback.inFlight ||
             !editor ||
             publicationLoading ||
             (!hasChangesToPublish && publishFeedback === "idle")
