@@ -14,6 +14,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  type KeyboardEvent,
   type ReactNode,
   type Ref,
 } from "react";
@@ -100,6 +101,7 @@ export type DocumentPublishValue = {
       disabled?: boolean;
       /** Accessible name when the field has no visible label. */
       ariaLabel?: string;
+      onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
     },
   ) => ReactNode;
   unpublish: () => void;
@@ -457,6 +459,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         inputRef?: Ref<HTMLInputElement>;
         disabled?: boolean;
         ariaLabel?: string;
+        onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
       },
     ) => {
       const isDrawerMobileSurface = surface === "mobile";
@@ -536,6 +539,7 @@ export function useDocumentPublish(): DocumentPublishValue | null {
                   setSlugOverride(next);
                 }
               }}
+              onKeyDown={options?.onKeyDown}
               disabled={busy || options?.disabled}
             />
             {showInlineRevert ? (

@@ -487,6 +487,26 @@ function PublishedArticleSection({
     }
   }
 
+  // Capture Escape before the popover dismisses, so edit mode exits first.
+  useEffect(() => {
+    if (!editing) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (feedback.inFlight || feedback.state === "saved") return;
+      setDraft(publication.slug);
+      setEditing(false);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    editing,
+    feedback.inFlight,
+    feedback.state,
+    publication.slug,
+  ]);
+
   return (
     <section
       className="flex min-w-0 flex-col gap-5"
@@ -536,18 +556,26 @@ function PublishedArticleSection({
                       inputRef,
                       ariaLabel: "Article URL",
                       disabled: feedback.inFlight || feedback.state === "saved",
+                      onKeyDown: (event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        void confirmEdit();
+                      },
                     })}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Cancel URL edit"
-                    disabled={feedback.inFlight || feedback.state === "saved"}
-                    onClick={cancelEdit}
-                  >
-                    <X aria-hidden />
-                  </Button>
+                  {feedback.state === "saving" ||
+                  feedback.state === "saved" ? null : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Cancel URL edit"
+                      disabled={feedback.inFlight}
+                      onClick={cancelEdit}
+                    >
+                      <X aria-hidden />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
