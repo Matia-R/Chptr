@@ -383,12 +383,14 @@ export function useDocumentPublish(): DocumentPublishValue | null {
           ? readDocumentFontId(liveBeforePublish.ydoc)
           : DEFAULT_DOCUMENT_FONT_ID;
 
+      // Slug rides with first publish only. Later path edits use the slug API.
+      const editedSlug = slugOverride.trim();
       await publishMutation.mutateAsync({
         documentId,
         title,
         blocksJson,
-        slug: slugOverride.trim() || publication?.slug,
         font,
+        ...(isFirstTimePublish && editedSlug ? { slug: editedSlug } : {}),
       });
 
       const live = useCollaborativeDocStore.getState();

@@ -472,6 +472,10 @@ export async function getPublicationOwnerPathSegmentForDocument(
   };
 }
 
+/**
+ * Creates or refreshes the published snapshot. Optional `slug` is used only on
+ * first publish; a later update leaves the stored path alone.
+ */
 export async function publishDocument(
   input: {
     documentId: string;
@@ -597,14 +601,6 @@ export async function publishDocument(
   const title =
     titleInput.length > 0 ? titleInput : (doc.name?.trim() ?? "Untitled");
   const slugInput = input.slug?.trim();
-  const baseSlug = slugInput ? slugifyTitle(slugInput) : slugifyTitle(title);
-
-  const finalSlug = await allocateSlug(
-    supabase,
-    ownerUsername,
-    baseSlug,
-    input.documentId,
-  );
 
   const priorResult = await supabase
     .from("document_publications")
@@ -621,7 +617,80 @@ export async function publishDocument(
 
   const priorPub = priorResult.data as PriorPublicationRow | null;
 
-  const publishedAt = priorPub?.published_at ?? new Date().toISOString();
+  // Republish never changes the public path. Slug is only chosen on create;
+  // later renames go through updatePublicationSlug.
+  if (priorPub) {
+    const updateResult = await supabase
+      .from("document_publications")
+      .update({
+        creator_id: doc.creator_id,
+        owner_username: ownerUsername,
+        title,
+        body_html: bodyHtml,
+        blocks_json: blocksParsed,
+        font: input.font,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("document_id", input.documentId)
+      .select()
+      .single();
+
+    if (updateResult.error) {
+      if (updateResult.error.code === "PGRST116") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "This document is not published",
+        });
+      }
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: updateResult.error.message,
+      });
+    }
+
+    const updated = updateResult.data as DocumentPublicationRow;
+    if (priorPub.owner_username !== ownerUsername) {
+      await recordPublicationPathRedirect(supabase, {
+        fromOwnerUsername: priorPub.owner_username,
+        fromSlug: priorPub.slug,
+        toOwnerUsername: ownerUsername,
+        toSlug: updated.slug,
+        documentId: input.documentId,
+        creatorId: doc.creator_id,
+      });
+      revalidatePath(`/${priorPub.owner_username}/${priorPub.slug}`);
+
+      const { error: liveRedirectDeleteError } = await supabase
+        .from("document_publication_redirects")
+        .delete()
+        .eq("from_owner_username", ownerUsername)
+        .eq("from_slug", updated.slug);
+
+      if (liveRedirectDeleteError) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: liveRedirectDeleteError.message,
+        });
+      }
+    }
+
+    const path = `/${updated.owner_username}/${updated.slug}`;
+    revalidatePath(path);
+
+    return {
+      success: true as const,
+      publication: updated,
+      publicPath: path,
+    };
+  }
+
+  const baseSlug = slugInput ? slugifyTitle(slugInput) : slugifyTitle(title);
+  const finalSlug = await allocateSlug(
+    supabase,
+    ownerUsername,
+    baseSlug,
+    input.documentId,
+  );
 
   const row = {
     document_id: input.documentId,
@@ -632,39 +701,24 @@ export async function publishDocument(
     body_html: bodyHtml,
     blocks_json: blocksParsed,
     font: input.font,
-    published_at: publishedAt,
+    published_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  const upsertResult = await supabase
+  const insertResult = await supabase
     .from("document_publications")
-    .upsert(row, { onConflict: "document_id" })
+    .insert(row)
     .select()
     .single();
 
-  if (upsertResult.error) {
+  if (insertResult.error) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: upsertResult.error.message,
+      message: insertResult.error.message,
     });
   }
 
-  const upserted = upsertResult.data as DocumentPublicationRow;
-
-  if (
-    priorPub &&
-    (priorPub.slug !== finalSlug || priorPub.owner_username !== ownerUsername)
-  ) {
-    await recordPublicationPathRedirect(supabase, {
-      fromOwnerUsername: priorPub.owner_username,
-      fromSlug: priorPub.slug,
-      toOwnerUsername: ownerUsername,
-      toSlug: finalSlug,
-      documentId: input.documentId,
-      creatorId: doc.creator_id,
-    });
-    revalidatePath(`/${priorPub.owner_username}/${priorPub.slug}`);
-  }
+  const inserted = insertResult.data as DocumentPublicationRow;
 
   // Live publication path must not also be a redirect source.
   const { error: liveRedirectDeleteError } = await supabase
@@ -685,7 +739,7 @@ export async function publishDocument(
 
   return {
     success: true as const,
-    publication: upserted,
+    publication: inserted,
     publicPath: path,
   };
 }
