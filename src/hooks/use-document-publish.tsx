@@ -478,30 +478,20 @@ export function useDocumentPublish(): DocumentPublishValue | null {
         <>
           <div
             className={cn(
-              "flex w-full min-w-0 items-stretch overflow-hidden",
+              "flex w-full min-w-0 items-center overflow-hidden rounded-md pl-3",
+              formControlClassName,
+              "focus-within:border-foreground/40 focus-within:outline-none focus-within:ring-1 focus-within:ring-foreground/10",
               isDrawerMobileSurface
-                ? cn(
-                    "min-h-10 rounded-lg border border-sidebar-border/70 bg-background/50 shadow-inner",
-                    "dark:border-white/[0.12] dark:bg-black/35",
-                    "focus-within:ring-1 focus-within:ring-ring",
-                  )
-                : cn(
-                    "h-9 items-center rounded-md pl-3",
-                    showInlineRevert ? "pr-1" : "pr-3",
-                    formControlClassName,
-                    "focus-within:border-foreground/40 focus-within:outline-none focus-within:ring-1 focus-within:ring-foreground/10",
-                  ),
+                ? "h-10 min-h-10 pr-3"
+                : cn("h-9", showInlineRevert ? "pr-1" : "pr-3"),
             )}
           >
             <span
               className={cn(
-                "shrink-0 select-none font-normal",
+                "shrink-0 select-none whitespace-nowrap font-normal text-muted-foreground",
                 isDrawerMobileSurface
-                  ? cn(
-                      "inline-flex items-center border-r px-2 py-1.5 text-xs sm:text-sm",
-                      "border-sidebar-border/60 bg-muted/30 text-muted-foreground dark:border-white/[0.1] dark:bg-white/[0.06]",
-                    )
-                  : "whitespace-nowrap text-base text-muted-foreground md:text-sm",
+                  ? "text-base"
+                  : "text-base md:text-sm",
               )}
               title={urlPrefixTitle}
               aria-hidden
@@ -518,15 +508,9 @@ export function useDocumentPublish(): DocumentPublishValue | null {
               spellCheck={false}
               enterKeyHint="done"
               className={cn(
-                "min-w-0 flex-1 shadow-none",
-                isDrawerMobileSurface
-                  ? cn(
-                      "h-10 rounded-r-md border-0 bg-[hsl(var(--input-background))] px-2 py-1 text-base text-sidebar-foreground focus-visible:ring-0",
-                    )
-                  : cn(
-                      "h-9 rounded-none border-0 bg-transparent px-0 font-normal text-foreground",
-                      "focus-visible:border-transparent focus-visible:ring-0",
-                    ),
+                "min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 font-normal text-foreground shadow-none",
+                "focus-visible:border-transparent focus-visible:ring-0",
+                isDrawerMobileSurface ? "h-10 text-base" : "h-9",
               )}
               placeholder={slugPlaceholder}
               aria-label={options?.ariaLabel}

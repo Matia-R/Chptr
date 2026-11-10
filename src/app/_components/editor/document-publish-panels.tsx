@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
-  CloudUpload,
   ExternalLink,
   BookOpen,
   Check,
@@ -13,6 +12,7 @@ import {
   GlobeOff,
   Link as LinkIcon,
   Loader2,
+  RefreshCw,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -37,6 +37,7 @@ import {
   MobileDrawerFieldView,
   MobileDrawerScreenHeader,
   MobileDrawerViewStack,
+  useMobileDrawerLeave,
   useMobileDrawerStage,
 } from "~/app/_components/mobile-drawer";
 
@@ -91,10 +92,16 @@ function MobilePublishActionRow({
     showPublishedPopoverActions,
   } = ctx;
 
+  const idleIcon = showPublishedPopoverActions
+    ? hasChangesToPublish
+      ? RefreshCw
+      : Check
+    : Globe;
+
   return (
     <MobileActionFeedbackRow
       state={publishFeedbackToSaveState(publishFeedback)}
-      idleIcon={CloudUpload}
+      idleIcon={idleIcon}
       failedIcon={X}
       idleLabel={
         showPublishedPopoverActions
@@ -132,51 +139,122 @@ function MobilePublishEditUrlView({
   buildUrlSlugCluster,
   ownerPreview,
   busy,
+  publishedSlug,
+  savePublicationSlug,
   onBack,
   onDone,
 }: {
   buildUrlSlugCluster: DocumentPublishValue["buildUrlSlugCluster"];
   ownerPreview: string | null;
   busy: boolean;
+  /** Live slug when published; null stages the field for first publish. */
+  publishedSlug: string | null;
+  savePublicationSlug: DocumentPublishValue["savePublicationSlug"];
   onBack: () => void;
   onDone: () => void;
 }) {
   const slugOverride = useDocumentPublishStore((s) => s.slugOverride);
   const setSlugOverride = useDocumentPublishStore((s) => s.setSlugOverride);
-  const [draftSlug, setDraftSlug] = useState(slugOverride);
-  const snapshotRef = useRef(slugOverride);
+  const isPublished = publishedSlug != null;
+  const initialSlug = isPublished ? publishedSlug : slugOverride;
+  const [draftSlug, setDraftSlug] = useState(initialSlug);
+  const snapshotRef = useRef(initialSlug);
   const inputRef = useRef<HTMLInputElement>(null);
+  const feedback = useSaveFeedback();
+  const leave = useMobileDrawerLeave();
 
   useEffect(() => {
-    snapshotRef.current = slugOverride;
-    setDraftSlug(slugOverride);
+    snapshotRef.current = initialSlug;
+    setDraftSlug(initialSlug);
     // Snapshot draft only when this view mounts (AnimatePresence unmounts on exit).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isBusy =
+    feedback.inFlight ||
+    feedback.state === "saving" ||
+    feedback.state === "saved";
+  const draftTrimmed = draftSlug.trim();
+  const nextSlug = draftTrimmed ? slugifyTitle(draftTrimmed) : "";
+  const unchanged =
+    isPublished && (nextSlug.length === 0 || nextSlug === publishedSlug);
+
   const leaveEditUrl = (commit: boolean) => {
+    if (isBusy) return;
+    if (isPublished) {
+      onBack();
+      return;
+    }
     if (commit) {
       setSlugOverride(draftSlug);
       onDone();
-    } else {
-      setSlugOverride(snapshotRef.current);
-      onBack();
+      return;
+    }
+    setSlugOverride(snapshotRef.current);
+    onBack();
+  };
+
+  const savePublishedUrl = async () => {
+    if (!isPublished || isBusy || unchanged) {
+      if (unchanged && !isBusy) leave(onBack);
+      return;
+    }
+    if (!draftTrimmed) return;
+
+    feedback.start();
+    const ok = await savePublicationSlug(draftTrimmed);
+    await feedback.settle(ok ? "saved" : "failed");
+    if (ok) {
+      setSlugOverride("");
+      feedback.runAfterResult(() => {
+        leave(onDone);
+      }, SAVE_FEEDBACK_SETTLE_MS);
     }
   };
 
   return (
     <MobileDrawerFieldView
       title="Edit URL"
-      helperText="URL changes apply after you publish."
-      disabled={busy}
+      helperText={
+        isPublished
+          ? "Changes the public link for this article."
+          : "This URL is used when you publish."
+      }
+      doneLabel={
+        isPublished ? (
+          <SaveFeedbackLabel
+            state={feedback.state}
+            idleLabel="Save"
+            savingLabel="Saving"
+            savedLabel="Saved"
+          />
+        ) : (
+          "Done"
+        )
+      }
+      disabled={busy || feedback.inFlight || feedback.state === "saving"}
+      doneDisabled={
+        isPublished
+          ? busy || isBusy || !draftTrimmed || unchanged
+          : busy
+      }
+      doneClassName={isPublished && isBusy ? "disabled:opacity-100" : undefined}
+      dismissKeyboardOnDone={!isPublished}
       onBack={() => leaveEditUrl(false)}
-      onDone={() => leaveEditUrl(true)}
+      onDone={() => {
+        if (isPublished) {
+          void savePublishedUrl();
+          return;
+        }
+        leaveEditUrl(true);
+      }}
     >
       <div className="grid min-w-0 gap-2">
         {buildUrlSlugCluster("mobile", {
           value: draftSlug,
           onChange: setDraftSlug,
           inputRef,
+          disabled: busy || feedback.inFlight || feedback.state === "saving",
         })}
       </div>
       {!ownerPreview ? (
@@ -394,6 +472,8 @@ export function DocumentPublishMobileDrawer({
               buildUrlSlugCluster={ctx.buildUrlSlugCluster}
               ownerPreview={ctx.ownerPreview}
               busy={ctx.busy}
+              publishedSlug={ctx.publication?.slug ?? null}
+              savePublicationSlug={ctx.savePublicationSlug}
               onBack={stage.returnToMainView}
               onDone={stage.returnToMainView}
             />
