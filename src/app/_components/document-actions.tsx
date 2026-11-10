@@ -128,11 +128,7 @@ export function DocumentActions() {
       return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
           <span
-            className={
-              isOutOfDate
-                ? "size-2 shrink-0 rounded-full bg-amber-500 ring-2 ring-background"
-                : "size-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-background"
-            }
+            className="size-2 shrink-0 rounded-full bg-emerald-500"
             aria-hidden
           />
           <span>

@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
-  CloudUpload,
   ExternalLink,
   BookOpen,
   Check,
@@ -13,6 +12,7 @@ import {
   GlobeOff,
   Link as LinkIcon,
   Loader2,
+  RefreshCw,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -92,10 +92,16 @@ function MobilePublishActionRow({
     showPublishedPopoverActions,
   } = ctx;
 
+  const idleIcon = showPublishedPopoverActions
+    ? hasChangesToPublish
+      ? RefreshCw
+      : Check
+    : Globe;
+
   return (
     <MobileActionFeedbackRow
       state={publishFeedbackToSaveState(publishFeedback)}
-      idleIcon={CloudUpload}
+      idleIcon={idleIcon}
       failedIcon={X}
       idleLabel={
         showPublishedPopoverActions
