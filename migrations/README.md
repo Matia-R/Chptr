@@ -26,3 +26,5 @@ Older tables in your project may have been created before this repo’s filename
 | `purge_expired_trash.sql` | 30-day hard delete: `purge_expired_trash()`, id-only audit log, `pg_cron` job |
 | `purge_expired_trash_batch.sql` | Hourly, 1,000 expired documents per run. Raise the cron frequency later if trash volume needs a faster drain. |
 | `documents_trashed_deleted_at_idx.sql` | Partial index on trashed `documents.deleted_at` — **not** via `apply_migration` |
+| `waitlist_signups.sql` | Landing-page waitlist: email and signup time. Insert-only for `service_role`, no API read access |
+| `reserve_privacy_handle.sql` | Reserves the `privacy` handle for the `/privacy` route |

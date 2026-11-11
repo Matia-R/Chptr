@@ -88,7 +88,8 @@ VALUES
   ('welcome'),
   ('onboarding'),
   ('error'),
-  ('auth')
+  ('auth'),
+  ('privacy')
 ON CONFLICT (handle) DO NOTHING;
 
 ALTER TABLE public.reserved_handles ENABLE ROW LEVEL SECURITY;
