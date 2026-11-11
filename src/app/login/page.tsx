@@ -17,10 +17,7 @@ import {
 import { Input } from "../_components/input";
 import { PasswordInput } from "../_components/password-input";
 import { SaveFeedbackLabel } from "../_components/save-feedback-label";
-import {
-  SAVE_FEEDBACK_SETTLE_MS,
-  useSaveFeedback,
-} from "~/hooks/use-save-feedback";
+import { useSaveFeedback } from "~/hooks/use-save-feedback";
 import { formSpacing } from "~/lib/form-spacing";
 import { cn } from "~/lib/utils";
 import { useRouter } from "next/navigation";
@@ -66,11 +63,9 @@ export default function LoginPage() {
         return;
       }
 
-      await feedback.settle("saved");
-      window.setTimeout(() => {
-        router.push(result.redirectTo!);
-        router.refresh();
-      }, SAVE_FEEDBACK_SETTLE_MS);
+      // Keep the spinner up until navigation replaces this page.
+      router.push(result.redirectTo!);
+      router.refresh();
     } catch {
       setAuthError("Couldn't log in. Try again.");
       await feedback.settle("failed");
@@ -166,7 +161,6 @@ export default function LoginPage() {
                   state={feedback.state}
                   idleLabel="Log in"
                   savingLabel="Logging in"
-                  savedLabel="Logged in"
                 />
               </Button>
               <div className="w-full items-start text-left text-sm text-muted-foreground">
