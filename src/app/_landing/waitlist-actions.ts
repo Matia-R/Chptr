@@ -42,14 +42,37 @@ function isRateLimited(key: string): boolean {
   return entry.count > MAX_ATTEMPTS;
 }
 
+/**
+ * Address for rate limiting. Prefer headers the edge sets (not the caller).
+ * Never use the first x-forwarded-for hop — that value is client-controlled
+ * when a proxy appends rather than replaces the header.
+ */
 async function clientAddress(): Promise<string> {
   const requestHeaders = await headers();
-  const forwarded = requestHeaders
-    .get("x-forwarded-for")
+
+  const vercel = requestHeaders
+    .get("x-vercel-forwarded-for")
     ?.split(",")[0]
     ?.trim();
+  if (vercel) return vercel;
+
+  const cloudflare = requestHeaders.get("cf-connecting-ip")?.trim();
+  if (cloudflare) return cloudflare;
+
   const realIp = requestHeaders.get("x-real-ip")?.trim();
-  return forwarded ? forwarded : realIp ? realIp : "anonymous";
+  if (realIp) return realIp;
+
+  const forwarded = requestHeaders.get("x-forwarded-for");
+  if (forwarded) {
+    const hops = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const edgeHop = hops[hops.length - 1];
+    if (edgeHop) return edgeHop;
+  }
+
+  return "anonymous";
 }
 
 export async function joinWaitlist(input: unknown): Promise<JoinWaitlistResult> {
