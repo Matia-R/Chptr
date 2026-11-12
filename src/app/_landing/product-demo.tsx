@@ -142,6 +142,11 @@ function DemoBody({ frame }: { frame: DemoFrame }) {
           ) : null}
         </p>
       </div>
+      {DEMO_DOCUMENT.continuation.map((paragraph) => (
+        <div key={paragraph} className="article-block hidden lg:block">
+          <p>{paragraph}</p>
+        </div>
+      ))}
     </div>
   );
 }

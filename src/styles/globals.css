@@ -173,6 +173,21 @@ html.dark[data-drawer-chrome-sampler] {
   background-color: #050505;
 }
 
+/*
+ * Landing / marketing pages that use bg-sidebar (see setSurfaceChrome).
+ * Paint html/body so overscroll and edge sampling match the page — no fixed
+ * strips, which would sit on top of content while scrolling.
+ */
+html[data-surface-chrome="sidebar"],
+html[data-surface-chrome="sidebar"] body {
+  background-color: #f8f7f6;
+}
+
+html.dark[data-surface-chrome="sidebar"],
+html.dark[data-surface-chrome="sidebar"] body {
+  background-color: #242424;
+}
+
 /* display:none when idle — opacity:0 still gets sampled by Safari 26. */
 [data-overlay-chrome-sampler] {
   display: none;

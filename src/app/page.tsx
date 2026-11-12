@@ -1,11 +1,20 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 
 import { ProductDemo } from "./_landing/product-demo";
+import { SidebarSurfaceChrome } from "./_landing/surface-chrome";
 import { WaitlistForm } from "./_landing/waitlist-form";
 
 const DESCRIPTION =
-  "A beautiful place to create, refine, and share your ideas.";
+  "A thoughtful place to create, refine, and share your ideas.";
+
+/** Matches bg-sidebar so iOS Safari chrome isn't pure white against the page. */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f7f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#242424" },
+  ],
+};
 
 export const metadata: Metadata = {
   title: "Chptr — Your space to write and publish",
@@ -27,24 +36,25 @@ export default function Home() {
      * to the right edge of the page, and the demo is centred in them, so the
      * space on either side of it stays equal.
      */
-    <div className="flex min-h-dvh flex-col bg-sidebar px-6 sm:px-10 lg:grid lg:grid-cols-[minmax(3rem,1fr)_23rem_minmax(0,57rem)_minmax(3rem,1fr)] lg:grid-rows-[auto_1fr_auto] lg:px-0 xl:grid-cols-[minmax(3rem,1fr)_26rem_minmax(0,54rem)_minmax(3rem,1fr)]">
-      <header className="shrink-0 pt-5 lg:col-start-2 lg:row-start-1 lg:pt-8">
+    <div className="flex min-h-dvh flex-col bg-sidebar px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:px-10 lg:grid lg:grid-cols-[minmax(3rem,1fr)_23rem_minmax(0,57rem)_minmax(3rem,1fr)] lg:grid-rows-[auto_1fr_auto] lg:px-0 xl:grid-cols-[minmax(3rem,1fr)_26rem_minmax(0,54rem)_minmax(3rem,1fr)]">
+      <SidebarSurfaceChrome />
+      <header className="shrink-0 pt-6 lg:col-start-2 lg:row-start-1 lg:pt-8">
         <p className="font-lora text-3xl font-medium tracking-tight">Chptr</p>
       </header>
 
       {/*
-       * Mobile keeps justify-start so free space cannot open under the logo.
-       * Desktop uses lg:contents and ignores this flex context.
+       * Mobile: editorial rhythm with room to scroll to the demo. Desktop uses
+       * lg:contents and ignores this flex context entirely.
        */}
-      <main className="flex flex-1 flex-col justify-start gap-10 pb-10 pt-6 sm:gap-14 sm:pb-12 sm:pt-12 lg:contents">
+      <main className="flex flex-1 flex-col justify-start gap-16 pb-16 pt-16 sm:gap-20 sm:pb-20 sm:pt-20 lg:contents">
         <section className="max-w-xl lg:col-start-2 lg:row-start-2 lg:self-center lg:py-10">
           <h1 className="text-balance font-lora text-5xl font-medium leading-[1.05] tracking-tight sm:text-6xl xl:text-7xl xl:leading-[1.02]">
             Your space to write and publish.
           </h1>
-          <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">
+          <p className="mt-8 max-w-md text-lg leading-relaxed text-muted-foreground lg:mt-6">
             {DESCRIPTION}
           </p>
-          <div className="mt-6 max-w-md sm:mt-10">
+          <div className="mt-10 max-w-md">
             <WaitlistForm />
           </div>
         </section>

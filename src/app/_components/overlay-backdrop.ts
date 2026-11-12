@@ -22,6 +22,13 @@ const DEFAULT_THEME_COLORS: Record<ThemeColorScheme, string> = {
   default: "#ffffff",
 };
 
+/** Matches `bg-sidebar` / --sidebar-background (30 14% 97% / 0 0% 14%). */
+const SIDEBAR_THEME_COLORS: Record<ThemeColorScheme, string> = {
+  light: "#f8f7f6",
+  dark: "#242424",
+  default: "#f8f7f6",
+};
+
 const OVERLAY_THEME_COLORS: Record<ThemeColorScheme, string> = {
   light: "#333333",
   dark: "#050505",
@@ -82,8 +89,14 @@ function setThemeColors(colors: Record<ThemeColorScheme, string>) {
   active.content = colors[activeThemeScheme()];
 }
 
+function restingThemeColors(): Record<ThemeColorScheme, string> {
+  return document.documentElement.dataset.surfaceChrome === "sidebar"
+    ? SIDEBAR_THEME_COLORS
+    : DEFAULT_THEME_COLORS;
+}
+
 function setDefaultThemeColors() {
-  setThemeColors(DEFAULT_THEME_COLORS);
+  setThemeColors(restingThemeColors());
 }
 
 function setOverlayThemeColors() {
@@ -103,6 +116,20 @@ function clearOverlayChrome() {
   delete document.documentElement.dataset.overlayOpen;
   delete document.documentElement.dataset.drawerChromeSampler;
   setDefaultThemeColors();
+}
+
+/**
+ * Resting safe-area chrome for surfaces that aren't `bg-background`.
+ * Landing pages use "sidebar" so iOS Safari matches `bg-sidebar`.
+ */
+export function setSurfaceChrome(surface: "sidebar" | null) {
+  const html = document.documentElement;
+  if (surface) {
+    html.dataset.surfaceChrome = surface;
+  } else {
+    delete html.dataset.surfaceChrome;
+  }
+  refreshOverlayChrome();
 }
 
 /** Drive iOS safe-area chrome — instant snap, separate from scrim opacity. */

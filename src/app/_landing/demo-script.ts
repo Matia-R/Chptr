@@ -28,6 +28,14 @@ export const DEMO_DOCUMENT = {
   /** Typed by the author while the demo plays. */
   typed:
     "Most mornings, a page is enough. Some mornings it turns into something worth sharing.",
+  /**
+   * Extra body copy shown beside the hero. Hidden on the stacked mobile card
+   * so the preview stays a manageable height.
+   */
+  continuation: [
+    "The hard part is not finding the words. It is leaving the rest of the day outside the room long enough to hear them arrive.",
+    "When a draft finally feels finished, publishing it is less a launch than a quiet handoff: the page leaves your desk and goes looking for a reader.",
+  ],
 } as const;
 
 type DemoState = {

@@ -1,5 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+
+import { SidebarSurfaceChrome } from "~/app/_landing/surface-chrome";
+
+/** Matches bg-sidebar so iOS Safari chrome isn't pure white against the page. */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f7f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#242424" },
+  ],
+};
 
 export const metadata: Metadata = {
   title: "Privacy — Chptr",
@@ -8,7 +18,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-sidebar px-6 sm:px-10 lg:px-12">
+    <div className="flex min-h-dvh flex-col bg-sidebar px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:px-10 lg:px-12">
+      <SidebarSurfaceChrome />
       <header className="mx-auto w-full max-w-7xl shrink-0 pt-6 lg:pt-8">
         <Link
           href="/"
