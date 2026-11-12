@@ -10,12 +10,12 @@ export const DEMO_DOCUMENT = {
   font: "lora",
   publishedAt: "2026-11-05T10:00:00.000Z",
   author: {
-    username: "elena",
-    author_name: "Elena Marsh",
-    avatar_url: null,
+    username: "matia",
+    author_name: "Matia Raspopovic",
+    avatar_url: "/landing/matia.jpg",
     default_avatar_background_color: "yellow",
   },
-  collaborator: { name: "Theo", color: getAvatarColorHex("indigo") },
+  collaborator: { name: "Mya", color: getAvatarColorHex("indigo") },
   opening:
     "There is a particular kind of silence before the day begins. The kettle hums, the window brightens, and for a little while nothing is asked of you.",
   /** The collaborator swaps `original` for `revised`. */
