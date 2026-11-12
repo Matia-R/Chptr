@@ -25,6 +25,11 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Chptr — Your space to write and publish",
+    description: DESCRIPTION,
+  },
 };
 
 export default function Home() {
