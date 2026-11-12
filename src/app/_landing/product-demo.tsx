@@ -311,7 +311,7 @@ export function ProductDemo({ className }: { className?: string }) {
       <div
         role="img"
         aria-label="The Chptr editor: a draft is written, a collaborator makes an edit, and the document is published as an article."
-        className="pointer-events-none relative select-none overflow-hidden rounded-xl border bg-background shadow-sm lg:min-h-[24rem] lg:flex-1 lg:rounded-b-none lg:rounded-t-2xl lg:border-b-0 lg:shadow-[0_8px_32px_rgba(0,0,0,0.12)] lg:dark:shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+        className="pointer-events-none relative select-none overflow-hidden rounded-xl border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45)] lg:min-h-[24rem] lg:flex-1 lg:rounded-b-none lg:rounded-t-2xl lg:border-b-0"
       >
         {/*
          * Gives the card its height: an unseen copy of the finished article.
