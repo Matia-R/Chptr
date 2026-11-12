@@ -21,6 +21,7 @@ export const RESERVED_HANDLES = [
   "onboarding",
   "error",
   "auth",
+  "privacy",
 ] as const;
 
 const HANDLE_PATTERN = /^[a-z0-9_-]+$/;

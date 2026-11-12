@@ -2,8 +2,17 @@ import type { NextRequest, NextResponse } from "next/server";
 
 import { RESERVED_HANDLES } from "~/lib/author-handle";
 
-/** First path segment reserved for app routes (not `/:user/:slug` published docs). */
-const RESERVED_FIRST_SEGMENTS = new Set<string>(RESERVED_HANDLES);
+/**
+ * App namespaces that are never published docs. Marketing-only reserved handles
+ * (e.g. `privacy` → `/privacy`) stay in RESERVED_HANDLES so new authors cannot
+ * claim them, but `/:handle/:slug` under those names still gets CSP — a legacy
+ * publication must not lose security headers because the handle was reserved.
+ */
+const MARKETING_ONLY_RESERVED = new Set<string>(["privacy"]);
+
+const RESERVED_FIRST_SEGMENTS = new Set<string>(
+  RESERVED_HANDLES.filter((handle) => !MARKETING_ONLY_RESERVED.has(handle)),
+);
 
 /**
  * Published docs are a React tree from the stored blocks. Author text is

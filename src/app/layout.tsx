@@ -12,6 +12,7 @@ import {
 } from "next/font/google";
 import { type Metadata, type Viewport } from "next";
 
+import { PUBLIC_SITE_HOST } from "~/lib/public-url";
 import { TRPCReactProvider } from "~/trpc/react";
 import { AuthSessionListener } from "./_components/auth-session-listener";
 import { OverlayThemeSync } from "./_components/overlay-theme-sync";
@@ -71,6 +72,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // Resolves relative openGraph/canonical URLs (e.g. landing "/") to absolute.
+  metadataBase: new URL(`https://${PUBLIC_SITE_HOST}`),
   title: "Chptr",
   description: "A powerful app to develop and share your ideas",
   icons: {
